@@ -103,6 +103,13 @@ textarea {
   color: #ffffff;
 }
 
+.nav-list a:focus-visible {
+  outline: 2px solid #21d47b;
+  outline-offset: 2px;
+  background: rgba(33, 212, 123, 0.12);
+  color: #ffffff;
+}
+
 .nav-icon {
   display: grid;
   place-items: center;
@@ -173,6 +180,14 @@ textarea {
   color: #06120c;
 }
 
+.primary-link:focus-visible,
+.secondary-link:focus-visible,
+.api-status:focus-visible {
+  outline: 2px solid #0f172a;
+  outline-offset: 3px;
+  box-shadow: 0 0 0 4px rgba(33, 212, 123, 0.22);
+}
+
 .hero-actions {
   display: flex;
   flex-wrap: wrap;
@@ -185,6 +200,11 @@ textarea {
   border-color: rgba(255, 255, 255, 0.2);
   background: rgba(255, 255, 255, 0.08);
   color: #ffffff;
+}
+
+.secondary-link.inverse:focus-visible {
+  outline-color: #21d47b;
+  box-shadow: 0 0 0 4px rgba(33, 212, 123, 0.28);
 }
 
 .page-frame {

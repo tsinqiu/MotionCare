@@ -47,6 +47,11 @@ function displayActivityType(value) {
   return ACTIVITY_TYPE_LABELS[value] || value || '--'
 }
 
+function paceToSpeedMps(value) {
+  const pace = toNumber(value)
+  return pace && Number.isFinite(pace) && pace > 0 ? 1000 / pace : null
+}
+
 function normalizeCollection(value, normalizer) {
   if (Array.isArray(value)) {
     return value.map(normalizer)
@@ -99,7 +104,7 @@ function normalizeActivity(row = {}) {
   const avgSpeedMps = firstDefined(
     row.avg_speed_mps,
     row.avgSpeedMps,
-    row.avgPaceSecPerKm ? 1000 / row.avgPaceSecPerKm : null,
+    paceToSpeedMps(row.avgPaceSecPerKm),
   )
 
   return {

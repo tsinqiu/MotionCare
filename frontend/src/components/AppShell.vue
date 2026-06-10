@@ -25,7 +25,7 @@
           <h1>{{ route.meta.title || '运动数据分析' }}</h1>
         </div>
         <div class="topbar-actions">
-          <span class="api-status">Mock 数据</span>
+          <span class="api-status">{{ apiStatus }}</span>
         </div>
       </header>
 
@@ -45,8 +45,10 @@
 import { useRoute } from 'vue-router'
 
 import ApiModeBanner from '@/components/ApiModeBanner.vue'
+import { useMockData } from '@/services/http'
 
 const route = useRoute()
+const apiStatus = useMockData() ? 'Mock 数据' : '后端 API'
 
 const navItems = [
   { to: '/', label: '首页概览', icon: '01' },

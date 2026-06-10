@@ -57,7 +57,7 @@ const distanceLabel = computed(() => formatDistance(props.activity.total_distanc
 const durationLabel = computed(() => formatDuration(props.activity.total_timer_time_s))
 const speedTitle = computed(() => (props.activity.activity_type === '骑行' ? '速度' : '配速'))
 const speedLabel = computed(() => {
-  if (!props.activity.avg_speed_mps) return `${props.activity.total_calories || 0} kcal`
+  if (!props.activity.avg_speed_mps) return '--'
   if (props.activity.activity_type === '骑行') return `${(props.activity.avg_speed_mps * 3.6).toFixed(1)} km/h`
   return formatPace(props.activity.avg_speed_mps)
 })

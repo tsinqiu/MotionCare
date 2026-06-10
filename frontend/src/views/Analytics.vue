@@ -34,7 +34,7 @@
           <strong>{{ item.activity_type }}</strong>
           <span>{{ item.activity_count }} 次</span>
           <span>{{ formatDistance(item.total_distance_m) }}</span>
-          <span>{{ Math.round(item.avg_heart_rate_bpm) }} bpm</span>
+          <span>{{ formatAverageHeartRate(item.avg_heart_rate_bpm) }}</span>
         </article>
       </div>
     </section>
@@ -53,6 +53,10 @@ import { formatDistance } from '@/utils/formatters'
 
 const { data, error, load, loading } = useAsyncData(getActivityTypeStats)
 const stats = computed(() => data.value || [])
+
+function formatAverageHeartRate(value) {
+  return Number.isFinite(value) ? `${Math.round(value)} bpm` : '--'
+}
 
 const typeOption = computed(() => ({
   color: ['#21d47b', '#2563eb', '#0f172a'],

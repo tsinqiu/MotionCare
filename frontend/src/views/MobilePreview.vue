@@ -395,13 +395,13 @@ const activeMetric = computed(() => metricTiles.find((metric) => metric.id === s
 
 const healthItems = [
   { label: '静息心率', value: '44 bpm', icon: Heart },
-  { label: 'HRV 状态', value: 'hrv_status_unbalanced', icon: Activity },
+  { label: 'HRV 状态', value: '不平衡', icon: Activity },
   { label: '身体电量', value: '79%', icon: Battery, progress: '79%' },
   { label: '睡眠分数', value: '68', icon: Bed, progress: '68%' },
   { label: '最大摄氧量 (跑步)', value: '64.0', icon: TrendingUp },
   { label: '乳酸阈值心率', value: '184 bpm', icon: Heart },
   { label: '恢复时间', value: '--', icon: Timer },
-  { label: '身体重量', value: '79%', icon: Weight },
+  { label: '身体重量', value: '65 kg', icon: Weight },
 ]
 
 const calendarDays = Array.from({ length: 35 }, (_, index) => {
