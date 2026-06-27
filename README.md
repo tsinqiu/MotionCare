@@ -1,180 +1,107 @@
-# Garmin 运动数据分析数据库系统
+MotionCare
+MotionCare 是一个基于可穿戴设备运动数据的运动状态分析与训练建议系统。
+本项目由原数据库课程大作业 Motion_Analysis 继续迭代而来。原项目已经完成 Garmin FIT / JSON 数据导入、MySQL 关系建模、Express 后端 API、Vue 前端展示和基础统计分析。当前仓库将其升级为软件综合设计项目，转向面向用户的运动健康软件。
+项目希望解决的问题是：用户在长期运动过程中，如何看懂自己的运动状态、训练负荷和恢复情况，并获得更合理的训练建议。同时，系统也考虑账号、轨迹、健康指标等个人数据的安全保护。
 
-本项目是数据库课程大作业，主题为：
+1. 项目定位
+MotionCare 面向跑步、骑行等运动场景的用户，围绕 Garmin 等可穿戴设备采集的运动数据与用户上传的身高，体重等其他数据，提供运动记录、状态分析、训练负荷、AI 教练建议和安全防护能力。
+系统关注运动训练场景中的疲劳状态、负荷变化和恢复建议，用于辅助用户安排训练。
+项目完整题目
+基于可穿戴设备数据的运动疲劳风险预警与智能训练干预系统
+产品侧名称
+MotionCare
+产品界面中尽量使用简短自然的名称，例如“今日”“运动”“状态”“教练”“我的”，避免把“风险预警”“智能干预”等报告语言直接放到用户界面上。
 
-> 基于 Garmin 可穿戴设备数据的运动健康分析数据库系统设计与实现
+2. 项目来源与迭代目标
+本仓库 fork 自原数据库大作业仓库，并在其基础上继续开发。
+V1：数据库课程设计基础
+原项目已经完成：
+● Garmin FIT / JSON 运动数据解析与导入
+● MySQL 数据库 MotionAnalysis 建模
+● 活动、轨迹点、分段、心率、速度、训练负荷等数据存储
+● Node.js + Express 后端 API
+● Vue 3 + Vite 前端页面
+● 注册登录、运动记录、运动详情、统计分析、日历、最佳记录
+● Garmin 同步、社区、探索、设置、开始运动等扩展功能
+● AI 助手与训练负荷分析的初步实现
+V2：软件综合设计升级方向
+当前仓库重点升级为：
+● 贴近真实 App 的产品结构，UI 及整体结构对用户友好，借鉴 Keep 的优点，远离 AI 版本的粗糙
+● 今日状态与训练建议
+● 训练负荷与恢复状态分析
+● 单次运动分析与风险提示
+● AI 教练建议
+● 用户目标管理
+● 账号安全、防暴力破解、接口权限控制和服务器安全设计
+● Web App / PWA / 移动端适配方向
 
-系统围绕 Garmin 手表采集的跑步、骑行等运动数据，完成数据导入、关系型数据库设计、后端 API 封装和前端可视化展示。项目采用前后端分离结构，前端不直接连接 MySQL，而是通过后端 API 获取数据。
+3. 系统架构
+已实现部分同数据库大作业，未实现部分不做束缚。
 
-当前 `main` 分支已作为大作业稳定基础版本V1.0，后续只做小功能补充、文档整理、报告截图和演示优化。
+4. 技术栈
+已实现部分同数据库大作业，未实现部分不做束缚。
 
----
+5. 核心功能
+5.1 今日
+首页面向用户展示当天最关心的信息：
+● 今日状态
+● 最近运动
+● 本月运动概览
+● 训练负荷摘要
+● AI 智能运动简报
+● 今日训练建议
+界面文案尽量采用用户能直接理解的表达，例如“今天宜轻松训练”“最近疲劳略高”“建议安排恢复日”，禁止直接堆技术术语和加一堆小字注释。
+5.2 运动
+运动记录模块用于查看用户历史运动数据：
+● 活动列表
+● 运动类型筛选
+● 日期范围筛选
+● 排序与分页
+● 单次运动详情
+● 轨迹点、心率、速度、分段和区间数据展示
+● 支持分享功能：通过保存为图片实现
+5.3 状态
+状态模块用于分析长期训练变化：
+● 训练负荷
+● 体能 CTL
+● 疲劳 ATL
+● 恢复状态 TSB
+● 心率趋势
+● 距离、时长、消耗、VO2max 等指标趋势
+● 运动日历和月度统计
+技术上可以使用 CTL、ATL、TSB 等指标，但产品界面中优先展示为“体能”“疲劳”“恢复”“近期状态”。
+5.4 教练
+教练模块基于用户近期运动数据提供建议：
+● 今日是否适合训练
+● 下一次训练如何安排
+● 最近训练负荷是否偏高
+● 单次运动后的恢复建议
+● 基于规则或 ML 模型的和 AI 的简短回答
+5.5 目标
+目标模块用于形成训练闭环：
+● 每周运动次数目标
+● 每周跑量目标
+● 每月运动时长目标
+● 恢复日目标
+● 目标完成度统计
+目标管理使系统不只停留在“展示历史数据”，而是能够帮助用户安排后续训练。
+5.6 安全
+安全部分面向账号、接口和服务器防护：
+● 密码 bcrypt 哈希存储
+● JWT 鉴权
+● 管理员与普通用户角色区分
+● 用户数据归属校验
+● 登录失败记录与防暴力破解
+● 安全事件日志
+● API 对象级权限控制
+● 轨迹起终点隐私保护
+● .env、token、原始数据和服务器密钥不提交
+● 部署时 MySQL 不暴露公网
 
-## 1. 项目状态
-
-- [x] 完成 GitHub 仓库初始化与三人协作分支划分。
-- [x] 完成 MySQL 数据库 `MotionAnalysis` 的核心表结构设计。
-- [x] 完成 Garmin FIT / JSON 数据导入脚本与查询脚本。
-- [x] 完成 Node.js + Express 后端 API 服务。
-- [x] 完成 Vue 3 + Vite 前端页面与真实后端 API 对接。
-- [x] 完成注册登录、活动查询、运动统计、同步中心、社区、探索、设置、手动上传、开始运动等主要功能。
-- [x] 已将阶段性开发成果合并至 `main`，作为 V1.0 稳定版本。
-- [x] 26.6.14中午，从dev合并到main作为PPT的版本,V1.1为冻结版本，用于最终展示的素材来源
-- [x] 26.6.19正式完成
-
-后续重点：
-
-- [x] 整理 ER 图、数据字典和报告素材。
-- [x] 补充系统运行截图、前后端接口截图、典型 SQL 查询截图。
-- [x] 根据答辩展示需要微调页面文案和小功能 etc.
-
----
-
-## 2. 系统架构
-
-```text
-Garmin 手表 / Garmin Connect
-        ↓
-FIT / JSON 数据下载与解析
-        ↓
-MySQL 数据库 MotionAnalysis
-        ↓
-Node.js + Express 后端 API
-        ↓
-Vue 3 前端页面
-        ↓
-运动数据分析与可视化展示
-````
-
-系统分为三层：
-
-```text
-frontend/   前端页面与可视化
-backend/    后端 API、鉴权、业务逻辑
-database/   数据库结构、导入脚本、查询脚本
-```
-
-基本原则：
-
-* 前端只调用后端 API，不直接连接 MySQL。
-* 后端负责数据库访问、鉴权、数据封装和业务逻辑。
-* 数据库结构通过 SQL 脚本维护。
-* 真实 Garmin 原始数据、token、`.env`、数据库导出大文件不提交到 GitHub。
-
----
-
-## 3. 技术栈
-
-### 前端
-
-* Vue 3
-* Vite
-* Vue Router
-* Axios
-* ECharts
-* @lucide/vue
-
-### 后端
-
-* Node.js
-* Express
-* mysql2
-* JWT
-* bcryptjs
-* multer
-* dotenv
-
-### 数据库
-
-* MySQL 9.x
-* InnoDB
-* utf8mb4
-* 主键、外键、唯一约束、索引
-* 多表关联查询与聚合统计
-
-### 数据处理
-
-* Python
-* Garmin FIT / JSON 解析
-* Garmin Connect 同步脚本
-* 可选 Running 模型分析拓展
-
-### 协作
-
-* Git
-* GitHub
-* 分支：`main`、`dev`、`feature/frontend`、`feature/backend`、`feature/database`
-
----
-
-## 4. 项目目录结构
-
-```text
-Motion_Analysis/
-│
-├─ frontend/                 # Vue 前端工程
-│  ├─ src/
-│  ├─ public/
-│  ├─ package.json
-│  ├─ .env.example
-│  └─ README.md
-│
-├─ backend/                  # Node Express 后端工程
-│  ├─ src/
-│  ├─ scripts/
-│  ├─ docs/
-│  ├─ ml/
-│  ├─ package.json
-│  ├─ .env.example
-│  └─ README.md
-│
-├─ database/                 # 数据库结构、导入脚本和查询脚本
-│  ├─ scripts/
-│  │  ├─ download_garmin_connect.py
-│  │  ├─ import_fit_files.py
-│  │  └─ import_to_mysql.ps1
-│  ├─ sql/
-│  │  ├─ 01_schema.sql
-│  │  ├─ 03_queries.sql
-│  │  ├─ 04_auth_manual_upload.sql
-│  │  ├─ 05_performance_indexes.sql
-│  │  ├─ 06_extension_modules.sql
-│  │  └─ 07_profile_follow_explore_uploads.sql
-│  ├─ requirements.txt
-│  └─ README.md
-│
-├─ docs/                     # 报告素材、ER 图、说明文档
-│  └─ README.md
-│
-├─ .gitignore
-└─ README.md                 # 项目总说明
-```
-
-本地生成但不提交的路径：
-
-```text
-database/data/
-database/.garmin_tokens/
-database/sql/02_import_data.sql
-backend/ml/models/
-.env
-node_modules/
-dist/
-```
-
----
-
-## 5. 数据库说明
-
+6. 数据库说明
 当前数据库名：
-
-```text
 MotionAnalysis
-```
-
 核心数据表包括：
-
-```text
 Users
 SourceFiles
 Activities
@@ -187,85 +114,27 @@ TrackPoints
 Events
 Metrics
 FitMessages
-```
-
 其中：
+● Users 保存用户账号、角色和状态。
+● Activities 保存运动活动主记录。
+● ActivitySummaries 保存距离、时长、心率、训练负荷、VO2max、步频、步幅、爬升等摘要指标。
+● TrackPoints 保存逐点轨迹、速度、心率、步频、功率等时序数据。
+● Laps 保存分段数据。
+● ActivityZones 保存心率区间、功率区间等统计信息。
+● SourceFiles 和 ActivitySourceFiles 用于追踪 FIT / JSON 来源文件。
+● Metrics 和 FitMessages 用于保存扩展指标和 FIT 原始消息。
+后续计划新增或强化：
+RiskAssessments        运动状态与风险评估结果
+UserGoals              用户训练目标
+TrainingInterventions  训练建议与干预记录
+LoginAttempts          登录失败记录
+SecurityEvents         安全事件日志
 
-* `Activities` 保存运动活动主记录。
-* `ActivitySummaries` 保存运动摘要、训练负荷、心率、功率、步频、海拔等分析指标。
-* `TrackPoints` 保存逐点轨迹、速度、心率、步频、功率等时序数据。
-* `Laps` 保存分段数据。
-* `Sessions` 保存活动级 session 汇总。
-* `SourceFiles` 和 `ActivitySourceFiles` 用于追踪 FIT / JSON 来源文件。
-* `Users` 用于系统登录、用户归属和权限控制。
-
-数据库脚本说明：
-
-```text
-01_schema.sql                         建库建表、主外键、基础索引
-02_import_data.sql                    本地生成的数据导入脚本，不提交
-03_queries.sql                        典型查询与分析 SQL
-04_auth_manual_upload.sql             注册登录、用户归属、手动上传相关结构
-05_performance_indexes.sql            常用查询索引
-06_extension_modules.sql              同步、设置、社区、探索等扩展模块
-07_profile_follow_explore_uploads.sql 用户资料、关注、探索上传等扩展结构
-```
-
-首次导入建议顺序：
-
-```sql
-source database/sql/01_schema.sql;
-source database/sql/02_import_data.sql;
-source database/sql/03_queries.sql;
-source database/sql/04_auth_manual_upload.sql;
-source database/sql/05_performance_indexes.sql;
-source database/sql/06_extension_modules.sql;
-source database/sql/07_profile_follow_explore_uploads.sql;
-```
-
-如果是已有数据库，只补充后续模块时，可按需要单独执行 `04`、`05`、`06`、`07` 脚本。
-
----
-
-## 6. 后端说明
-
-后端目录：
-
-```text
-backend/
-```
-
-后端使用 Node.js + Express + mysql2，默认监听：
-
-```text
-http://127.0.0.1:8080
-```
-
-本地运行：
-
-```powershell
-cd backend
-npm install
-Copy-Item .env.example .env
-npm run dev
-```
-
-需要先在 `.env` 中配置本地 MySQL 用户名、密码、数据库名等信息。
-
-常用命令：
-
-```powershell
-npm run dev          # 开发模式启动
-npm start            # 普通启动
-npm run seed:admin   # 初始化管理员账号
-npm test             # 后端测试
-```
-
+7. API 说明
+已有部分如下，未实现的不做束缚。
+后端基础地址：
+http://localhost:8080/api
 主要接口包括：
-
-```text
-GET  /api/health
-
 POST /api/auth/register
 POST /api/auth/login
 GET  /api/auth/me
@@ -289,263 +158,125 @@ GET  /api/stats/personal-bests
 GET  /api/training/load-balance
 GET  /api/dashboard/overview
 
-POST /api/manual-activities
-GET  /api/manual-activities/:id
-PUT  /api/manual-activities/:id
-DELETE /api/manual-activities/:id
+GET  /api/ai/health
+POST /api/ai/chat
+GET  /api/ai/daily-brief
+POST /api/ai/activity-analysis
 
-GET  /api/sync/providers
-POST /api/sync/providers/:provider/authorize
-POST /api/sync/providers/:provider/disconnect
-POST /api/sync/jobs
-GET  /api/sync/jobs
-GET  /api/sync/logs
-
-GET  /api/community/posts
-POST /api/community/posts
-GET  /api/explore/articles
-GET  /api/settings
-PUT  /api/settings
-
-GET  /api/ml/health
 POST /api/ml/running-prediction
-```
+后续建议新增：
+GET  /api/risk/today
+GET  /api/risk/trend
+POST /api/risk/activities/:id/evaluate
+GET  /api/risk/activities/:id
 
-接口详细说明见：
+GET  /api/goals
+POST /api/goals
+PUT  /api/goals/:id
+DELETE /api/goals/:id
 
-```text
-backend/docs/api.md
-backend/docs/frontend-integration.md
-backend/docs/deployment.md
-```
+GET  /api/security/overview
+GET  /api/security/events
 
----
 
-## 7. 前端说明
 
-前端目录：
-
-```text
-frontend/
-```
-
-本地运行：
-
-```powershell
+9. 本地运行
+9.1 后端
+cd backend
+npm install
+Copy-Item .env.example .env
+npm run seed:admin
+npm run dev
+默认地址：
+http://127.0.0.1:8080
+需要先在 .env 中配置 MySQL 用户名、密码、数据库名、JWT_SECRET 等信息。
+9.2 前端
 cd frontend
 npm install
 Copy-Item .env.example .env
 npm run dev
-```
-
 默认地址：
-
-```text
 http://localhost:5173
-```
-
-构建检查：
-
-```powershell
-npm run build
-```
-
-Smoke Check：
-
-```powershell
-npm run dev -- --host 127.0.0.1
-npm run smoke
-```
-
 前端环境变量示例：
-
-```text
 VITE_API_BASE_URL=http://localhost:8080/api
 VITE_USE_MOCK=false
-```
-
 如果后端暂时不可用，可设置：
-
-```text
 VITE_USE_MOCK=true
-```
+9.3 数据库
+不做束缚
 
-主要页面：
+10. 部署方式
+同前
 
-```text
-/login                登录
-/register             注册
-/today                今日首页
-/activities           我的运动
-/activities/:id       运动详情
-/calendar             运动日历
-/trends               趋势分析
-/training-load        训练负荷
-/statistics           运动统计
-/records              最佳记录
-/sync                 同步中心
-/community            运动圈
-/explore              探索
-/settings             设置
-/start                开始运动
-/schema               数据库结构展示
-```
+11. 安全设计
+由于本系统处理用户账号、运动轨迹、心率、训练负荷和同步凭证等敏感信息，因此安全设计是软件综合设计的重要部分。
+11.1 密码安全
+● 用户密码不明文保存。
+● 使用 bcrypt 进行慢哈希存储。
+● 后续可增加 PASSWORD_PEPPER，将额外密钥保存在服务器环境变量中，降低数据库泄露后的离线破解风险。
+11.2 登录防护
+● 登录失败统一返回“邮箱或密码错误”，避免账号枚举。
+● 记录登录成功、失败和被限制的事件。
+● 对同一邮箱、同一 IP 的连续失败登录进行限流。
+● 防止暴力破解和撞库攻击。
+11.3 API 权限控制
+● 普通用户只能访问自己的运动记录和分析结果。
+● 管理员接口单独控制。
+● 所有涉及 activity_id 的接口都需要在服务端进行对象级权限校验。
+● 前端隐藏按钮不能代替后端鉴权。
+11.4 数据与服务器安全
+● 前端不保存 Garmin 密码、AI API Key、数据库账号等敏感信息。
+● Garmin 密码不入库。
+● Garmin token 存放在服务器本地安全目录。
+● MySQL 不暴露公网。
+● 生产环境通过 Nginx 转发 API。
+● 真实轨迹原始文件、数据库导出文件和服务器密钥不提交 GitHub。
+11.5 轨迹隐私
+运动轨迹可能暴露用户住址、学校、宿舍和常用路线，因此系统应默认保护地图隐私：
+● 默认隐藏起终点附近轨迹。
+● 分享或公开展示时不显示精确位置。
+● 可在设置中调整轨迹隐私级别。
 
----
+12. 软件综合设计重点
+方面	内容
+需求分析	运动用户希望了解状态、负荷、恢复和训练建议
+数据来源	Garmin 可穿戴设备真实运动数据
+前端设计	类 App 页面结构，强调用户体验
+后端设计	API、鉴权、权限控制、业务逻辑
+数据库设计	活动、轨迹、摘要、用户、安全日志等数据表
+分析算法	训练负荷、状态趋势、风险提示
+AI 辅助	基于运动摘要生成自然语言建议
+安全防护	密码哈希、登录限流、权限校验、服务器安全
+部署方案	Web App / PWA / 服务端部署
 
-## 8. Garmin 数据与同步
+13. 开发路线
+已完成
+● Garmin 数据导入与解析
+● MySQL 核心表结构
+● Express API 服务
+● Vue 前端页面
+● 注册登录与 JWT 鉴权
+● 运动记录与运动详情
+● 统计分析、日历、最佳记录
+● 训练负荷 CTL / ATL / TSB 分析
+● AI 助手和每日简报
+● 同步中心、社区、探索、设置等扩展页面
+软件综合设计阶段计划
+[ ] 调整产品命名和页面文案
+[ ] 移动端优先的页面布局优化
+[ ] 新增用户目标管理
+[ ] 强化训练负荷与状态页面
+[ ] 新增单次运动状态分析卡片
+[ ] 新增风险评估结果表
+[ ] 新增训练建议记录表
+[ ] 新增登录失败限制
+[ ] 新增安全事件日志
+[ ] 强化普通用户和管理员的数据权限隔离
+[ ] 增加 PWA 支持
+[ ] 整理软件综合设计报告和答辩素材
 
-系统支持两类 Garmin 数据来源：
-
-### 1. 本地批量导入
-
-本地准备 FIT / JSON 文件后，放入：
-
-```text
-database/data/fit
-database/data/json
-```
-
-然后执行：
-
-```powershell
-python database\scripts\import_fit_files.py
-```
-
-脚本会生成：
-
-```text
-database/sql/02_import_data.sql
-```
-
-该文件可能很大，并且包含真实运动数据，不提交到 GitHub。
-
-### 2. Garmin Connect 同步
-
-后端支持系统用户绑定 Garmin 账号，并通过同步接口导入新活动。
-
-注意：
-
-* Garmin 密码不入库。
-* token 文件保存在本地配置目录。
-* 不要把 `database/.garmin_tokens/` 提交到仓库。
-* 不建议本地和云端频繁同时同步同一个 Garmin 账号，避免触发限流。
-
-Python 依赖安装：
-
-```bash
-python3.12 -m pip install -r database/requirements.txt
-```
-
-生产环境建议使用 Python 3.12 或 3.13。
-
----
-
-## 9. 部署说明
-
-推荐部署结构：
-
-```text
-用户浏览器
-  ↓
-Nginx
-  ├─ 返回 frontend/dist 静态页面
-  └─ 将 /api 转发给 Node Express
-          ↓
-        MySQL MotionAnalysis
-```
-
-前端生产环境推荐：
-
-```text
-VITE_API_BASE_URL=/api
-VITE_USE_MOCK=false
-```
-
-后端生产环境建议：
-
-```text
-HOST=127.0.0.1
-PORT=8080
-DB_HOST=127.0.0.1
-DB_PORT=3306
-DB_NAME=MotionAnalysis
-```
-
-部署参考：
-
-```text
-backend/docs/deployment.md
-backend/docs/nginx-motion-analysis.conf
-```
-
-MySQL 端口 `3306` 不应直接暴露到公网。
-
----
-
-## 10. 协作流程
-
-当前 `main` 已作为稳定基础版本。后续如需小功能修改，建议仍按以下流程：
-
-```text
-feature/frontend  ┐
-feature/backend   ├──> dev ───> main
-feature/database  ┘
-```
-
-分支说明：
-
-```text
-main                  稳定版本，用于最终展示和提交
-dev                   日常集成版本
-feature/frontend      前端开发分支
-feature/backend       后端开发分支
-feature/database      数据库开发分支
-```
-
-基本规范：
-
-1. 修改前先同步远端：
-
-   ```bash
-   git checkout dev
-   git pull origin dev
-   ```
-
-2. 切到自己的功能分支：
-
-   ```bash
-   git checkout feature/frontend
-   git merge dev
-   ```
-
-3. 修改后只提交相关文件：
-
-   ```bash
-   git status
-   git add frontend/xxx
-   git commit -m "feat(frontend): update page"
-   git push origin feature/frontend
-   ```
-
-4. 在 GitHub 上创建 PR：
-
-   ```text
-   base: dev
-   compare: feature/xxx
-   ```
-
-5. `dev` 稳定后，再由负责人合并到 `main`。
-
-如果只是最终报告、小文档或截图说明的小修改，也可以直接在 `main` 上修改，但必须确认不会影响系统运行。
-
----
-
-## 11. 隐私与提交边界
-
+14. 隐私与提交边界
 禁止提交：
-
-```text
 .env
 node_modules/
 dist/
@@ -560,175 +291,16 @@ backend/ml/models/
 真实数据库密码
 真实服务器密钥
 Garmin token
+AI API Key
 个人精确轨迹原始文件
-```
-
 仓库中只保留：
+● 数据库结构脚本
+● 数据导入脚本
+● 示例配置
+● 前后端源码
+● 文档和报告素材
+● 不含隐私的截图或示意图
 
-* 数据库结构脚本。
-* 数据导入脚本。
-* 示例配置。
-* 前后端源码。
-* 文档和报告素材。
-* 不含隐私的截图或示意图。
-
----
-
-## 12. 成员分工
-
-### 数据库部分
-
-负责人：zhen chen
-
-主要内容：
-
-* Garmin 数据下载、解析与导入。
-* MySQL 表结构设计。
-* 主键、外键、约束和索引设计。
-* 典型 SQL 查询。
-* 数据库说明文档维护。
-
-主要目录：
-
-```text
-database/
-```
-
----
-
-### 后端部分
-
-负责人：anping zou、anan shao
-
-主要内容：
-
-* Node.js + Express API 服务。
-* MySQL 数据访问。
-* JWT 登录鉴权。
-* 活动、统计、同步、社区、探索、设置等接口。
-* 部署文档与接口文档维护。
-
-主要目录：
-
-```text
-backend/
-```
-
----
-
-### 前端部分
-
-负责人：hao chen
-
-主要内容：
-
-* Vue 3 前端页面。
-* 运动数据列表、详情、统计、趋势、日历、同步中心等页面。
-* ECharts 可视化。
-* 后端 API 对接。
-* 页面展示与演示优化。
-
-主要目录：
-
-```text
-frontend/
-```
-
----
-
-### Overall
-
-负责人：kun wang
-
-主要内容：
-
-* 总体进度协调。
-* GitHub 分支和合并管理。
-* ER 图、报告、PPT、演示素材整理。
-* 部署方案与最终展示统筹。
-
----
-
-## 13. 报告与展示建议
-
-数据库课程报告建议重点体现：
-
-* 需求分析。
-* 概念结构设计与 ER 图。
-* 逻辑结构设计。
-* 数据表结构与字段说明。
-* 主外键与约束设计。
-* 索引设计。
-* 数据导入流程。
-* 典型 SQL 查询。
-* 前后端接口调用。
-* 系统页面展示。
-* 小组分工与协作过程。
-
-建议补充到：
-
-```text
-docs/
-```
-
-推荐文件：
-
-```text
-docs/er_diagram.png
-docs/report-materials.md
-docs/screenshots/
-```
-
----
-
-## 14. 快速启动顺序
-
-首次本地运行建议顺序：
-
-```text
-1. 安装 MySQL 并确认 root 或项目用户可登录。
-2. 执行 database/sql/01_schema.sql 建库建表。
-3. 本地生成并执行 database/sql/02_import_data.sql。
-4. 执行 04、05、06、07 扩展脚本。
-5. 启动 backend。
-6. 启动 frontend。
-7. 浏览器访问 http://localhost:5173。
-```
-
-后端：
-
-```powershell
-cd backend
-npm install
-Copy-Item .env.example .env
-npm run seed:admin
-npm run dev
-```
-
-前端：
-
-```powershell
-cd frontend
-npm install
-Copy-Item .env.example .env
-npm run dev
-```
-
-数据库：
-
-```sql
-source database/sql/01_schema.sql;
-source database/sql/02_import_data.sql;
-source database/sql/04_auth_manual_upload.sql;
-source database/sql/05_performance_indexes.sql;
-source database/sql/06_extension_modules.sql;
-source database/sql/07_profile_follow_explore_uploads.sql;
-```
-
----
-
-## 15. 说明
-
-本项目为课程大作业，重点不只是页面效果，也包括数据库设计、数据导入、表关系、查询分析、接口封装和小组协作过程。
-
-最终提交时，应以 `main` 分支为准。
+15. 说明
+MotionCare 是一个课程软件综合设计项目，重点在于完整的软件系统设计与实现。项目以真实可穿戴设备运动数据为基础，结合前端交互、后端 API、数据库设计、训练状态分析、AI 建议和安全防护，探索运动健康类软件的完整实现路径。
+实现相关功能时，如果 GitHub / npm 上有成熟的开源方案，直接复用，不要自己实现。
