@@ -73,11 +73,10 @@ def load_rows(env_path: Path) -> list[dict[str, float]]:
           js.elevation_gain_m AS elevationGainM,
           js.elevation_loss_m AS elevationLossM,
           js.avg_stride_length_cm AS avgStrideLengthCm,
-          COALESCE(js.normalized_power_w, s.normalized_power_w) AS normalizedPowerW,
+          js.normalized_power_w AS normalizedPowerW,
           js.activity_training_load AS activityTrainingLoad
         FROM Activities a
         LEFT JOIN ActivitySummaries js ON js.activity_id = a.id
-        LEFT JOIN Sessions s ON s.activity_id = a.id
         WHERE a.activity_type = 'running'
           AND js.activity_training_load IS NOT NULL
         """

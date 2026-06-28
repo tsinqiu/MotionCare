@@ -69,6 +69,24 @@
         <MetricCard label="平均心率" :value="`${overview.monthlySummary?.avgHeartRateBpm || '--'} bpm`" />
       </div>
 
+      <section class="dark-panel" v-if="healthData">
+        <div class="section-heading">
+          <div>
+            <h2>今日身体状态</h2>
+          </div>
+        </div>
+        <div class="health-grid">
+          <span><small>静息心率</small><b>{{ healthData.restingHeartRateBpm ?? '--' }} bpm</b></span>
+          <span><small>压力</small><b>{{ healthData.avgStressLevel ?? '--' }}</b></span>
+          <span><small>身体电量</small><b>{{ healthData.bodyBatteryCharged ?? '--' }}</b></span>
+          <span><small>睡眠</small><b>{{ healthData.sleepScore ?? '--' }}/100</b></span>
+          <span><small>深睡</small><b>{{ healthData.deepSleepS ? (healthData.deepSleepS/3600).toFixed(1) : '--' }}h</b></span>
+          <span><small>HRV</small><b>{{ healthData.avgHrv ?? '--' }}</b></span>
+          <span><small>睡眠心率</small><b>{{ healthData.avgHeartRateDuringSleep ?? '--' }} bpm</b></span>
+          <span><small>呼吸率</small><b>{{ healthData.avgWakingRespiration ?? '--' }}</b></span>
+        </div>
+      </section>
+
       <section class="dark-panel">
         <div class="section-heading">
           <div>
@@ -101,6 +119,7 @@ import { useAsyncData } from '@/composables/useAsyncData'
 import { getDailyBrief } from '@/services/ai'
 import { getDashboardOverview } from '@/services/dashboard'
 import { formatDistance } from '@/utils/formatters'
+import { getTodayHealth } from '@/services/dashboard'
 
 const router = useRouter()
 const defaultOverview = {
@@ -184,6 +203,8 @@ async function reloadToday() {
 }
 
 const { data: overviewData, error, load } = useAsyncData(getDashboardOverview, defaultOverview)
+const healthData = ref(null)
+getTodayHealth().then(d => { healthData.value = d })
 const aiBrief = ref(normalizeBrief(defaultBrief))
 const aiMeta = ref({ ai: { fallback: true, provider: 'loading' } })
 const aiLoading = ref(true)
@@ -207,3 +228,26 @@ const recentActivities = computed(() => (overview.value?.recentActivities || [])
 
 onMounted(loadAiBrief)
 </script>
+
+<style scoped>
+.health-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+.health-grid span {
+  background: var(--bg-elevated, #1a1a2e);
+  border-radius: 10px;
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.health-grid small {
+  font-size: 12px;
+  color: var(--text-muted, #888);
+}
+.health-grid b {
+  font-size: 18px;
+}
+</style>

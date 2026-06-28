@@ -16,7 +16,8 @@ const createSyncRouter = require('./routes/syncRoutes');
 const createCommunityRouter = require('./routes/communityRoutes');
 const createExploreRouter = require('./routes/exploreRoutes');
 const createSettingsRouter = require('./routes/settingsRoutes');
-const createWorkoutRouter = require('./routes/workoutRoutes');
+const createShoeRouter = require('./routes/shoeRoutes');
+const defaultShoeService = require('./services/shoeService');
 
 function createApp({
   healthService,
@@ -29,8 +30,9 @@ function createApp({
   communityService,
   exploreService,
   settingsService,
-  workoutService
+  shoeService
 } = {}) {
+  if (!shoeService) shoeService = defaultShoeService;
   const app = express();
 
   app.use(
@@ -62,7 +64,7 @@ function createApp({
   app.use('/api', createCommunityRouter({ communityService, authService }));
   app.use('/api', createExploreRouter(exploreService, authService));
   app.use('/api', createSettingsRouter({ settingsService, authService }));
-  app.use('/api', createWorkoutRouter({ workoutService, authService }));
+  app.use('/api', createShoeRouter(shoeService, authService));
 
   app.use('/api', (req, res) => {
     res.status(404).json({ error: { code: 'ROUTE_NOT_FOUND', message: 'route not found' } });

@@ -4,11 +4,11 @@
       <div>
         <h2>数据库结构与字段字典</h2>
         <p>
-          本页展示运动记录、轨迹点、分段、指标、用户等核心数据对象，帮助管理员理解数据来源、字段含义和关系链路。
+          当前结构保留运动展示和同步需要的核心表，并新增 Garmin 日常健康数据表。
         </p>
       </div>
       <div class="hero-actions">
-        <RouterLink class="primary-link" to="/activities">查看活动数据</RouterLink>
+        <RouterLink class="primary-link" to="/activities">查看运动数据</RouterLink>
         <RouterLink class="secondary-link inverse" to="/statistics">统计分析</RouterLink>
       </div>
     </section>
@@ -104,21 +104,16 @@ const selectedTable = computed(
 
 const TABLE_LABELS = {
   Users: '用户表',
-  SourceFiles: '来源文件表',
   Activities: '运动记录表',
-  ActivitySourceFiles: '记录来源关系表',
-  Sessions: '运动摘要表',
-  ActivitySummaries: '扩展指标表',
-  ActivityZones: '心率区间表',
+  ActivitySummaries: '运动摘要表',
+  ActivityZones: '区间表',
   Laps: '分段表',
   TrackPoints: '轨迹点表',
-  Events: '事件表',
-  Metrics: '指标表',
-  FitMessages: '原始消息表',
+  DailyHealthSummaries: '每日健康表',
+  SleepSummaries: '睡眠表',
 }
 
 function tableLabel(name) {
   return TABLE_LABELS[name] || name
 }
-
 </script>

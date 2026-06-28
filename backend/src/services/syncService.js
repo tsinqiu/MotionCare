@@ -431,6 +431,7 @@ async function runGarminSync(jobId, user, payload) {
   const knownIdsPath = path.join(jobDir, 'known_ids.json');
   const summaryPath = path.join(jobDir, 'download_summary.json');
   const importSqlPath = path.join(jobDir, 'import.sql');
+  const healthSqlPath = path.join(jobDir, 'health_import.sql');
 
   await fs.mkdir(jobDir, { recursive: true });
   await fs.writeFile(knownIdsPath, JSON.stringify(await getExistingGarminIds(startDate)), 'utf8');
@@ -462,6 +463,7 @@ async function runGarminSync(jobId, user, payload) {
       String(config.garmin.retries),
       '--skip-activity-ids-file',
       knownIdsPath,
+      '--include-health',
       '--summary-out',
       summaryPath,
       ...(account.isCn ? ['--cn'] : [])
@@ -474,10 +476,28 @@ async function runGarminSync(jobId, user, payload) {
   );
 
   const summary = parseRawJson(await fs.readFile(summaryPath, 'utf8'));
+  const downloadedHealthDays = Array.isArray(summary.downloadedHealthDays) ? summary.downloadedHealthDays : [];
+  if (downloadedHealthDays.length) {
+    await runProcess(
+      config.garmin.pythonPath,
+      [
+        config.garmin.healthImportScriptPath,
+        '--health-dir',
+        path.join(jobDir, 'health'),
+        '--user-id',
+        String(user.id),
+        '--out',
+        healthSqlPath
+      ],
+      { cwd: PROJECT_ROOT, timeoutMs: config.garmin.timeoutMs }
+    );
+    await executeSqlFile(healthSqlPath);
+  }
+
   const downloadedIds = Array.isArray(summary.downloadedActivityIds) ? summary.downloadedActivityIds : [];
   if (!downloadedIds.length) {
     await addLog(jobId, user, 'garmin', 'info', 'no new Garmin activities found');
-    return { importedCount: 0, startDate, endDate, summary };
+    return { importedCount: 0, healthDaysImported: downloadedHealthDays.length, startDate, endDate, summary };
   }
 
   await runProcess(
@@ -508,6 +528,7 @@ async function runGarminSync(jobId, user, payload) {
 
   return {
     importedCount: updateResult.affectedRows || downloadedIds.length,
+    healthDaysImported: downloadedHealthDays.length,
     startDate,
     endDate,
     summary

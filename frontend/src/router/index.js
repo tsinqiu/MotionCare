@@ -12,6 +12,7 @@ import Login from '@/views/Login.vue'
 import Records from '@/views/Records.vue'
 import Register from '@/views/Register.vue'
 import Settings from '@/views/Settings.vue'
+import Shoes from '@/views/Shoes.vue'
 import StartWorkout from '@/views/StartWorkout.vue'
 import Statistics from '@/views/Statistics.vue'
 import Sync from '@/views/Sync.vue'
@@ -122,6 +123,12 @@ const routes = [
     name: 'settings',
     component: Settings,
     meta: { title: '设置', requiresAuth: true },
+  },
+  {
+    path: '/shoes',
+    name: 'shoes',
+    component: Shoes,
+    meta: { title: '跑鞋管理', requiresAuth: true },
   },
   {
     path: '/admin',

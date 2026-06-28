@@ -648,20 +648,6 @@ def maybe_raw_json(obj, include_raw_json):
     return sql_string(raw_json(obj)) if include_raw_json else "NULL"
 
 
-def source_file_sql(path, source_type):
-    return (
-        "INSERT INTO SourceFiles (source_type, file_name, file_path, file_size_bytes, file_hash) VALUES ("
-        + ", ".join([
-            sql_string(source_type),
-            sql_string(path.name),
-            sql_string(str(path)),
-            sql_int(path.stat().st_size),
-            sql_string(hashlib.sha256(path.read_bytes()).hexdigest()),
-        ])
-        + ") ON DUPLICATE KEY UPDATE id = LAST_INSERT_ID(id);"
-    )
-
-
 def canonical_activity(row):
     fit_item = row.get("fit")
     json_item = row.get("json")
@@ -697,55 +683,7 @@ def canonical_activity(row):
     }
 
 
-def emit_activity_source(lines, path, source_type, source_role, match_score=None, match_note=None):
-    lines.append(source_file_sql(path, source_type))
-    lines.append("SET @source_file_id = LAST_INSERT_ID();")
-    lines.append(
-        "INSERT INTO ActivitySourceFiles (activity_id, source_file_id, source_role, match_score, match_note) VALUES ("
-        + ", ".join([
-            "@activity_id",
-            "@source_file_id",
-            sql_string(source_role),
-            sql_number(match_score),
-            sql_string(match_note),
-        ])
-        + ");"
-    )
-
-
 def emit_fit_rows(lines, item, include_fit_messages=False, include_raw_json=False):
-    session_rows = []
-    for message in item["sessions"]:
-        v = message["values"]
-        session_rows.append([
-            "@activity_id",
-            sql_datetime(as_dt(v.get("start_time"))),
-            sql_number(get_num(v, "total_elapsed_time")),
-            sql_number(get_num(v, "total_timer_time")),
-            sql_number(get_num(v, "total_moving_time")),
-            sql_number(get_num(v, "total_distance")),
-            sql_int(get_int(v, "total_calories")),
-            sql_number(get_num(v, "enhanced_avg_speed", "avg_speed")),
-            sql_number(get_num(v, "enhanced_max_speed", "max_speed")),
-            sql_int(get_int(v, "avg_heart_rate")),
-            sql_int(get_int(v, "max_heart_rate")),
-            sql_number(get_num(v, "avg_cadence")),
-            sql_number(get_num(v, "max_cadence")),
-            sql_int(get_int(v, "avg_power")),
-            sql_int(get_int(v, "max_power")),
-            sql_int(get_int(v, "normalized_power")),
-            sql_int(get_int(v, "total_ascent")),
-            sql_int(get_int(v, "total_descent")),
-            maybe_raw_json(v, include_raw_json),
-        ])
-    emit_insert_values(lines, "Sessions", [
-        "activity_id", "start_time_utc", "total_elapsed_time_s", "total_timer_time_s",
-        "total_moving_time_s", "total_distance_m", "total_calories", "avg_speed_mps",
-        "max_speed_mps", "avg_heart_rate_bpm", "max_heart_rate_bpm", "avg_cadence",
-        "max_cadence", "avg_power_w", "max_power_w", "normalized_power_w",
-        "total_ascent_m", "total_descent_m", "raw_json",
-    ], session_rows, 50)
-
     lap_rows = []
     for idx, message in enumerate(item["laps"]):
         v = message["values"]
@@ -794,37 +732,8 @@ def emit_fit_rows(lines, item, include_fit_messages=False, include_raw_json=Fals
         "vertical_oscillation_mm", "stance_time_ms", "raw_json",
     ], record_rows, 200)
 
-    event_rows = []
-    for idx, message in enumerate(item["events"]):
-        v = message["values"]
-        event_rows.append([
-            "@activity_id", sql_int(idx), sql_datetime(as_dt(v.get("timestamp"))),
-            sql_string(v.get("event_type")),
-            sql_string(v.get("event")),
-            sql_int(get_int(v, "event_group")),
-            maybe_raw_json(v, include_raw_json),
-        ])
-    emit_insert_values(lines, "Events", [
-        "activity_id", "event_index", "event_time_utc", "event_type", "event", "event_group", "raw_json",
-    ], event_rows, 100)
-
     if include_fit_messages:
-        msg_rows = []
-        for message in item["messages"]:
-            v = message["values"]
-            msg_rows.append([
-                "@activity_id",
-                sql_int(message["message_index"]),
-                sql_int(message["global_num"]),
-                sql_string(message["message_name"]),
-                sql_int(message["local_num"]),
-                sql_datetime(as_dt(v.get("timestamp") or v.get("start_time"))),
-                sql_string(raw_json(v)),
-            ])
-        emit_insert_values(lines, "FitMessages", [
-            "activity_id", "message_index", "global_message_num", "message_name",
-            "local_message_num", "message_time_utc", "raw_json",
-        ], msg_rows, 200)
+        print("--include-fit-messages is ignored because FitMessages was removed from the simplified schema.")
 
 
 def zone_duration(value):
@@ -885,69 +794,98 @@ def append_zone_rows(zone_rows, activity_id, zone_type, values, source_field):
             ])
 
 
-def emit_json_summary_rows(lines, item):
-    j = item["data"]
+def fit_session_values(fit_item):
+    if not fit_item or not fit_item["sessions"]:
+        return {}
+    return fit_item["sessions"][0]["values"]
+
+
+def emit_activity_summary_rows(lines, fit_item, json_item):
+    j = json_item["data"] if json_item else {}
+    s = fit_session_values(fit_item)
     lines.append(
         "INSERT INTO ActivitySummaries ("
-        "activity_id, garmin_activity_id, duration_s, moving_duration_s, elapsed_duration_s, "
+        "activity_id, duration_s, moving_duration_s, elapsed_duration_s, "
         "distance_m, calories, avg_speed_mps, max_speed_mps, avg_heart_rate_bpm, max_heart_rate_bpm, "
         "avg_cadence_spm, max_cadence_spm, avg_power_w, max_power_w, normalized_power_w, "
-        "intensity_factor, training_stress_score, max_20min_power_w, aerobic_training_effect, "
+        "aerobic_training_effect, "
         "anaerobic_training_effect, training_effect_label, activity_training_load, vo2max, "
-        "body_battery_delta, water_estimated_ml, moderate_intensity_minutes, vigorous_intensity_minutes, "
-        "avg_stride_length_cm, avg_vertical_oscillation_cm, avg_ground_contact_time_ms, avg_vertical_ratio, "
-        "avg_respiration_rate, max_respiration_rate, min_respiration_rate, elevation_gain_m, elevation_loss_m, "
-        "min_elevation_m, max_elevation_m, original_file_url, manufacturer, raw_json"
+        "body_battery_delta, "
+        "avg_stride_length_cm, elevation_gain_m, elevation_loss_m, "
+        "min_elevation_m, max_elevation_m, manufacturer, raw_json"
         ") VALUES ("
         + ", ".join([
             "@activity_id",
-            sql_string(item.get("garmin_id")),
-            sql_number(get_num(j, "duration")),
-            sql_number(get_num(j, "movingDuration")),
-            sql_number(get_num(j, "elapsedDuration")),
-            sql_number(get_num(j, "distance")),
-            sql_number(get_num(j, "calories")),
-            sql_number(get_num(j, "avgSpeed")),
-            sql_number(get_num(j, "maxSpeed")),
-            sql_int(get_int(j, "avgHeartRate")),
-            sql_int(get_int(j, "maxHeartRate")),
-            sql_number(get_num(j, "avgCadenceSpm")),
-            sql_number(get_num(j, "maxCadenceSpm")),
-            sql_int(get_int(j, "avgPower")),
-            sql_int(get_int(j, "maxPower")),
-            sql_int(get_int(j, "normPower")),
-            sql_number(get_num(j, "intensityFactor")),
-            sql_number(get_num(j, "trainingStressScore")),
-            sql_int(get_int(j, "max20MinPower")),
-            sql_number(get_num(j, "aerobicTrainingEffect")),
-            sql_number(get_num(j, "anaerobicTrainingEffect")),
-            sql_string(j.get("trainingEffectLabel")),
+            sql_number(first_num(get_num(j, "duration"), get_num(s, "total_timer_time"))),
+            sql_number(first_num(get_num(j, "movingDuration"), get_num(s, "total_moving_time"))),
+            sql_number(first_num(get_num(j, "elapsedDuration"), get_num(s, "total_elapsed_time"))),
+            sql_number(first_num(get_num(j, "distance"), get_num(s, "total_distance"))),
+            sql_number(first_num(get_num(j, "calories"), get_num(s, "total_calories"))),
+            sql_number(first_num(get_num(j, "avgSpeed"), get_num(s, "enhanced_avg_speed", "avg_speed"))),
+            sql_number(first_num(get_num(j, "maxSpeed"), get_num(s, "enhanced_max_speed", "max_speed"))),
+            sql_int(first_num(get_int(j, "avgHeartRate"), get_int(s, "avg_heart_rate"))),
+            sql_int(first_num(get_int(j, "maxHeartRate"), get_int(s, "max_heart_rate"))),
+            sql_number(first_num(get_num(j, "avgCadenceSpm"), get_num(s, "avg_cadence"))),
+            sql_number(first_num(get_num(j, "maxCadenceSpm"), get_num(s, "max_cadence"))),
+            sql_int(first_num(
+                get_int(j, "avgPower"),
+                get_int(j.get("summaryDTO", {}), "averagePower"),
+                get_int(s, "avg_power"),
+            )),
+            sql_int(first_num(
+                get_int(j, "maxPower"),
+                get_int(j.get("summaryDTO", {}), "maxPower"),
+                get_int(s, "max_power"),
+            )),
+            sql_int(first_num(
+                get_int(j, "normPower"),
+                get_int(j.get("summaryDTO", {}), "normalizedPower"),
+                get_int(s, "normalized_power"),
+            )),
+            sql_number(first_num(
+                get_num(j, "aerobicTrainingEffect"),
+                get_num(j.get("summaryDTO", {}), "trainingEffect"),
+                get_num(s, "aerobic_training_effect"),
+            )),
+            sql_number(first_num(
+                get_num(j, "anaerobicTrainingEffect"),
+                get_num(j.get("summaryDTO", {}), "anaerobicTrainingEffect"),
+                get_num(s, "anaerobic_training_effect"),
+            )),
+            sql_string(
+                j.get("trainingEffectLabel")
+                or (j.get("summaryDTO") or {}).get("trainingEffectLabel")
+                or s.get("training_effect_label")
+            ),
             sql_number(first_num(
                 get_num(j, "activityTrainingLoad"),
                 get_nested_num(j, "summaryDTO", "activityTrainingLoad"),
+                get_num(s, "activity_training_load"),
             )),
-            sql_number(get_num(j, "vO2MaxValue")),
-            sql_int(get_int(j, "differenceBodyBattery")),
-            sql_number(get_num(j, "waterEstimated")),
-            sql_int(get_int(j, "moderateIntensityMinutes")),
-            sql_int(get_int(j, "vigorousIntensityMinutes")),
-            sql_number(get_num(j, "avgStrideLength")),
-            sql_number(get_num(j, "avgVerticalOscillation")),
-            sql_number(get_num(j, "avgGroundContactTime")),
-            sql_number(get_num(j, "avgVerticalRatio")),
-            sql_number(get_num(j, "avgRespirationRate")),
-            sql_number(get_num(j, "maxRespirationRate")),
-            sql_number(get_num(j, "minRespirationRate")),
-            sql_number(get_num(j, "elevationGain")),
-            sql_number(get_num(j, "elevationLoss")),
-            sql_number(get_num(j, "minElevation")),
-            sql_number(get_num(j, "maxElevation")),
-            sql_string(j.get("originalFileUrl")),
+            sql_number(first_num(
+                get_num(j, "vO2MaxValue"),
+                get_num(j.get("summaryDTO", {}), "vO2MaxValue"),
+            )),
+            sql_int(first_num(
+                get_int(j, "differenceBodyBattery"),
+                get_int(j.get("summaryDTO", {}), "differenceBodyBattery"),
+            )),
+            sql_number(first_num(
+                get_num(j, "avgStrideLength"),
+                get_num(j.get("summaryDTO", {}), "strideLength"),
+            )),
+            sql_number(first_num(get_num(j, "elevationGain"), get_num(j.get("summaryDTO", {}), "elevationGain"), get_num(s, "total_ascent"))),
+            sql_number(first_num(get_num(j, "elevationLoss"), get_num(j.get("summaryDTO", {}), "elevationLoss"), get_num(s, "total_descent"))),
+            sql_number(first_num(get_num(j, "minElevation"), get_num(j.get("summaryDTO", {}), "minElevation"))),
+            sql_number(first_num(get_num(j, "maxElevation"), get_num(j.get("summaryDTO", {}), "maxElevation"))),
             sql_string(j.get("manufacturer")),
-            sql_json(j),
+            sql_json(j or s),
         ])
         + ");"
     )
+
+    if not json_item:
+        return
 
     zone_rows = []
     append_zone_rows(zone_rows, "@activity_id", "heart_rate", j.get("hrZone") or [], "hrZone")
@@ -987,13 +925,12 @@ def build_sql(activities, include_fit_messages=False, include_raw_json=False):
         lines.extend([
             f"SELECT 'Importing activity {label}' AS status;",
             "START TRANSACTION;",
-            "SET @source_file_id = NULL;",
             "SET @activity_id = NULL;",
         ])
         lines.append(
             "INSERT INTO Activities (activity_key, garmin_activity_id, activity_name, activity_type, sport_code, "
             "sub_sport_code, start_time_utc, local_start_time, location_name, start_latitude, start_longitude, "
-            "end_latitude, end_longitude, match_status, raw_json) VALUES ("
+            "end_latitude, end_longitude, match_status) VALUES ("
             + ", ".join([
                 sql_string(activity["key"]),
                 sql_string(activity["garmin_id"]),
@@ -1009,17 +946,13 @@ def build_sql(activities, include_fit_messages=False, include_raw_json=False):
                 sql_number(activity["end_latitude"]),
                 sql_number(activity["end_longitude"]),
                 sql_string(activity["match_status"]),
-                maybe_raw_json(activity["raw"], include_raw_json),
             ])
             + ");"
         )
         lines.append("SET @activity_id = LAST_INSERT_ID();")
+        emit_activity_summary_rows(lines, fit_item, json_item)
         if fit_item:
-            emit_activity_source(lines, fit_item["path"], "fit", "fit", row.get("match_score"), "matched by start time, type, distance and duration" if json_item else "fit only")
             emit_fit_rows(lines, fit_item, include_fit_messages, include_raw_json)
-        if json_item:
-            emit_activity_source(lines, json_item["path"], "garmin_json_txt", "garmin_json", row.get("match_score"), "matched by content; file name ignored" if fit_item else "json only")
-            emit_json_summary_rows(lines, json_item)
         lines.extend(["COMMIT;"])
     return "\n".join(lines) + "\n"
 
