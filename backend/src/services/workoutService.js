@@ -343,37 +343,6 @@ async function finishWorkout(workoutId, payload, user) {
       ]
     );
 
-    await connection.query(
-      `
-        INSERT INTO Sessions (
-          activity_id, start_time_utc, total_elapsed_time_s, total_timer_time_s,
-          total_moving_time_s, total_distance_m, total_calories, avg_speed_mps,
-          max_speed_mps, avg_heart_rate_bpm, max_heart_rate_bpm, avg_cadence,
-          max_cadence, avg_power_w, max_power_w, total_ascent_m, total_descent_m, raw_json
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `,
-      [
-        newActivityId,
-        startedAt,
-        summary.elapsedDurationS,
-        summary.durationS,
-        summary.movingDurationS,
-        summary.distanceM,
-        summary.calories,
-        summary.avgSpeedMps,
-        summary.maxSpeedMps,
-        summary.avgHeartRateBpm,
-        summary.maxHeartRateBpm,
-        summary.avgCadenceSpm,
-        summary.maxCadenceSpm,
-        summary.avgPowerW,
-        summary.maxPowerW,
-        summary.elevationGainM,
-        summary.elevationLossM,
-        rawJson
-      ]
-    );
-
     for (const point of points) {
       await connection.query(
         `

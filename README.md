@@ -148,17 +148,16 @@ MotionAnalysis
 
 ```latex
 Users
-SourceFiles
 Activities
-ActivitySourceFiles
-Sessions
 ActivitySummaries
 ActivityZones
 Laps
 TrackPoints
-Events
-Metrics
-FitMessages
+DailyHealthSummaries
+SleepSummaries
+RestingHeartRates
+BodyWeights
+DailyStressSummaries
 ```
 
 其中：
@@ -169,8 +168,8 @@ FitMessages
 + `TrackPoints` 保存逐点轨迹、速度、心率、步频、功率等时序数据。
 + `Laps` 保存分段数据。
 + `ActivityZones` 保存心率区间、功率区间等统计信息。
-+ `SourceFiles` 和 `ActivitySourceFiles` 用于追踪 FIT / JSON 来源文件。
-+ `Metrics` 和 `FitMessages` 用于保存扩展指标和 FIT 原始消息。
++ `DailyHealthSummaries`、`SleepSummaries`、`RestingHeartRates`、`BodyWeights` 和 `DailyStressSummaries` 保存 Garmin 日常健康数据。
++ 来源追踪、FIT 原始消息和通用指标表已精简；需要保留的原始数据写入各业务表的 `raw_json`。
 
 后续计划新增或强化：
 

@@ -12,6 +12,11 @@ function createDashboardRouter(activityService = defaultActivityService, authSer
     sendCachedStats(req, res, () => activityService.getDashboardOverview(parseDashboardFilters(req.query, req.user)))
   ));
 
+  router.get('/dashboard/health', optionalAuthenticate(authService), asyncHandler(async (req, res) => {
+    const data = await activityService.getTodayHealth(req.user?.id || 1);
+    res.json(data);
+  }));
+
   return router;
 }
 

@@ -1632,7 +1632,7 @@ test('activityService listActivities exposes frontend-compatible activity fields
     assert.equal(result.items[0].durationS, 1800);
     assert.equal(result.items[0].normalizedPowerW, 220);
     assert.match(queries[1].sql, /a\.activity_key AS activityKey/);
-    assert.match(queries[1].sql, /COALESCE\(js\.distance_m, s\.total_distance_m\) AS distanceM/);
+    assert.match(queries[1].sql, /js\.distance_m AS distanceM/);
     assert.deepEqual(queries[0].params, ['%Morning%', '%Morning%', '%Morning%', '%Morning%', '%Morning%']);
   } finally {
     db.query = originalQuery;

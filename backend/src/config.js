@@ -129,6 +129,10 @@ const config = {
       process.env.GARMIN_IMPORT_SCRIPT,
       'database/scripts/import_fit_files.py'
     ),
+    healthImportScriptPath: resolveProjectPath(
+      process.env.GARMIN_HEALTH_IMPORT_SCRIPT,
+      'database/scripts/import_garmin_health.py'
+    ),
     tokenBaseDir: resolveProjectPath(
       process.env.GARMIN_TOKEN_BASE_DIR,
       'database/.garmin_tokens/users'

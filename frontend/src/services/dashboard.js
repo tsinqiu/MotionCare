@@ -14,3 +14,8 @@ export async function getDashboardOverview(params = {}) {
     personalBests: {},
   }
 }
+
+export async function getTodayHealth() {
+  const res = await fetch('/api/dashboard/health', { credentials: 'include' })
+  return res.ok ? res.json() : {}
+}

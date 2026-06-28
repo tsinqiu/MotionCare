@@ -242,11 +242,12 @@ async function listActivities({
       u.username AS ownerUsername,
       a.data_source AS dataSource,
       a.is_manual AS isManual,
-      ROUND(s.total_distance_m / 1000, 2) AS fitDistanceKm,
+      a.shoe_id AS shoeId,
+      ROUND(js.distance_m / 1000, 2) AS fitDistanceKm,
       ROUND(js.distance_m / 1000, 2) AS jsonDistanceKm,
-      s.total_timer_time_s AS fitTimerTimeS,
-      COALESCE(js.distance_m, s.total_distance_m) AS distanceM,
-      COALESCE(js.duration_s, s.total_timer_time_s) AS durationS,
+      js.duration_s AS fitTimerTimeS,
+      js.distance_m AS distanceM,
+      js.duration_s AS durationS,
       js.moving_duration_s AS movingDurationS,
       js.elapsed_duration_s AS elapsedDurationS,
       js.calories,
@@ -255,13 +256,13 @@ async function listActivities({
       ROUND(js.duration_s / NULLIF(js.distance_m / 1000, 0), 2) AS avgPaceSecPerKm,
       js.avg_heart_rate_bpm AS avgHeartRateBpm,
       js.max_heart_rate_bpm AS maxHeartRateBpm,
-      COALESCE(js.avg_cadence_spm, s.avg_cadence) AS avgCadenceSpm,
+      js.avg_cadence_spm AS avgCadenceSpm,
       js.max_cadence_spm AS maxCadenceSpm,
-      COALESCE(js.avg_power_w, s.avg_power_w) AS avgPowerW,
-      COALESCE(js.max_power_w, s.max_power_w) AS maxPowerW,
-      COALESCE(js.normalized_power_w, s.normalized_power_w) AS normalizedPowerW,
-      COALESCE(js.elevation_gain_m, s.total_ascent_m) AS elevationGainM,
-      COALESCE(js.elevation_loss_m, s.total_descent_m) AS elevationLossM,
+      js.avg_power_w AS avgPowerW,
+      js.max_power_w AS maxPowerW,
+      js.normalized_power_w AS normalizedPowerW,
+      js.elevation_gain_m AS elevationGainM,
+      js.elevation_loss_m AS elevationLossM,
       js.activity_training_load AS activityTrainingLoad,
       js.aerobic_training_effect AS aerobicTrainingEffect,
       js.anaerobic_training_effect AS anaerobicTrainingEffect,
@@ -270,7 +271,6 @@ async function listActivities({
       js.body_battery_delta AS bodyBatteryDelta
     FROM Activities a
     LEFT JOIN Users u ON u.id = a.owner_user_id
-    LEFT JOIN Sessions s ON s.activity_id = a.id
     LEFT JOIN ActivitySummaries js ON js.activity_id = a.id
     ${filters.clause}
     ORDER BY ${sortColumn} ${direction}, a.id DESC
@@ -309,8 +309,9 @@ async function getActivityById(activityId) {
         u.username AS ownerUsername,
         a.data_source AS dataSource,
         a.is_manual AS isManual,
-        s.total_elapsed_time_s AS fitElapsedTimeS,
-        s.total_timer_time_s AS fitTimerTimeS,
+        a.shoe_id AS shoeId,
+        js.elapsed_duration_s AS fitElapsedTimeS,
+        js.duration_s AS fitTimerTimeS,
         js.elapsed_duration_s AS elapsedDurationS,
         js.duration_s AS durationS,
         js.moving_duration_s AS movingDurationS,
@@ -320,25 +321,25 @@ async function getActivityById(activityId) {
         js.max_speed_mps AS maxSpeedMps,
         js.avg_heart_rate_bpm AS avgHeartRateBpm,
         js.max_heart_rate_bpm AS maxHeartRateBpm,
-        s.avg_cadence AS fitSingleLegCadence,
-        COALESCE(js.avg_cadence_spm, s.avg_cadence) AS avgCadenceSpm,
+        js.avg_cadence_spm AS fitSingleLegCadence,
+        js.avg_cadence_spm AS avgCadenceSpm,
         js.max_cadence_spm AS maxCadenceSpm,
-        COALESCE(js.avg_power_w, s.avg_power_w) AS avgPowerW,
-        COALESCE(js.max_power_w, s.max_power_w) AS maxPowerW,
-        COALESCE(js.normalized_power_w, s.normalized_power_w) AS normalizedPowerW,
+        js.avg_power_w AS avgPowerW,
+        js.max_power_w AS maxPowerW,
+        js.normalized_power_w AS normalizedPowerW,
         js.activity_training_load AS activityTrainingLoad,
         js.aerobic_training_effect AS aerobicTrainingEffect,
         js.anaerobic_training_effect AS anaerobicTrainingEffect,
         js.training_effect_label AS trainingEffectLabel,
         js.vo2max,
         js.body_battery_delta AS bodyBatteryDelta,
-        js.water_estimated_ml AS waterEstimatedMl,
-        COALESCE(js.elevation_gain_m, s.total_ascent_m) AS elevationGainM,
-        COALESCE(js.elevation_loss_m, s.total_descent_m) AS elevationLossM
+        js.elevation_gain_m AS elevationGainM,
+        js.elevation_loss_m AS elevationLossM,
+        s.name AS shoeName, s.brand AS shoeBrand, s.distance_km AS shoeDistanceKm
       FROM Activities a
       LEFT JOIN Users u ON u.id = a.owner_user_id
-      LEFT JOIN Sessions s ON s.activity_id = a.id
       LEFT JOIN ActivitySummaries js ON js.activity_id = a.id
+      LEFT JOIN Shoes s ON s.id = a.shoe_id
       WHERE a.id = ?
     `,
     [activityId]
@@ -1125,6 +1126,37 @@ async function getDashboardOverview(filters = {}) {
   };
 }
 
+async function getTodayHealth(userId) {
+  const today = new Date().toISOString().slice(0, 10);
+  const [dhs] = await db.query(
+    `SELECT
+      steps, resting_heart_rate_bpm AS restingHeartRateBpm,
+      avg_stress_level AS avgStressLevel, max_stress_level AS maxStressLevel,
+      body_battery_charged AS bodyBatteryCharged,
+      stress_duration_s AS stressDurationS,
+      low_stress_duration_s AS lowStressDurationS,
+      high_stress_duration_s AS highStressDurationS,
+      sleeping_seconds AS sleepingSeconds,
+      avg_waking_respiration_value AS avgWakingRespiration
+    FROM DailyHealthSummaries
+    WHERE user_id = ? AND summary_date = ?
+    LIMIT 1`,
+    [userId, today]
+  );
+  const [sleep] = await db.query(
+    `SELECT
+      duration_s AS durationS, sleep_score AS sleepScore,
+      deep_sleep_s AS deepSleepS, light_sleep_s AS lightSleepS, rem_sleep_s AS remSleepS,
+      avg_hrv AS avgHrv, avg_heart_rate_during_sleep AS avgHeartRateDuringSleep,
+      avg_sleep_stress AS avgSleepStress
+    FROM SleepSummaries
+    WHERE user_id = ? AND sleep_date = ?
+    LIMIT 1`,
+    [userId, today]
+  );
+  return { ...(dhs || {}), ...(sleep || {}) };
+}
+
 module.exports = {
   listActivities,
   getActivityById,
@@ -1142,5 +1174,6 @@ module.exports = {
   getHeartRateZones,
   getLoadBalance,
   getPersonalBests,
-  getDashboardOverview
+  getDashboardOverview,
+  getTodayHealth
 };

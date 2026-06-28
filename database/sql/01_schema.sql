@@ -5,18 +5,17 @@ CREATE DATABASE IF NOT EXISTS MotionAnalysis
 USE MotionAnalysis;
 
 SET FOREIGN_KEY_CHECKS = 0;
-DROP TABLE IF EXISTS FitMessages;
-DROP TABLE IF EXISTS Metrics;
+DROP TABLE IF EXISTS DailyStressSummaries;
+
+DROP TABLE IF EXISTS RestingHeartRates;
+DROP TABLE IF EXISTS SleepSummaries;
+DROP TABLE IF EXISTS DailyHealthSummaries;
 DROP TABLE IF EXISTS ActivityZones;
 DROP TABLE IF EXISTS ActivitySummaries;
-DROP TABLE IF EXISTS Events;
 DROP TABLE IF EXISTS TrackPoints;
 DROP TABLE IF EXISTS Laps;
-DROP TABLE IF EXISTS Sessions;
-DROP TABLE IF EXISTS ActivitySourceFiles;
 DROP TABLE IF EXISTS Activities;
 DROP TABLE IF EXISTS Users;
-DROP TABLE IF EXISTS SourceFiles;
 SET FOREIGN_KEY_CHECKS = 1;
 
 CREATE TABLE Users (
@@ -32,15 +31,18 @@ CREATE TABLE Users (
     CONSTRAINT UQ_Users_username UNIQUE (username)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-CREATE TABLE SourceFiles (
+CREATE TABLE Shoes (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    source_type VARCHAR(40) NOT NULL COMMENT 'fit/json/report/gpx/tcx 等来源类型。',
-    file_name VARCHAR(260) NOT NULL,
-    file_path VARCHAR(1000) NOT NULL,
-    file_size_bytes BIGINT NOT NULL,
-    file_hash CHAR(64) NOT NULL,
-    imported_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT UQ_SourceFiles_file_hash UNIQUE (file_hash)
+    user_id INT NOT NULL,
+    name VARCHAR(120) NOT NULL,
+    brand VARCHAR(80) NULL,
+    model VARCHAR(120) NULL,
+    purchase_date DATE NULL,
+    distance_km DOUBLE NOT NULL DEFAULT 0,
+    is_retired BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT FK_Shoes_user FOREIGN KEY (user_id) REFERENCES Users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE Activities (
@@ -61,97 +63,46 @@ CREATE TABLE Activities (
     owner_user_id INT NULL,
     data_source VARCHAR(40) NOT NULL DEFAULT 'garmin_import',
     is_manual BOOLEAN NOT NULL DEFAULT FALSE,
-    match_status VARCHAR(40) NOT NULL DEFAULT 'imported' COMMENT 'matched_fit_json / fit_only / json_only 等。',
+    match_status VARCHAR(40) NOT NULL DEFAULT 'imported',
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    raw_json JSON NULL,
     CONSTRAINT UQ_Activities_activity_key UNIQUE (activity_key),
     CONSTRAINT UQ_Activities_garmin_activity_id UNIQUE (garmin_activity_id),
+    shoe_id INT NULL,
     CONSTRAINT FK_Activities_owner_user
-        FOREIGN KEY (owner_user_id) REFERENCES Users(id) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE ActivitySourceFiles (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    activity_id INT NOT NULL,
-    source_file_id INT NOT NULL,
-    source_role VARCHAR(40) NOT NULL COMMENT 'fit / garmin_json / report / route 等。',
-    match_score DOUBLE NULL COMMENT '内容匹配得分；文件名随意时用于追溯匹配依据。',
-    match_note VARCHAR(400) NULL,
-    CONSTRAINT UQ_ActivitySourceFiles_activity_source UNIQUE (activity_id, source_file_id, source_role),
-    CONSTRAINT FK_ActivitySourceFiles_Activities
-        FOREIGN KEY (activity_id) REFERENCES Activities(id) ON DELETE CASCADE,
-    CONSTRAINT FK_ActivitySourceFiles_SourceFiles
-        FOREIGN KEY (source_file_id) REFERENCES SourceFiles(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE Sessions (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    activity_id INT NOT NULL,
-    start_time_utc DATETIME(3) NULL,
-    total_elapsed_time_s DOUBLE NULL,
-    total_timer_time_s DOUBLE NULL,
-    total_moving_time_s DOUBLE NULL COMMENT 'FIT session field 59; Garmin Connect 的 movingDuration 当前来自 JSON，FIT 中可能为空。',
-    total_distance_m DOUBLE NULL,
-    total_calories INT NULL,
-    avg_speed_mps DOUBLE NULL,
-    max_speed_mps DOUBLE NULL,
-    avg_heart_rate_bpm INT NULL,
-    max_heart_rate_bpm INT NULL,
-    avg_cadence DOUBLE NULL COMMENT 'FIT/Garmin 跑步步频口径：单腿/单脚 cadence。',
-    max_cadence DOUBLE NULL COMMENT 'FIT/Garmin 跑步步频口径：单腿/单脚 cadence。',
-    avg_power_w INT NULL,
-    max_power_w INT NULL,
-    normalized_power_w INT NULL COMMENT '标准化功率 Normalized Power，单位 W；FIT session field 34。',
-    total_ascent_m INT NULL,
-    total_descent_m INT NULL,
-    raw_json JSON NULL,
-    CONSTRAINT FK_Sessions_Activities
-        FOREIGN KEY (activity_id) REFERENCES Activities(id) ON DELETE CASCADE
+        FOREIGN KEY (owner_user_id) REFERENCES Users(id) ON DELETE SET NULL,
+    CONSTRAINT FK_Activities_shoe
+        FOREIGN KEY (shoe_id) REFERENCES Shoes(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE ActivitySummaries (
     id INT AUTO_INCREMENT PRIMARY KEY,
     activity_id INT NOT NULL,
-    garmin_activity_id VARCHAR(80) NULL,
-    duration_s DOUBLE NULL COMMENT 'Garmin Connect duration，通常对应总时长/计时时间。',
-    moving_duration_s DOUBLE NULL COMMENT 'Garmin Connect movingDuration，截图中的移动时间。',
-    elapsed_duration_s DOUBLE NULL COMMENT 'Garmin Connect elapsedDuration，截图中的全程耗时。',
+    duration_s DOUBLE NULL,
+    moving_duration_s DOUBLE NULL,
+    elapsed_duration_s DOUBLE NULL,
     distance_m DOUBLE NULL,
     calories DOUBLE NULL,
     avg_speed_mps DOUBLE NULL,
     max_speed_mps DOUBLE NULL,
     avg_heart_rate_bpm INT NULL,
     max_heart_rate_bpm INT NULL,
-    avg_cadence_spm DOUBLE NULL COMMENT 'Garmin JSON 双脚步频，steps per minute。',
-    max_cadence_spm DOUBLE NULL COMMENT 'Garmin JSON 双脚步频，steps per minute。',
+    avg_cadence_spm DOUBLE NULL,
+    max_cadence_spm DOUBLE NULL,
     avg_power_w INT NULL,
     max_power_w INT NULL,
-    normalized_power_w INT NULL COMMENT '标准化功率 Normalized Power，单位 W。',
-    intensity_factor DOUBLE NULL,
-    training_stress_score DOUBLE NULL,
-    max_20min_power_w INT NULL,
+    normalized_power_w INT NULL,
     aerobic_training_effect DOUBLE NULL,
     anaerobic_training_effect DOUBLE NULL,
     training_effect_label VARCHAR(120) NULL,
     activity_training_load DOUBLE NULL,
     vo2max DOUBLE NULL,
     body_battery_delta INT NULL,
-    water_estimated_ml DOUBLE NULL,
-    moderate_intensity_minutes INT NULL,
-    vigorous_intensity_minutes INT NULL,
     avg_stride_length_cm DOUBLE NULL,
-    avg_vertical_oscillation_cm DOUBLE NULL,
-    avg_ground_contact_time_ms DOUBLE NULL,
-    avg_vertical_ratio DOUBLE NULL,
-    avg_respiration_rate DOUBLE NULL,
-    max_respiration_rate DOUBLE NULL,
-    min_respiration_rate DOUBLE NULL,
     elevation_gain_m DOUBLE NULL,
     elevation_loss_m DOUBLE NULL,
     min_elevation_m DOUBLE NULL,
     max_elevation_m DOUBLE NULL,
-    original_file_url VARCHAR(1000) NULL,
     manufacturer VARCHAR(100) NULL,
     raw_json JSON NULL,
     CONSTRAINT UQ_ActivitySummaries_activity UNIQUE (activity_id),
@@ -162,10 +113,10 @@ CREATE TABLE ActivitySummaries (
 CREATE TABLE ActivityZones (
     id INT AUTO_INCREMENT PRIMARY KEY,
     activity_id INT NOT NULL,
-    zone_type VARCHAR(40) NOT NULL COMMENT 'heart_rate / power',
+    zone_type VARCHAR(40) NOT NULL,
     zone_index INT NOT NULL,
     duration_s DOUBLE NOT NULL,
-    source_field VARCHAR(80) NULL COMMENT 'hrZone/powerZone/metadata 等来源字段。',
+    source_field VARCHAR(80) NULL,
     CONSTRAINT UQ_ActivityZones_activity_type_index UNIQUE (activity_id, zone_type, zone_index),
     CONSTRAINT FK_ActivityZones_Activities
         FOREIGN KEY (activity_id) REFERENCES Activities(id) ON DELETE CASCADE
@@ -183,8 +134,8 @@ CREATE TABLE Laps (
     max_speed_mps DOUBLE NULL,
     avg_heart_rate_bpm INT NULL,
     max_heart_rate_bpm INT NULL,
-    avg_cadence DOUBLE NULL COMMENT 'FIT/Garmin 跑步步频口径：单腿/单脚 cadence。',
-    max_cadence DOUBLE NULL COMMENT 'FIT/Garmin 跑步步频口径：单腿/单脚 cadence。',
+    avg_cadence DOUBLE NULL,
+    max_cadence DOUBLE NULL,
     avg_power_w INT NULL,
     max_power_w INT NULL,
     raw_json JSON NULL,
@@ -203,7 +154,7 @@ CREATE TABLE TrackPoints (
     distance_m DOUBLE NULL,
     speed_mps DOUBLE NULL,
     heart_rate_bpm INT NULL,
-    cadence DOUBLE NULL COMMENT 'FIT/Garmin 跑步步频口径：单腿/单脚 cadence。',
+    cadence DOUBLE NULL,
     power_w INT NULL,
     accumulated_power_w INT NULL,
     vertical_oscillation_mm DOUBLE NULL,
@@ -213,56 +164,77 @@ CREATE TABLE TrackPoints (
         FOREIGN KEY (activity_id) REFERENCES Activities(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-CREATE TABLE Events (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    activity_id INT NOT NULL,
-    event_index INT NOT NULL,
-    event_time_utc DATETIME(3) NULL,
-    event_type VARCHAR(80) NULL,
-    event VARCHAR(80) NULL,
-    event_group INT NULL,
-    raw_json JSON NULL,
-    CONSTRAINT FK_Events_Activities
-        FOREIGN KEY (activity_id) REFERENCES Activities(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE Metrics (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    activity_id INT NOT NULL,
-    metric_type VARCHAR(80) NOT NULL,
-    metric_name VARCHAR(120) NOT NULL,
-    metric_value_float DOUBLE NULL,
-    metric_value_text VARCHAR(400) NULL,
-    unit VARCHAR(40) NULL,
-    raw_json JSON NULL,
-    CONSTRAINT FK_Metrics_Activities
-        FOREIGN KEY (activity_id) REFERENCES Activities(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE FitMessages (
+CREATE TABLE DailyHealthSummaries (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    activity_id INT NOT NULL,
-    message_index INT NOT NULL,
-    global_message_num INT NOT NULL,
-    message_name VARCHAR(80) NOT NULL,
-    local_message_num INT NULL,
-    message_time_utc DATETIME(3) NULL,
-    raw_json JSON NOT NULL,
-    CONSTRAINT FK_FitMessages_Activities
-        FOREIGN KEY (activity_id) REFERENCES Activities(id) ON DELETE CASCADE
+    user_id INT NOT NULL,
+    summary_date DATE NOT NULL,
+    steps INT NULL,
+    distance_m DOUBLE NULL,
+    calories DOUBLE NULL,
+    active_calories DOUBLE NULL,
+    floors_climbed DOUBLE NULL,
+    moderate_intensity_minutes INT NULL,
+    vigorous_intensity_minutes INT NULL,
+    avg_stress_level DOUBLE NULL,
+    max_stress_level DOUBLE NULL,
+    body_battery_charged INT NULL,
+    body_battery_drained INT NULL,
+    min_body_battery INT NULL,
+    max_body_battery INT NULL,
+    resting_heart_rate_bpm INT NULL,
+    avg_waking_respiration_value DOUBLE NULL,
+    lowest_respiration_value DOUBLE NULL,
+    highest_respiration_value DOUBLE NULL,
+    stress_duration_s INT NULL,
+    rest_stress_duration_s INT NULL,
+    activity_stress_duration_s INT NULL,
+    low_stress_duration_s INT NULL,
+    medium_stress_duration_s INT NULL,
+    high_stress_duration_s INT NULL,
+    sleeping_seconds INT NULL,
+    raw_json JSON NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT UQ_DailyHealthSummaries_user_date UNIQUE (user_id, summary_date),
+    CONSTRAINT FK_DailyHealthSummaries_user
+        FOREIGN KEY (user_id) REFERENCES Users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE SleepSummaries (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    sleep_date DATE NOT NULL,
+    sleep_start DATETIME(3) NULL,
+    sleep_end DATETIME(3) NULL,
+    duration_s INT NULL,
+    deep_sleep_s INT NULL,
+    light_sleep_s INT NULL,
+    rem_sleep_s INT NULL,
+    awake_s INT NULL,
+    sleep_score INT NULL,
+    avg_hrv DOUBLE NULL,
+    avg_heart_rate_during_sleep INT NULL,
+    avg_sleep_stress DOUBLE NULL,
+    avg_respiration_value DOUBLE NULL,
+    lowest_respiration_value DOUBLE NULL,
+    highest_respiration_value DOUBLE NULL,
+    raw_json JSON NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT UQ_SleepSummaries_user_date UNIQUE (user_id, sleep_date),
+    CONSTRAINT FK_SleepSummaries_user
+        FOREIGN KEY (user_id) REFERENCES Users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE INDEX IX_Activities_type_start ON Activities(activity_type, start_time_utc);
 CREATE INDEX IX_Activities_local_start ON Activities(local_start_time);
 CREATE INDEX IX_Activities_owner_source ON Activities(owner_user_id, data_source);
-CREATE INDEX IX_ActivitySourceFiles_source_role ON ActivitySourceFiles(source_role);
-CREATE INDEX IX_Sessions_activity ON Sessions(activity_id);
 CREATE INDEX IX_ActivitySummaries_load ON ActivitySummaries(activity_training_load);
 CREATE INDEX IX_ActivityZones_activity_type ON ActivityZones(activity_id, zone_type);
 CREATE UNIQUE INDEX IX_Laps_activity_index ON Laps(activity_id, lap_index);
 CREATE UNIQUE INDEX IX_TrackPoints_activity_index ON TrackPoints(activity_id, sample_index);
 CREATE INDEX IX_TrackPoints_activity_time ON TrackPoints(activity_id, sample_time_utc);
 CREATE INDEX IX_TrackPoints_activity_distance ON TrackPoints(activity_id, distance_m);
-CREATE UNIQUE INDEX IX_Events_activity_index ON Events(activity_id, event_index);
-CREATE INDEX IX_Events_activity_time ON Events(activity_id, event_time_utc);
-CREATE INDEX IX_FitMessages_activity_message ON FitMessages(activity_id, message_name);
+CREATE INDEX IX_DailyHealthSummaries_user_date ON DailyHealthSummaries(user_id, summary_date);
+CREATE INDEX IX_SleepSummaries_user_date ON SleepSummaries(user_id, sleep_date);
+

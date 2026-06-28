@@ -45,6 +45,23 @@
         <MetricCard label="训练负荷" :value="formatTrainingLoad(activity.activity_training_load)" />
       </div>
 
+      <section class="dark-panel">
+        <div class="section-heading">
+          <div>
+            <h2>绑定跑鞋</h2>
+          </div>
+        </div>
+        <div class="shoe-bind">
+          <select v-model="selectedShoeId" @change="bindShoe">
+            <option :value="null">不绑定</option>
+            <option v-for="s in shoes" :key="s.id" :value="s.id" :disabled="s.isRetired">
+              {{ s.name }} {{ s.isRetired ? '(已退役)' : '' }}
+            </option>
+          </select>
+          <span v-if="activity.shoeName" class="shoe-bind-info">当前：{{ activity.shoeName }}</span>
+        </div>
+      </section>
+
       <div class="detail-grid">
         <ChartPanel title="心率曲线" eyebrow="运动详情" :option="heartRateOption" />
         <ChartPanel title="配速曲线" eyebrow="运动详情" :option="paceOption" />
@@ -127,6 +144,7 @@ import {
 } from '@/services/activities'
 import { authSession } from '@/stores/authStore'
 import { formatClockDuration, formatDistance, formatPace, formatPaceSeconds } from '@/utils/formatters'
+import { apiClient } from '@/services/http'
 
 const route = useRoute()
 const router = useRouter()
@@ -142,6 +160,8 @@ const trackPoints = ref([])
 const heartRateSeries = ref([])
 const speedSeries = ref([])
 const laps = ref([])
+const shoes = ref([])
+const selectedShoeId = ref(null)
 
 const sportColor = computed(() => {
   if (activity.value?.activity_type === '骑行') return '#ff9d19'
@@ -363,6 +383,9 @@ async function loadActivity(id) {
       return
     }
 
+    selectedShoeId.value = nextActivity.shoeId || null
+    try { const { data } = await apiClient.get('/shoes'); shoes.value = data || [] } catch (_) {}
+
     const [points, heartRate, speed, lapRows] = await Promise.all([
       getTrackPoints(id),
       getHeartRateSeries(id),
@@ -417,5 +440,17 @@ async function handleSaved(nextActivity) {
   await loadActivity(nextActivity.id)
 }
 
+async function bindShoe() {
+  await apiClient.post(`/activities/${activity.value.id}/shoe`, { shoeId: selectedShoeId.value })
+  const s = shoes.value.find(s => s.id === selectedShoeId.value)
+  activity.value.shoeName = s?.name || null
+}
+
 watch(() => route.params.id, loadActivity, { immediate: true })
 </script>
+
+<style scoped>
+.shoe-bind { display: flex; align-items: center; gap: 12px; padding: 8px 0; }
+.shoe-bind select { padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border, #333); background: var(--bg-elevated, #1a1a2e); color: inherit; }
+.shoe-bind-info { font-size: 13px; color: var(--text-muted, #888); }
+</style>
