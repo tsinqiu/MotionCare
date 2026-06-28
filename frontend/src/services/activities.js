@@ -1,4 +1,5 @@
 import { cleanParams, getEnvelope, mutateEnvelope } from '@/services/api'
+import { apiClient, unwrapApiResponse } from '@/services/http'
 
 const ACTIVITY_TYPE_LABELS = {
   running: '跑步',
@@ -97,6 +98,16 @@ export function normalizeActivity(row = {}) {
     activity_training_load: toNumber(firstDefined(row.activity_training_load, row.activityTrainingLoad)),
     avg_pace_sec_per_km: toNumber(firstDefined(row.avg_pace_sec_per_km, row.avgPaceSecPerKm)),
     vo2max: toNumber(firstDefined(row.vo2max, row.vo2Max)),
+    perceived_effort: toNumber(firstDefined(row.perceived_effort, row.perceivedEffort)),
+    photo_path: firstDefined(row.photo_path, row.photoPath),
+    shoe_id: toNumber(firstDefined(row.shoe_id, row.shoeId)),
+    shoe_name: firstDefined(row.shoe_name, row.shoeName),
+    weather_condition: firstDefined(row.weather_condition, row.weatherCondition),
+    temperature_c: toNumber(firstDefined(row.temperature_c, row.temperatureC)),
+    humidity_percent: toNumber(firstDefined(row.humidity_percent, row.humidityPercent)),
+    feels_like_c: toNumber(firstDefined(row.feels_like_c, row.feelsLikeC)),
+    weather_source: firstDefined(row.weather_source, row.weatherSource),
+    weather_updated_at: firstDefined(row.weather_updated_at, row.weatherUpdatedAt),
   }
 }
 
@@ -236,6 +247,29 @@ export async function updateManualActivity(id, payload) {
 
 export async function deleteManualActivity(id) {
   const envelope = await mutateEnvelope('delete', `/manual-activities/${id}`)
+  return envelope.data
+}
+
+export async function updateActivityMeta(id, payload) {
+  const envelope = await mutateEnvelope('patch', `/activities/${id}`, payload, { normalizer: normalizeActivity })
+  return envelope.data
+}
+
+export async function uploadActivityPhoto(id, file) {
+  const form = new FormData()
+  form.append('photo', file)
+  const response = await apiClient.post(`/activities/${id}/photo`, form)
+  const envelope = unwrapApiResponse(response.data)
+  return normalizeActivity(envelope.data)
+}
+
+export async function updateActivityWeather(id, payload) {
+  const envelope = await mutateEnvelope('patch', `/activities/${id}/weather`, payload, { normalizer: normalizeActivity })
+  return envelope.data
+}
+
+export async function fetchActivityWeather(id) {
+  const envelope = await mutateEnvelope('post', `/activities/${id}/weather/fetch`, {}, { normalizer: normalizeActivity })
   return envelope.data
 }
 

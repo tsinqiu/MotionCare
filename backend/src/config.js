@@ -96,6 +96,8 @@ const config = {
     exploreVideosDir: resolveBackendPath(process.env.EXPLORE_VIDEO_UPLOAD_DIR, 'uploads/explore-videos'),
     exploreImagesDir: resolveBackendPath(process.env.EXPLORE_IMAGE_UPLOAD_DIR, 'uploads/explore-images'),
     communityImagesDir: resolveBackendPath(process.env.COMMUNITY_IMAGE_UPLOAD_DIR, 'uploads/community-images'),
+    activityImagesDir: resolveBackendPath(process.env.ACTIVITY_IMAGE_UPLOAD_DIR, 'uploads/activity-images'),
+    shoeImagesDir: resolveBackendPath(process.env.SHOE_IMAGE_UPLOAD_DIR, 'uploads/shoe-images'),
     maxVideoBytes: parseInteger(process.env.EXPLORE_VIDEO_MAX_BYTES, 200 * 1024 * 1024),
     maxImageBytes: parseInteger(process.env.IMAGE_UPLOAD_MAX_BYTES, 10 * 1024 * 1024)
   },

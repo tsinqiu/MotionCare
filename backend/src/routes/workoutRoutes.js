@@ -1,5 +1,6 @@
 const express = require('express');
 const defaultWorkoutService = require('../services/workoutService');
+const defaultWeatherService = require('../services/weatherService');
 const defaultAuthService = require('../services/authService');
 const { ApiError } = require('../errors');
 const { asyncHandler, parseActivityType, parseOptionalNumber, parsePositiveId } = require('../http');
@@ -170,6 +171,29 @@ function createWorkoutRouter({ workoutService = defaultWorkoutService, authServi
       );
       statsCache.clear();
       sendData(res, result);
+
+      const activityId = result.activityId || result?.activity?.id;
+      if (activityId) {
+        const db = require('../db');
+        const [act] = await db.query(
+          `SELECT id, start_latitude AS startLatitude, start_longitude AS startLongitude, local_start_time AS localStartTime
+           FROM Activities WHERE id = ? AND start_latitude IS NOT NULL AND start_longitude IS NOT NULL`,
+          [activityId]
+        );
+        if (act) {
+          defaultWeatherService.fetchHistoricalWeatherForActivity(act)
+            .then((payload) => {
+              const { weatherCondition, temperatureC, humidityPercent, feelsLikeC } = payload;
+              if (temperatureC !== null || humidityPercent !== null || feelsLikeC !== null) {
+                return db.query(
+                  `UPDATE Activities SET weather_condition = ?, temperature_c = ?, humidity_percent = ?, feels_like_c = ?, weather_source = 'open_meteo', weather_updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+                  [weatherCondition, temperatureC, humidityPercent, feelsLikeC, act.id]
+                );
+              }
+            })
+            .catch(() => {});
+        }
+      }
     })
   );
 

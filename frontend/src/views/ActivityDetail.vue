@@ -45,7 +45,51 @@
         <MetricCard label="训练负荷" :value="formatTrainingLoad(activity.activity_training_load)" />
       </div>
 
+      <section v-if="canEditActivity" class="dark-panel">
+        <div class="section-heading">
+          <div><h2>编辑活动信息</h2></div>
+        </div>
+        <div class="edit-form">
+          <label>
+            <span>活动名称</span>
+            <input v-model="editForm.activityName" type="text" placeholder="输入活动名称" />
+          </label>
+          <label>
+            <span>体感程度 (1-10)</span>
+            <input v-model.number="editForm.effort" type="number" min="1" max="10" placeholder="1-10" />
+          </label>
+          <div class="edit-form-actions">
+            <button type="button" class="primary-link" :disabled="isSavingMeta" @click="saveMeta">
+              {{ isSavingMeta ? '保存中' : '保存' }}
+            </button>
+          </div>
+        </div>
+        <div class="photo-section">
+          <label class="photo-upload-label">
+            <span>活动照片</span>
+            <input type="file" accept="image/*" @change="uploadPhoto" :disabled="isUploadingPhoto" />
+          </label>
+          <span v-if="isUploadingPhoto" class="upload-status">上传中...</span>
+          <img v-if="activity.photo_path" :src="photoUrl(activity.photo_path)" class="activity-photo" alt="活动照片" />
+        </div>
+      </section>
+
       <section class="dark-panel">
+        <div class="section-heading">
+          <div>
+            <h2>天气</h2>
+          </div>
+        </div>
+        <div class="weather-grid">
+          <span><small>天气</small><b>{{ activity.weather_condition || '--' }}</b></span>
+          <span><small>温度</small><b>{{ activity.temperature_c != null ? activity.temperature_c + '°C' : '--' }}</b></span>
+          <span><small>湿度</small><b>{{ activity.humidity_percent != null ? activity.humidity_percent + '%' : '--' }}</b></span>
+          <span><small>体感</small><b>{{ activity.feels_like_c != null ? activity.feels_like_c + '°C' : '--' }}</b></span>
+        </div>
+        <p v-if="activity.weather_source" class="weather-source">来源：{{ activity.weather_source }}{{ activity.weather_updated_at ? ' · ' + new Date(activity.weather_updated_at).toLocaleString('zh-CN') : '' }}</p>
+      </section>
+
+      <section v-if="isRunningActivity" class="dark-panel">
         <div class="section-heading">
           <div>
             <h2>绑定跑鞋</h2>
@@ -121,7 +165,7 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import ChartPanel from '@/components/ChartPanel.vue'
@@ -140,7 +184,9 @@ import {
   getLaps,
   getSpeedSeries,
   getTrackPoints,
+  updateActivityMeta,
   updateManualActivity,
+  uploadActivityPhoto,
 } from '@/services/activities'
 import { authSession } from '@/stores/authStore'
 import { formatClockDuration, formatDistance, formatPace, formatPaceSeconds } from '@/utils/formatters'
@@ -162,6 +208,9 @@ const speedSeries = ref([])
 const laps = ref([])
 const shoes = ref([])
 const selectedShoeId = ref(null)
+const editForm = ref({ activityName: '', effort: null })
+const isSavingMeta = ref(false)
+const isUploadingPhoto = ref(false)
 
 const sportColor = computed(() => {
   if (activity.value?.activity_type === '骑行') return '#ff9d19'
@@ -170,6 +219,15 @@ const sportColor = computed(() => {
   return '#21d47b'
 })
 const canManageManual = computed(() => authSession.user?.role === 'admin' && activity.value?.is_manual)
+const isRunningActivity = computed(() => {
+  const rawType = activity.value?.raw_activity_type
+  return ['running', 'street_running', 'track_running', 'treadmill_running'].includes(rawType)
+})
+const canEditActivity = computed(() => {
+  if (!authSession.user) return false
+  if (authSession.user.role === 'admin') return true
+  return authSession.user.id === activity.value?.ownerUserId
+})
 const analysisInsights = computed(() => analysis.value?.insights || [])
 const analysisSuggestions = computed(() => analysis.value?.suggestions || [])
 
@@ -383,6 +441,9 @@ async function loadActivity(id) {
       return
     }
 
+    editForm.value.activityName = nextActivity.activity_name || ''
+    editForm.value.effort = nextActivity.perceived_effort || null
+
     selectedShoeId.value = nextActivity.shoeId || null
     try { const { data } = await apiClient.get('/shoes'); shoes.value = data || [] } catch (_) {}
 
@@ -414,6 +475,46 @@ async function runAnalysis() {
     analysisError.value = err instanceof Error ? err.message : '智能分析失败'
   } finally {
     analysisLoading.value = false
+  }
+}
+
+async function saveMeta() {
+  isSavingMeta.value = true
+  try {
+    const updated = await updateActivityMeta(activity.value.id, {
+      activityName: editForm.value.activityName || undefined,
+      perceivedEffort: editForm.value.effort || null,
+    })
+    activity.value = updated
+    editForm.value.activityName = updated.activity_name || ''
+    editForm.value.effort = updated.perceived_effort || null
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : '保存失败'
+  } finally {
+    isSavingMeta.value = false
+  }
+}
+
+function photoUrl(path) {
+  if (!path) return ''
+  const base = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api'
+  return base.replace(/\/api$/, '') + path
+}
+
+async function uploadPhoto(e) {
+  const file = e.target.files?.[0]
+  if (!file) return
+  isUploadingPhoto.value = true
+  try {
+    const updated = await uploadActivityPhoto(activity.value.id, file)
+    activity.value = updated
+    editForm.value.activityName = updated.activity_name || ''
+    editForm.value.effort = updated.perceived_effort || null
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : '照片上传失败'
+  } finally {
+    isUploadingPhoto.value = false
+    e.target.value = ''
   }
 }
 
@@ -453,4 +554,19 @@ watch(() => route.params.id, loadActivity, { immediate: true })
 .shoe-bind { display: flex; align-items: center; gap: 12px; padding: 8px 0; }
 .shoe-bind select { padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border, #333); background: var(--bg-elevated, #1a1a2e); color: inherit; }
 .shoe-bind-info { font-size: 13px; color: var(--text-muted, #888); }
+.edit-form { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; padding: 8px 0; }
+.edit-form label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--text-muted, #888); }
+.edit-form input { padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border, #333); background: var(--bg-elevated, #1a1a2e); color: inherit; }
+.edit-form-actions { display: flex; align-items: flex-end; }
+.photo-section { padding: 8px 0; display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.photo-upload-label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--text-muted, #888); }
+.upload-status { font-size: 12px; color: var(--text-muted, #888); }
+.activity-photo { max-width: 240px; max-height: 180px; border-radius: 8px; object-fit: cover; margin-top: 8px; }
+.weather-grid { display: flex; flex-wrap: wrap; gap: 16px; padding: 8px 0; }
+.weather-grid span { display: flex; flex-direction: column; gap: 2px; }
+.weather-grid small { font-size: 12px; color: var(--text-muted, #888); }
+.weather-form { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; padding: 8px 0; }
+.weather-form label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--text-muted, #888); }
+.weather-form input { width: 100px; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--border, #333); background: var(--bg-elevated, #1a1a2e); color: inherit; }
+.weather-source { font-size: 11px; color: var(--text-muted, #888); margin: 4px 0 0; }
 </style>

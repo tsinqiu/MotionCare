@@ -243,6 +243,12 @@ async function listActivities({
       a.data_source AS dataSource,
       a.is_manual AS isManual,
       a.shoe_id AS shoeId,
+      a.perceived_effort AS perceivedEffort,
+      a.photo_path AS photoPath,
+      a.weather_condition AS weatherCondition,
+      a.temperature_c AS temperatureC,
+      a.humidity_percent AS humidityPercent,
+      a.feels_like_c AS feelsLikeC,
       ROUND(js.distance_m / 1000, 2) AS fitDistanceKm,
       ROUND(js.distance_m / 1000, 2) AS jsonDistanceKm,
       js.duration_s AS fitTimerTimeS,
@@ -310,6 +316,17 @@ async function getActivityById(activityId) {
         a.data_source AS dataSource,
         a.is_manual AS isManual,
         a.shoe_id AS shoeId,
+        a.perceived_effort AS perceivedEffort,
+        a.photo_path AS photoPath,
+        a.photo_original_name AS photoOriginalName,
+        a.photo_mime_type AS photoMimeType,
+        a.photo_size_bytes AS photoSizeBytes,
+        a.weather_condition AS weatherCondition,
+        a.temperature_c AS temperatureC,
+        a.humidity_percent AS humidityPercent,
+        a.feels_like_c AS feelsLikeC,
+        a.weather_source AS weatherSource,
+        a.weather_updated_at AS weatherUpdatedAt,
         js.elapsed_duration_s AS fitElapsedTimeS,
         js.duration_s AS fitTimerTimeS,
         js.elapsed_duration_s AS elapsedDurationS,
@@ -1157,6 +1174,144 @@ async function getTodayHealth(userId) {
   return { ...(dhs || {}), ...(sleep || {}) };
 }
 
+async function updateActivityMeta(user, activityId, payload) {
+  const rows = await db.query('SELECT owner_user_id FROM Activities WHERE id = ?', [activityId]);
+  if (!rows.length) {
+    const err = new Error('activity not found');
+    err.status = 404;
+    throw err;
+  }
+
+  if (user.role !== 'admin' && rows[0].owner_user_id !== user.id) {
+    const err = new Error('forbidden');
+    err.status = 403;
+    throw err;
+  }
+
+  const sets = [];
+  const params = [];
+
+  if (payload.activityName !== undefined) {
+    sets.push('activity_name = ?');
+    params.push(payload.activityName);
+  }
+
+  if (payload.perceivedEffort !== undefined && payload.perceivedEffort !== null && payload.perceivedEffort !== '') {
+    const effort = Number(payload.perceivedEffort);
+    if (!Number.isInteger(effort) || effort < 1 || effort > 10) {
+      const err = new Error('perceivedEffort must be an integer from 1 to 10');
+      err.status = 400;
+      throw err;
+    }
+    sets.push('perceived_effort = ?');
+    params.push(effort);
+  } else if (payload.perceivedEffort === '' || payload.perceivedEffort === null) {
+    sets.push('perceived_effort = NULL');
+  }
+
+  if (!sets.length) {
+    return getActivityById(activityId);
+  }
+
+  params.push(activityId);
+  await db.query(`UPDATE Activities SET ${sets.join(', ')} WHERE id = ?`, params);
+
+  return getActivityById(activityId);
+}
+
+async function updateActivityPhoto(user, activityId, fileInfo) {
+  const rows = await db.query('SELECT owner_user_id FROM Activities WHERE id = ?', [activityId]);
+  if (!rows.length) {
+    const err = new Error('activity not found');
+    err.status = 404;
+    throw err;
+  }
+
+  if (user.role !== 'admin' && rows[0].owner_user_id !== user.id) {
+    const err = new Error('forbidden');
+    err.status = 403;
+    throw err;
+  }
+
+  await db.query(
+    `UPDATE Activities SET photo_path = ?, photo_original_name = ?, photo_mime_type = ?, photo_size_bytes = ? WHERE id = ?`,
+    [fileInfo.path, fileInfo.originalName || null, fileInfo.mimeType || null, fileInfo.size != null ? Number(fileInfo.size) : null, activityId]
+  );
+
+  return getActivityById(activityId);
+}
+
+async function updateActivityWeather(user, activityId, payload, source = 'manual') {
+  const rows = await db.query('SELECT owner_user_id FROM Activities WHERE id = ?', [activityId]);
+  if (!rows.length) {
+    const err = new Error('activity not found');
+    err.status = 404;
+    throw err;
+  }
+
+  if (user.role !== 'admin' && rows[0].owner_user_id !== user.id) {
+    const err = new Error('forbidden');
+    err.status = 403;
+    throw err;
+  }
+
+  if (payload.weatherCondition !== undefined && payload.weatherCondition !== null) {
+    const text = String(payload.weatherCondition).trim();
+    if (text.length > 80) {
+      const err = new Error('weatherCondition must be at most 80 characters');
+      err.status = 400;
+      throw err;
+    }
+  }
+
+  if (payload.temperatureC !== undefined && payload.temperatureC !== null && payload.temperatureC !== '') {
+    const temp = Number(payload.temperatureC);
+    if (!Number.isFinite(temp) || temp < -80 || temp > 80) {
+      const err = new Error('temperatureC must be from -80 to 80');
+      err.status = 400;
+      throw err;
+    }
+  }
+
+  if (payload.humidityPercent !== undefined && payload.humidityPercent !== null && payload.humidityPercent !== '') {
+    const humid = Number(payload.humidityPercent);
+    if (!Number.isInteger(humid) || humid < 0 || humid > 100) {
+      const err = new Error('humidityPercent must be an integer from 0 to 100');
+      err.status = 400;
+      throw err;
+    }
+  }
+
+  if (payload.feelsLikeC !== undefined && payload.feelsLikeC !== null && payload.feelsLikeC !== '') {
+    const feels = Number(payload.feelsLikeC);
+    if (!Number.isFinite(feels) || feels < -100 || feels > 100) {
+      const err = new Error('feelsLikeC must be from -100 to 100');
+      err.status = 400;
+      throw err;
+    }
+  }
+
+  const weatherCondition = payload.weatherCondition !== undefined && payload.weatherCondition !== null && payload.weatherCondition !== ''
+    ? String(payload.weatherCondition).trim()
+    : null;
+  const temperatureC = payload.temperatureC !== undefined && payload.temperatureC !== null && payload.temperatureC !== ''
+    ? Number(payload.temperatureC)
+    : null;
+  const humidityPercent = payload.humidityPercent !== undefined && payload.humidityPercent !== null && payload.humidityPercent !== ''
+    ? Number(payload.humidityPercent)
+    : null;
+  const feelsLikeC = payload.feelsLikeC !== undefined && payload.feelsLikeC !== null && payload.feelsLikeC !== ''
+    ? Number(payload.feelsLikeC)
+    : null;
+
+  await db.query(
+    `UPDATE Activities SET weather_condition = ?, temperature_c = ?, humidity_percent = ?, feels_like_c = ?, weather_source = ?, weather_updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+    [weatherCondition, temperatureC, humidityPercent, feelsLikeC, source, activityId]
+  );
+
+  return getActivityById(activityId);
+}
+
 module.exports = {
   listActivities,
   getActivityById,
@@ -1175,5 +1330,8 @@ module.exports = {
   getLoadBalance,
   getPersonalBests,
   getDashboardOverview,
-  getTodayHealth
+  getTodayHealth,
+  updateActivityMeta,
+  updateActivityPhoto,
+  updateActivityWeather
 };

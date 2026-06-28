@@ -526,6 +526,37 @@ async function runGarminSync(jobId, user, payload) {
   );
   statsCache.clear();
 
+  const weatherService = require('./weatherService');
+
+  if (downloadedIds.length) {
+    const placeholders = downloadedIds.map(() => '?').join(', ');
+    const weatherActivities = await db.query(
+      `SELECT id, start_latitude AS startLatitude, start_longitude AS startLongitude, local_start_time AS localStartTime
+       FROM Activities
+       WHERE garmin_activity_id IN (${placeholders})
+         AND start_latitude IS NOT NULL AND start_longitude IS NOT NULL
+         AND (weather_condition IS NULL AND temperature_c IS NULL)`,
+      [...downloadedIds.map(String)]
+    );
+
+    for (const act of weatherActivities) {
+      weatherService.fetchHistoricalWeatherForActivity(act)
+        .then((payload) => {
+          const wc = payload.weatherCondition;
+          const tc = payload.temperatureC;
+          const hp = payload.humidityPercent;
+          const fl = payload.feelsLikeC;
+          if (tc !== null || hp !== null || fl !== null) {
+            return db.query(
+              `UPDATE Activities SET weather_condition = ?, temperature_c = ?, humidity_percent = ?, feels_like_c = ?, weather_source = 'open_meteo', weather_updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+              [wc, tc, hp, fl, act.id]
+            );
+          }
+        })
+        .catch(() => {});
+    }
+  }
+
   return {
     importedCount: updateResult.affectedRows || downloadedIds.length,
     healthDaysImported: downloadedHealthDays.length,
