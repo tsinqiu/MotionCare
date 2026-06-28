@@ -1,6 +1,5 @@
-import { exploreArticles } from '@/mock/garsync'
+import { collectionPayload, getEnvelope } from '@/services/api'
 import { apiClient, unwrapApiResponse } from '@/services/http'
-import { collectionPayload, getEnvelope, useMockData } from '@/services/api'
 
 function resolveMediaUrl(value) {
   if (!value || typeof value !== 'string') return ''
@@ -47,41 +46,21 @@ function normalizePaged(payload) {
 }
 
 export async function getExploreArticles(params = {}) {
-  if (useMockData()) return normalizePaged(exploreArticles)
-
   const envelope = await getEnvelope('/explore/articles', { params })
   return normalizePaged(envelope.data)
 }
 
 export async function getExploreArticle(id) {
-  if (useMockData()) return exploreArticles.map(normalizeArticle).find((article) => String(article.id) === String(id)) || null
-
   const envelope = await getEnvelope(`/explore/articles/${id}`, { normalizer: normalizeArticle })
   return envelope.data || null
 }
 
 export async function getExploreRecommendations(params = {}) {
-  if (useMockData()) return normalizePaged(exploreArticles.slice(0, 2))
-
   const envelope = await getEnvelope('/explore/recommendations', { params })
   return normalizePaged(envelope.data)
 }
 
 export async function createExploreArticle(payload) {
-  if (useMockData()) {
-    return normalizeArticle({
-      ...payload,
-      id: `mock-article-${Date.now()}`,
-      username: 'Mock User',
-      userBio: '热爱运动和课程分享',
-      coverUrl: payload.image ? URL.createObjectURL(payload.image) : '',
-      imageUrl: payload.image ? URL.createObjectURL(payload.image) : '',
-      videoOriginalName: payload.video?.name || '',
-      videoSizeBytes: payload.video?.size || null,
-      publishedAt: new Date().toISOString(),
-    })
-  }
-
   const formData = new FormData()
   formData.append('type', payload.type)
   formData.append('title', payload.title)

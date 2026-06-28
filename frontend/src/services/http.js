@@ -44,10 +44,6 @@ export function setAuthFailureHandler(handler) {
   authFailureHandler = handler
 }
 
-export function useMockData() {
-  return import.meta.env.VITE_USE_MOCK === 'true'
-}
-
 export function unwrapApiResponse(payload) {
   if (payload && typeof payload === 'object' && Object.prototype.hasOwnProperty.call(payload, 'data')) {
     return {

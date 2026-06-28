@@ -3,7 +3,7 @@ const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 const multer = require('multer');
-const defaultExploreService = require('../services/exploreService');
+const db = require('../db');
 const defaultAuthService = require('../services/authService');
 const config = require('../config');
 const { ApiError } = require('../errors');
@@ -80,6 +80,178 @@ function optionalText(value, max) {
   const text = String(value || '').trim();
   return text ? text.slice(0, max) : '';
 }
+
+function parseTags(value) {
+  if (!value) {
+    return [];
+  }
+  if (Array.isArray(value)) {
+    return value;
+  }
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function toArticle(row) {
+  return {
+    id: row.id,
+    userId: row.userId,
+    username: row.username || '',
+    userBio: row.userBio || '',
+    type: row.type,
+    title: row.title,
+    summary: row.summary,
+    coverUrl: row.coverUrl,
+    videoUrl: row.videoPath || '',
+    videoOriginalName: row.videoOriginalName || '',
+    videoMimeType: row.videoMimeType || '',
+    videoSizeBytes: row.videoSizeBytes == null ? null : Number(row.videoSizeBytes),
+    tags: parseTags(row.tags),
+    difficulty: row.difficulty,
+    durationMin: row.durationMin,
+    content: row.content,
+    publishedAt: row.publishedAt
+  };
+}
+
+function articleWhere(filters, alias = '') {
+  const prefix = alias ? `${alias}.` : '';
+  const where = [`${prefix}status = 'published'`];
+  const params = [];
+  if (filters.type) {
+    where.push(`${prefix}type = ?`);
+    params.push(filters.type);
+  }
+  if (filters.keyword) {
+    where.push(`(${prefix}title LIKE ? OR ${prefix}summary LIKE ? OR ${prefix}content LIKE ?)`);
+    params.push(`%${filters.keyword}%`, `%${filters.keyword}%`, `%${filters.keyword}%`);
+  }
+  return { sql: where.join(' AND '), params };
+}
+
+async function listArticles(filters) {
+  const countWhere = articleWhere(filters);
+  const listWhere = articleWhere(filters, 'a');
+  const countRows = await db.query(`SELECT COUNT(*) AS total FROM ExploreArticles WHERE ${countWhere.sql}`, countWhere.params);
+  const rows = await db.query(
+    `
+      SELECT
+        a.id,
+        a.user_id AS userId,
+        u.username,
+        u.bio AS userBio,
+        a.type,
+        a.title,
+        a.summary,
+        a.cover_url AS coverUrl,
+        a.video_path AS videoPath,
+        a.video_original_name AS videoOriginalName,
+        a.video_mime_type AS videoMimeType,
+        a.video_size_bytes AS videoSizeBytes,
+        a.tags_json AS tags,
+        a.difficulty,
+        a.duration_min AS durationMin,
+        a.content,
+        a.published_at AS publishedAt
+      FROM ExploreArticles a
+      LEFT JOIN Users u ON u.id = a.user_id
+      WHERE ${listWhere.sql}
+      ORDER BY a.published_at DESC, a.id DESC
+      LIMIT ? OFFSET ?
+    `,
+    [...listWhere.params, filters.pageSize, filters.offset]
+  );
+
+  const total = Number(countRows[0]?.total || 0);
+  return {
+    items: rows.map(toArticle),
+    page: filters.page,
+    pageSize: filters.pageSize,
+    total,
+    totalPages: Math.ceil(total / filters.pageSize)
+  };
+}
+
+async function getArticleById(articleId) {
+  const rows = await db.query(
+    `
+      SELECT
+        a.id,
+        a.user_id AS userId,
+        u.username,
+        u.bio AS userBio,
+        a.type,
+        a.title,
+        a.summary,
+        a.cover_url AS coverUrl,
+        a.video_path AS videoPath,
+        a.video_original_name AS videoOriginalName,
+        a.video_mime_type AS videoMimeType,
+        a.video_size_bytes AS videoSizeBytes,
+        a.tags_json AS tags,
+        a.difficulty,
+        a.duration_min AS durationMin,
+        a.content,
+        a.published_at AS publishedAt
+      FROM ExploreArticles a
+      LEFT JOIN Users u ON u.id = a.user_id
+      WHERE a.id = ? AND a.status = 'published'
+      LIMIT 1
+    `,
+    [articleId]
+  );
+
+  if (!rows[0]) {
+    throw new ApiError(404, 'article not found', 'NOT_FOUND');
+  }
+
+  return toArticle(rows[0]);
+}
+
+async function createArticle(payload, user) {
+  const result = await db.query(
+    `
+      INSERT INTO ExploreArticles (
+        user_id,
+        type,
+        title,
+        summary,
+        content,
+        status,
+        published_at,
+        video_path,
+        video_original_name,
+        video_mime_type,
+        video_size_bytes
+      )
+      VALUES (?, ?, ?, ?, ?, 'published', NOW(3), ?, ?, ?, ?)
+    `,
+    [
+      user.id,
+      payload.type,
+      payload.title,
+      payload.summary || null,
+      payload.content || null,
+      payload.videoPath || null,
+      payload.videoOriginalName || null,
+      payload.videoMimeType || null,
+      payload.videoSizeBytes || null
+    ]
+  );
+
+  return getArticleById(result.insertId);
+}
+
+const defaultExploreService = {
+  listArticles,
+  getArticleById,
+  getRecommendations: (filters) => listArticles(filters),
+  createArticle
+};
 
 function createExploreRouter(exploreService = defaultExploreService, authService = defaultAuthService) {
   const router = express.Router();

@@ -1,14 +1,5 @@
-import {
-  getActivityTypeStats as getMockActivityTypeStats,
-  getCalendarStats as getMockCalendarStats,
-  getMetricTrend as getMockMetricTrend,
-  getPersonalBests as getMockPersonalBests,
-  getSummaryStats as getMockSummaryStats,
-  getTimelineStats as getMockTimelineStats,
-  normalizeActivity,
-  normalizeActivityTypeStat,
-} from '@/services/activities'
-import { getEnvelope, useMockData } from '@/services/api'
+import { normalizeActivity, normalizeActivityTypeStat } from '@/services/activities'
+import { getEnvelope } from '@/services/api'
 
 function normalizeTrendRow(row = {}) {
   return {
@@ -32,15 +23,11 @@ function normalizeCalendar(payload = {}) {
 }
 
 export async function getSummaryStats(params = {}) {
-  if (useMockData()) return getMockSummaryStats(params)
-
   const envelope = await getEnvelope('/stats/summary', { params })
   return envelope.data || {}
 }
 
 export async function getActivityTypeStats(params = {}) {
-  if (useMockData()) return getMockActivityTypeStats(params)
-
   const envelope = await getEnvelope('/stats/activity-types', {
     params,
     normalizer: normalizeActivityTypeStat,
@@ -49,15 +36,11 @@ export async function getActivityTypeStats(params = {}) {
 }
 
 export async function getTimelineStats(params = { group_by: 'month' }) {
-  if (useMockData()) return getMockTimelineStats(params)
-
   const envelope = await getEnvelope('/stats/timeline', { params })
   return envelope.data || []
 }
 
 export async function getMetricTrend(params = { metric: 'avg_heart_rate_bpm', range: '3m' }) {
-  if (useMockData()) return getMockMetricTrend(params)
-
   const envelope = await getEnvelope('/stats/metric-trend', {
     params,
     normalizer: normalizeTrendRow,
@@ -66,8 +49,6 @@ export async function getMetricTrend(params = { metric: 'avg_heart_rate_bpm', ra
 }
 
 export async function getCalendarStats(params = {}) {
-  if (useMockData()) return getMockCalendarStats(params)
-
   const envelope = await getEnvelope('/stats/calendar', {
     params,
     normalizer: normalizeCalendar,
@@ -76,8 +57,6 @@ export async function getCalendarStats(params = {}) {
 }
 
 export async function getPersonalBests(params = {}) {
-  if (useMockData()) return getMockPersonalBests(params)
-
   const envelope = await getEnvelope('/stats/personal-bests', { params })
   return envelope.data || { steps: [], running: [], cycling: [], swimming: [], overall: [] }
 }
