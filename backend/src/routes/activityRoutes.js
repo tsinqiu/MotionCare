@@ -1,8 +1,14 @@
 const express = require('express');
+const crypto = require('node:crypto');
+const fs = require('node:fs');
+const path = require('node:path');
+const multer = require('multer');
 const defaultActivityService = require('../services/activityService');
+const defaultWeatherService = require('../services/weatherService');
 const defaultAuthService = require('../services/authService');
+const config = require('../config');
 const { ApiError } = require('../errors');
-const { optionalAuthenticate } = require('../middleware/authMiddleware');
+const { authenticate, optionalAuthenticate } = require('../middleware/authMiddleware');
 const {
   asyncHandler,
   parseActivityType,
@@ -28,6 +34,30 @@ const ACTIVITY_SORT_FIELDS = [
 ];
 const OWNER_FILTERS = ['all', 'admin', 'mine'];
 const SOURCE_FILTERS = ['garmin_import', 'manual_upload', 'live_workout'];
+
+fs.mkdirSync(config.uploads.activityImagesDir, { recursive: true });
+
+const activityImageStorage = multer.diskStorage({
+  destination(req, file, callback) {
+    callback(null, config.uploads.activityImagesDir);
+  },
+  filename(req, file, callback) {
+    const extension = path.extname(file.originalname || '').slice(0, 16) || '.jpg';
+    callback(null, `${Date.now()}-${crypto.randomBytes(8).toString('hex')}${extension}`);
+  }
+});
+
+const uploadActivityImage = multer({
+  storage: activityImageStorage,
+  limits: { fileSize: config.uploads.maxImageBytes },
+  fileFilter(req, file, callback) {
+    if (!String(file.mimetype || '').startsWith('image/')) {
+      callback(new ApiError(400, 'image file is required', 'INVALID_UPLOAD'));
+      return;
+    }
+    callback(null, true);
+  }
+});
 
 function createActivityRouter(activityService = defaultActivityService, authService = defaultAuthService) {
   const router = express.Router();
@@ -149,6 +179,61 @@ function createActivityRouter(activityService = defaultActivityService, authServ
       const zones = await activityService.getZones(activityId);
 
       sendData(res, zones);
+    })
+  );
+
+  router.route('/activities/:id')
+    .patch(
+      authenticate(authService),
+      asyncHandler(async (req, res) => {
+        const activityId = parsePositiveId(req.params.id, 'activity id');
+        const activity = await activityService.updateActivityMeta(req.user, activityId, req.body);
+        sendData(res, activity);
+      })
+    );
+
+  router.post(
+    '/activities/:id/photo',
+    authenticate(authService),
+    uploadActivityImage.single('photo'),
+    asyncHandler(async (req, res) => {
+      const activityId = parsePositiveId(req.params.id, 'activity id');
+      const file = req.file;
+      if (!file) {
+        throw new ApiError(400, 'photo file is required', 'INVALID_UPLOAD');
+      }
+      const activity = await activityService.updateActivityPhoto(req.user, activityId, {
+        path: `/uploads/activity-images/${file.filename}`,
+        originalName: file.originalname || null,
+        mimeType: file.mimetype || null,
+        size: file.size
+      });
+      sendData(res, activity);
+    })
+  );
+
+  router.patch(
+    '/activities/:id/weather',
+    authenticate(authService),
+    asyncHandler(async (req, res) => {
+      const activityId = parsePositiveId(req.params.id, 'activity id');
+      const activity = await activityService.updateActivityWeather(req.user, activityId, req.body, 'manual');
+      sendData(res, activity);
+    })
+  );
+
+  router.post(
+    '/activities/:id/weather/fetch',
+    authenticate(authService),
+    asyncHandler(async (req, res) => {
+      const activityId = parsePositiveId(req.params.id, 'activity id');
+      const current = await activityService.getActivityById(activityId);
+      if (!current) {
+        throw new ApiError(404, 'activity not found');
+      }
+      const weatherPayload = await defaultWeatherService.fetchHistoricalWeatherForActivity(current);
+      const activity = await activityService.updateActivityWeather(req.user, activityId, weatherPayload, 'open_meteo');
+      sendData(res, activity);
     })
   );
 
