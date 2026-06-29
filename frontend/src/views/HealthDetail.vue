@@ -149,7 +149,7 @@ const sleepStageOption = computed(() => ({
     type: 'scatter',
     symbolSize: 9,
     data: sleepStages.value.map((s) => ({
-      value: [toTimestamp(s.stageStartUtc), s.stageType, Math.round((s.durationS || 0) / 60)],
+      value: [toTimestamp(s.stageStartUtc), stageLabels[s.stageType] || s.stageType, Math.round((s.durationS || 0) / 60)],
       itemStyle: { color: stageColors[s.stageType] || stageColors.unknown },
     })),
   }],
