@@ -25,6 +25,7 @@ CREATE TABLE Users (
     password_hash VARCHAR(255) NOT NULL,
     role ENUM('admin', 'user') NOT NULL DEFAULT 'user',
     status ENUM('active', 'disabled') NOT NULL DEFAULT 'active',
+    bio VARCHAR(50) NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     CONSTRAINT UQ_Users_email UNIQUE (email),
@@ -112,6 +113,8 @@ CREATE TABLE ActivitySummaries (
     normalized_power_w INT NULL,
     aerobic_training_effect DOUBLE NULL,
     anaerobic_training_effect DOUBLE NULL,
+    aerobic_training_effect_message VARCHAR(160) NULL,
+    anaerobic_training_effect_message VARCHAR(160) NULL,
     training_effect_label VARCHAR(120) NULL,
     activity_training_load DOUBLE NULL,
     vo2max DOUBLE NULL,
@@ -177,7 +180,6 @@ CREATE TABLE TrackPoints (
     accumulated_power_w INT NULL,
     vertical_oscillation_mm DOUBLE NULL,
     stance_time_ms DOUBLE NULL,
-    raw_json JSON NULL,
     CONSTRAINT FK_TrackPoints_Activities
         FOREIGN KEY (activity_id) REFERENCES Activities(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

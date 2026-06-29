@@ -272,6 +272,8 @@ async function listActivities({
       js.activity_training_load AS activityTrainingLoad,
       js.aerobic_training_effect AS aerobicTrainingEffect,
       js.anaerobic_training_effect AS anaerobicTrainingEffect,
+      js.aerobic_training_effect_message AS aerobicTrainingEffectMessage,
+      js.anaerobic_training_effect_message AS anaerobicTrainingEffectMessage,
       js.training_effect_label AS trainingEffectLabel,
       js.vo2max,
       js.body_battery_delta AS bodyBatteryDelta
@@ -347,6 +349,8 @@ async function getActivityById(activityId) {
         js.activity_training_load AS activityTrainingLoad,
         js.aerobic_training_effect AS aerobicTrainingEffect,
         js.anaerobic_training_effect AS anaerobicTrainingEffect,
+        js.aerobic_training_effect_message AS aerobicTrainingEffectMessage,
+        js.anaerobic_training_effect_message AS anaerobicTrainingEffectMessage,
         js.training_effect_label AS trainingEffectLabel,
         js.vo2max,
         js.body_battery_delta AS bodyBatteryDelta,
@@ -1177,7 +1181,23 @@ async function getTodayHealth(userId, date) {
   );
   const [training] = await db.query(
     `SELECT snapshot_date AS snapshotDate, vo2max,
-            training_status AS trainingStatus, load_balance AS loadBalance
+            training_status AS trainingStatus, load_balance AS loadBalance,
+            acute_training_load AS acuteTrainingLoad,
+            chronic_training_load AS chronicTrainingLoad,
+            acute_chronic_workload_ratio AS acuteChronicWorkloadRatio,
+            acwr_status AS acwrStatus,
+            acwr_percent AS acwrPercent,
+            optimal_load_min AS optimalLoadMin,
+            optimal_load_max AS optimalLoadMax,
+            low_aerobic_load AS lowAerobicLoad,
+            low_aerobic_target_min AS lowAerobicTargetMin,
+            low_aerobic_target_max AS lowAerobicTargetMax,
+            high_aerobic_load AS highAerobicLoad,
+            high_aerobic_target_min AS highAerobicTargetMin,
+            high_aerobic_target_max AS highAerobicTargetMax,
+            anaerobic_load AS anaerobicLoad,
+            anaerobic_target_min AS anaerobicTargetMin,
+            anaerobic_target_max AS anaerobicTargetMax
      FROM TrainingStatusSnapshots
      WHERE user_id = ? AND snapshot_date <= ?
      ORDER BY snapshot_date DESC

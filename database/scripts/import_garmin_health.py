@@ -371,14 +371,53 @@ def collect_time_series(user_id: int, day: str, payload: dict[str, Any]) -> dict
         first_present(training_status, "mostRecentTrainingLoadBalance", "trainingLoadBalance", "loadBalance"),
         "trainingBalanceFeedbackPhrase", "loadBalance", "status", "value",
     )
+    acute_load = first_key(training_status, "dailyTrainingLoadAcute")
+    chronic_load = first_key(training_status, "dailyTrainingLoadChronic")
+    acwr_ratio = first_key(training_status, "dailyAcuteChronicWorkloadRatio")
+    acwr_status = first_key(training_status, "acwrStatus")
+    acwr_percent = first_key(training_status, "acwrPercent")
+    optimal_min = first_key(training_status, "minTrainingLoadChronic")
+    optimal_max = first_key(training_status, "maxTrainingLoadChronic")
+    low_aerobic = first_key(training_status, "monthlyLoadAerobicLow")
+    low_aerobic_min = first_key(training_status, "monthlyLoadAerobicLowTargetMin")
+    low_aerobic_max = first_key(training_status, "monthlyLoadAerobicLowTargetMax")
+    high_aerobic = first_key(training_status, "monthlyLoadAerobicHigh")
+    high_aerobic_min = first_key(training_status, "monthlyLoadAerobicHighTargetMin")
+    high_aerobic_max = first_key(training_status, "monthlyLoadAerobicHighTargetMax")
+    anaerobic = first_key(training_status, "monthlyLoadAnaerobic")
+    anaerobic_min = first_key(training_status, "monthlyLoadAnaerobicTargetMin")
+    anaerobic_max = first_key(training_status, "monthlyLoadAnaerobicTargetMax")
     status_date = first_key(training_status, "calendarDate", "date") or day
     if isinstance(training_status, dict) and (training_value or vo2max or load_balance):
         add_batch("TrainingStatusSnapshots",
-            ["user_id", "snapshot_date", "vo2max", "training_status", "load_balance", "raw_json"],
+            [
+                "user_id", "snapshot_date", "vo2max", "training_status", "load_balance",
+                "acute_training_load", "chronic_training_load", "acute_chronic_workload_ratio",
+                "acwr_status", "acwr_percent", "optimal_load_min", "optimal_load_max",
+                "low_aerobic_load", "low_aerobic_target_min", "low_aerobic_target_max",
+                "high_aerobic_load", "high_aerobic_target_min", "high_aerobic_target_max",
+                "anaerobic_load", "anaerobic_target_min", "anaerobic_target_max", "raw_json",
+            ],
             [sql_int(user_id), sql_string(str(status_date)[:10]),
              sql_number(vo2max),
              sql_string(training_value),
              sql_string(load_balance),
+             sql_number(acute_load),
+             sql_number(chronic_load),
+             sql_number(acwr_ratio),
+             sql_string(acwr_status),
+             sql_number(acwr_percent),
+             sql_number(optimal_min),
+             sql_number(optimal_max),
+             sql_number(low_aerobic),
+             sql_number(low_aerobic_min),
+             sql_number(low_aerobic_max),
+             sql_number(high_aerobic),
+             sql_number(high_aerobic_min),
+             sql_number(high_aerobic_max),
+             sql_number(anaerobic),
+             sql_number(anaerobic_min),
+             sql_number(anaerobic_max),
              sql_json(training_status)])
 
     race_preds = payload.get("race_predictions") or {}
@@ -397,16 +436,20 @@ def collect_time_series(user_id: int, day: str, payload: dict[str, Any]) -> dict
 
     lt = payload.get("lactate_threshold") or {}
     lt_hr = scalar(first_key(lt, "heartRateBpm", "heartRate", "heartRateInBeatsPerMinute"), "value")
+    lt_cycling_hr = scalar(first_key(lt, "heartRateCycling"), "value")
     lt_speed = scalar(first_key(lt, "speedMps", "speed", "thresholdSpeed"), "value")
     lt_power = scalar(first_key(lt, "functionalThresholdPower", "powerWatts", "watts", "power"), "value", "functionalThresholdPower")
+    lt_power_to_weight = scalar(first_key(lt, "powerToWeight"), "value")
     lt_date = first_key(lt, "calendarDate", "date") or day
     if isinstance(lt, dict) and (lt_hr or lt_speed or lt_power):
         add_batch("LactateThresholds",
-            ["user_id", "threshold_date", "heart_rate_bpm", "speed_mps", "power_w", "raw_json"],
+            ["user_id", "threshold_date", "heart_rate_bpm", "cycling_heart_rate_bpm", "speed_mps", "power_w", "power_to_weight", "raw_json"],
             [sql_int(user_id), sql_string(str(lt_date)[:10]),
              sql_int(lt_hr),
+             sql_int(lt_cycling_hr),
              sql_number(lt_speed),
              sql_int(lt_power),
+             sql_number(lt_power_to_weight),
              sql_json(lt)])
 
     ftp = payload.get("cycling_ftp") or {}

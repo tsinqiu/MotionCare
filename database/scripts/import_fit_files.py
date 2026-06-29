@@ -724,12 +724,11 @@ def emit_fit_rows(lines, item, include_fit_messages=False, include_raw_json=Fals
             sql_int(get_int(v, "accumulated_power")),
             sql_number(get_num(v, "vertical_oscillation")),
             sql_number(get_num(v, "stance_time")),
-            maybe_raw_json(v, include_raw_json),
         ])
     emit_insert_values(lines, "TrackPoints", [
         "activity_id", "sample_index", "sample_time_utc", "latitude", "longitude", "altitude_m",
         "distance_m", "speed_mps", "heart_rate_bpm", "cadence", "power_w", "accumulated_power_w",
-        "vertical_oscillation_mm", "stance_time_ms", "raw_json",
+        "vertical_oscillation_mm", "stance_time_ms",
     ], record_rows, 200)
 
     if include_fit_messages:
@@ -809,7 +808,8 @@ def emit_activity_summary_rows(lines, fit_item, json_item):
         "distance_m, calories, avg_speed_mps, max_speed_mps, avg_heart_rate_bpm, max_heart_rate_bpm, "
         "avg_cadence_spm, max_cadence_spm, avg_power_w, max_power_w, normalized_power_w, "
         "aerobic_training_effect, "
-        "anaerobic_training_effect, training_effect_label, activity_training_load, vo2max, "
+        "anaerobic_training_effect, aerobic_training_effect_message, anaerobic_training_effect_message, "
+        "training_effect_label, activity_training_load, vo2max, "
         "body_battery_delta, "
         "avg_stride_length_cm, elevation_gain_m, elevation_loss_m, "
         "min_elevation_m, max_elevation_m, manufacturer, raw_json"
@@ -829,6 +829,7 @@ def emit_activity_summary_rows(lines, fit_item, json_item):
             sql_number(first_num(get_num(j, "maxCadenceSpm"), get_num(s, "max_cadence"))),
             sql_int(first_num(
                 get_int(j, "avgPower"),
+                get_int(j, "averagePower"),
                 get_int(j.get("summaryDTO", {}), "averagePower"),
                 get_int(s, "avg_power"),
             )),
@@ -839,11 +840,13 @@ def emit_activity_summary_rows(lines, fit_item, json_item):
             )),
             sql_int(first_num(
                 get_int(j, "normPower"),
+                get_int(j, "normalizedPower"),
                 get_int(j.get("summaryDTO", {}), "normalizedPower"),
                 get_int(s, "normalized_power"),
             )),
             sql_number(first_num(
                 get_num(j, "aerobicTrainingEffect"),
+                get_num(j, "trainingEffect"),
                 get_num(j.get("summaryDTO", {}), "trainingEffect"),
                 get_num(s, "aerobic_training_effect"),
             )),
@@ -852,6 +855,14 @@ def emit_activity_summary_rows(lines, fit_item, json_item):
                 get_num(j.get("summaryDTO", {}), "anaerobicTrainingEffect"),
                 get_num(s, "anaerobic_training_effect"),
             )),
+            sql_string(
+                j.get("aerobicTrainingEffectMessage")
+                or (j.get("summaryDTO") or {}).get("aerobicTrainingEffectMessage")
+            ),
+            sql_string(
+                j.get("anaerobicTrainingEffectMessage")
+                or (j.get("summaryDTO") or {}).get("anaerobicTrainingEffectMessage")
+            ),
             sql_string(
                 j.get("trainingEffectLabel")
                 or (j.get("summaryDTO") or {}).get("trainingEffectLabel")

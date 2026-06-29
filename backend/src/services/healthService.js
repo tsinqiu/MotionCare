@@ -198,7 +198,23 @@ async function getSamples(userId, type, date, source) {
 async function getLatestTrainingStatus(userId) {
   const [row] = await db.query(
     `SELECT snapshot_date AS snapshotDate, vo2max, training_status AS trainingStatus,
-            load_balance AS loadBalance
+            load_balance AS loadBalance,
+            acute_training_load AS acuteTrainingLoad,
+            chronic_training_load AS chronicTrainingLoad,
+            acute_chronic_workload_ratio AS acuteChronicWorkloadRatio,
+            acwr_status AS acwrStatus,
+            acwr_percent AS acwrPercent,
+            optimal_load_min AS optimalLoadMin,
+            optimal_load_max AS optimalLoadMax,
+            low_aerobic_load AS lowAerobicLoad,
+            low_aerobic_target_min AS lowAerobicTargetMin,
+            low_aerobic_target_max AS lowAerobicTargetMax,
+            high_aerobic_load AS highAerobicLoad,
+            high_aerobic_target_min AS highAerobicTargetMin,
+            high_aerobic_target_max AS highAerobicTargetMax,
+            anaerobic_load AS anaerobicLoad,
+            anaerobic_target_min AS anaerobicTargetMin,
+            anaerobic_target_max AS anaerobicTargetMax
      FROM TrainingStatusSnapshots
      WHERE user_id = ?
      ORDER BY snapshot_date DESC
@@ -225,7 +241,9 @@ async function getLatestRacePredictions(userId) {
 async function getLatestLactateThreshold(userId) {
   const [row] = await db.query(
     `SELECT threshold_date AS thresholdDate, heart_rate_bpm AS heartRateBpm,
-            speed_mps AS speedMps, power_w AS powerW
+            cycling_heart_rate_bpm AS cyclingHeartRateBpm,
+            speed_mps AS speedMps, power_w AS powerW,
+            power_to_weight AS powerToWeight
      FROM LactateThresholds
      WHERE user_id = ?
      ORDER BY threshold_date DESC

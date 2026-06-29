@@ -9,6 +9,7 @@ env/
 node_modules/
 dist/
 .vite/
+.playwright-cli/
 
 # IDE / OS
 .vscode/
@@ -48,3 +49,10 @@ database/.garmin_tokens/
 database/sql/02_import_data.sql
 backend/uploads/
 backend/ml/models/
+
+# Shared demo seed data is intentionally committed so collaborators do not
+# repeatedly crawl Garmin.
+!database/shared/
+!database/shared/**
+!database/shared/*.sql.gz
+!database/shared/*.zip

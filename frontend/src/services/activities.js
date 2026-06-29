@@ -96,6 +96,8 @@ export function normalizeActivity(row = {}) {
     total_ascent_m: toNumber(firstDefined(row.total_ascent_m, row.elevationGainM)),
     total_descent_m: toNumber(firstDefined(row.total_descent_m, row.elevationLossM)),
     activity_training_load: toNumber(firstDefined(row.activity_training_load, row.activityTrainingLoad)),
+    aerobic_training_effect_message: firstDefined(row.aerobic_training_effect_message, row.aerobicTrainingEffectMessage),
+    anaerobic_training_effect_message: firstDefined(row.anaerobic_training_effect_message, row.anaerobicTrainingEffectMessage),
     avg_pace_sec_per_km: toNumber(firstDefined(row.avg_pace_sec_per_km, row.avgPaceSecPerKm)),
     vo2max: toNumber(firstDefined(row.vo2max, row.vo2Max)),
     perceived_effort: toNumber(firstDefined(row.perceived_effort, row.perceivedEffort)),

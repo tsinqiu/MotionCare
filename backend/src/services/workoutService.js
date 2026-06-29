@@ -348,8 +348,8 @@ async function finishWorkout(workoutId, payload, user) {
         `
           INSERT INTO TrackPoints (
             activity_id, sample_index, sample_time_utc, latitude, longitude, altitude_m,
-            distance_m, speed_mps, heart_rate_bpm, cadence, power_w, raw_json
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            distance_m, speed_mps, heart_rate_bpm, cadence, power_w
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `,
         [
           newActivityId,
@@ -362,8 +362,7 @@ async function finishWorkout(workoutId, payload, user) {
           point.speedMps,
           point.heartRateBpm,
           point.cadence,
-          point.powerW,
-          JSON.stringify(point)
+          point.powerW
         ]
       );
     }

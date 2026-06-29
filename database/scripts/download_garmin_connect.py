@@ -19,6 +19,21 @@ from garminconnect.exceptions import GarminConnectAuthenticationError
 
 DEFAULT_DATA_DIR = Path(__file__).resolve().parents[1] / "data" / "garmin_downloads"
 DEFAULT_TOKEN_DIR = Path(__file__).resolve().parents[1] / ".garmin_tokens"
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
+
+def load_backend_env() -> None:
+    env_path = PROJECT_ROOT / "backend" / ".env"
+    if not env_path.exists():
+        return
+    for line in env_path.read_text(encoding="utf-8").splitlines():
+        text = line.strip()
+        if not text or text.startswith("#") or "=" not in text:
+            continue
+        key, value = text.split("=", 1)
+        key = key.strip()
+        value = value.strip().strip('"').strip("'")
+        os.environ.setdefault(key, value)
 
 
 def safe_name(value: str | None) -> str:
@@ -386,6 +401,8 @@ def download_health_range(
 
 
 def main() -> None:
+    load_backend_env()
+
     parser = argparse.ArgumentParser(description="Download Garmin Connect activity JSON and FIT files.")
     parser.add_argument("--out-dir", type=Path, default=DEFAULT_DATA_DIR)
     parser.add_argument("--token-dir", type=Path, default=DEFAULT_TOKEN_DIR)

@@ -1,80 +1,62 @@
-# MotionCare Database
+# Database
 
-This directory contains the MySQL schema, migration SQL, and Garmin import scripts.
+默认数据库名：
 
-## Core Tables
+```text
+MotionAnalysis
+```
 
-- `Users`
-- `Activities`
-- `ActivitySummaries`
-- `ActivityZones`
-- `Laps`
-- `TrackPoints`
-- `DailyHealthSummaries`
-- `SleepSummaries`
-- `RestingHeartRates`
-- `BodyWeights`
-- `DailyStressSummaries`
+## 普通协作者
 
-The old debug/lineage tables were removed: `SourceFiles`, `ActivitySourceFiles`,
-`Sessions`, `Events`, `Metrics`, and `FitMessages`. `ActivitySummaries` is now the
-single activity summary table; raw Garmin/FIT payloads can still be kept in
-`raw_json`.
-
-## Fresh Setup
+直接导入共享 Garmin 数据包，不要每个人都爬 Garmin：
 
 ```powershell
-python database\scripts\import_fit_files.py
+.\database\scripts\import_shared_seed.ps1
 ```
 
-Then run in MySQL:
+导入内容来自：
 
-```sql
-source database/sql/01_schema.sql;
-source database/sql/02_import_data.sql;
-source database/sql/03_queries.sql;
-source database/sql/04_auth_manual_upload.sql;
-source database/sql/05_performance_indexes.sql;
-source database/sql/06_extension_modules.sql;
-source database/sql/07_profile_follow_explore_uploads.sql;
+```text
+database/shared/garmin_seed.sql.gz
+database/shared/uploads.zip
 ```
 
-## Existing Database Migration
+导入后登录：
 
-Run this once on an existing database:
-
-```sql
-source database/sql/09_simplify_garmin_health_tables.sql;
+```text
+demo@example.com / 123456
 ```
 
-It copies missing FIT session summaries into `ActivitySummaries`, creates the new
-Garmin health tables, and drops the redundant old tables.
+注意：这个脚本会重建本地 `MotionAnalysis`。
 
-## Garmin Sync Scripts
+## 更新共享数据包
 
-Install Python dependencies:
+只由负责维护数据的人执行：
 
-```bash
-python -m pip install -r database/requirements.txt
+```powershell
+.\database\scripts\export_shared_seed.ps1
 ```
 
-Activity download:
+导出的文件仍然是：
 
-```bash
-python database/scripts/download_garmin_connect.py --start-date 2026-06-01 --end-date 2026-06-08
+```text
+database/shared/garmin_seed.sql.gz
+database/shared/uploads.zip
 ```
 
-Health-only download:
+## 重要脚本
 
-```bash
-python database/scripts/download_garmin_connect.py --health-only --start-date 2026-06-01 --end-date 2026-06-08
+```text
+database/scripts/import_shared_seed.ps1       导入共享 seed
+database/scripts/export_shared_seed.ps1       导出共享 seed
+database/scripts/download_garmin_connect.py   爬 Garmin
+database/scripts/import_fit_files.py          FIT/活动 JSON 转 SQL
+database/scripts/import_garmin_health.py      健康 JSON 转 SQL
 ```
 
-Convert downloaded health JSON to SQL:
+## 重要 SQL
 
-```bash
-python database/scripts/import_garmin_health.py --health-dir database/data/garmin_sync/user-1/job-1/health --user-id 1 --out health_import.sql
+```text
+database/sql/01_schema.sql              基础表
+database/sql/15_garmin_timeseries.sql   Garmin 时序表
 ```
-
-Garmin passwords are not stored in MySQL. Login tokens stay under
-`database/.garmin_tokens/`, which should remain local only.
