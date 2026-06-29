@@ -117,10 +117,20 @@ EXTRA_JSON_KEYS = {
     "exercise-sets": "exerciseSets",
 }
 
+DEFAULT_EXTRAS = [
+    "details",
+    "hr-zones",
+    "power-zones",
+    "split-summaries",
+    "splits",
+    "typed-splits",
+    "exercise-sets",
+]
+
 
 def parse_extras(value: str) -> list[str]:
     if value == "all":
-        return list(EXTRA_FETCHERS)
+        return DEFAULT_EXTRAS
     items = [item.strip() for item in value.split(",") if item.strip()]
     unknown = [item for item in items if item not in EXTRA_FETCHERS]
     if unknown:
@@ -327,7 +337,14 @@ HEALTH_FETCHERS = {
     "sleep": lambda client, day: client.get_sleep_data(day),
     "rhr": lambda client, day: client.get_rhr_day(day),
     "stress": lambda client, day: client.get_stress_data(day),
-    "weight": lambda client, day: client.get_daily_weigh_ins(day),
+    "heart_rates": lambda client, day: client.get_heart_rates(day),
+    "steps": lambda client, day: client.get_steps_data(day),
+    "intensity_minutes": lambda client, day: client.get_intensity_minutes_data(day),
+    "hrv": lambda client, day: client.get_hrv_data(day),
+    "training_status": lambda client, day: client.get_training_status(day),
+    "race_predictions": lambda client, _day: client.get_race_predictions(),
+    "lactate_threshold": lambda client, _day: client.get_lactate_threshold(),
+    "cycling_ftp": lambda client, _day: client.get_cycling_ftp(),
 }
 
 
@@ -392,7 +409,7 @@ def main() -> None:
     )
     parser.add_argument("--skip-fit", action="store_true")
     parser.add_argument("--skip-json", action="store_true")
-    parser.add_argument("--include-health", action="store_true", help="Also download daily health JSON: sleep, weight, resting HR and stress.")
+    parser.add_argument("--include-health", action="store_true", help="Also download daily health JSON: sleep, resting HR, stress and Garmin analysis samples.")
     parser.add_argument("--health-only", action="store_true", help="Only download daily health JSON, no activities.")
     parser.add_argument("--sleep", type=float, default=1.5, help="Seconds to wait between activities.")
     parser.add_argument("--extra-sleep", type=float, default=0.5, help="Seconds to wait between enriched JSON extra endpoints.")

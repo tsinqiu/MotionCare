@@ -8,6 +8,7 @@ import Calendar from '@/views/Calendar.vue'
 import Community from '@/views/Community.vue'
 import DatabaseSchema from '@/views/DatabaseSchema.vue'
 import Explore from '@/views/Explore.vue'
+import HealthDetail from '@/views/HealthDetail.vue'
 import Login from '@/views/Login.vue'
 import Records from '@/views/Records.vue'
 import Register from '@/views/Register.vue'
@@ -49,6 +50,12 @@ const routes = [
     name: 'today',
     component: Today,
     meta: { title: '今日', requiresAuth: true },
+  },
+  {
+    path: '/health',
+    name: 'health',
+    component: HealthDetail,
+    meta: { title: '健康详情', requiresAuth: true },
   },
   {
     path: '/activities',

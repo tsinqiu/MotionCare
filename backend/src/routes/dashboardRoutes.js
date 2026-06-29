@@ -13,7 +13,8 @@ function createDashboardRouter(activityService = defaultActivityService, authSer
   ));
 
   router.get('/dashboard/health', optionalAuthenticate(authService), asyncHandler(async (req, res) => {
-    const data = await activityService.getTodayHealth(req.user?.id || 1);
+    const date = typeof req.query.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(req.query.date) ? req.query.date : null;
+    const data = await activityService.getTodayHealth(req.user?.id || 1, date);
     res.json(data);
   }));
 

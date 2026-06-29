@@ -1,0 +1,15 @@
+USE MotionAnalysis;
+
+CREATE TABLE IF NOT EXISTS BodyWeights (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    measurement_date DATE NOT NULL,
+    weight_kg DOUBLE NULL,
+    source VARCHAR(40) NOT NULL DEFAULT 'manual',
+    note VARCHAR(255) NULL,
+    raw_json JSON NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT UQ_BodyWeights_user_date UNIQUE (user_id, measurement_date),
+    CONSTRAINT FK_BodyWeights_user FOREIGN KEY (user_id) REFERENCES Users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

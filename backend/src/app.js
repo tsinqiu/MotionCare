@@ -5,6 +5,7 @@ const { ApiError } = require('./errors');
 const createAuthRouter = require('./routes/authRoutes');
 const createAdminUserRouter = require('./routes/adminUserRoutes');
 const createHealthRouter = require('./routes/healthRoutes');
+const defaultHealthService = require('./services/healthService');
 const createActivityRouter = require('./routes/activityRoutes');
 const createStatsRouter = require('./routes/statsRoutes');
 const createTrainingRouter = require('./routes/trainingRoutes');
@@ -20,7 +21,7 @@ const createShoeRouter = require('./routes/shoeRoutes');
 const defaultShoeService = require('./services/shoeService');
 
 function createApp({
-  healthService,
+  healthService = defaultHealthService,
   activityService,
   mlService,
   aiService,

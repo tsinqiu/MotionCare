@@ -76,14 +76,21 @@
           </div>
         </div>
         <div class="health-grid">
+          <span><small>步数</small><b>{{ healthData.steps ?? '--' }}</b></span>
+          <span><small>活跃卡路里</small><b>{{ healthData.activeCalories ?? '--' }}</b></span>
+          <span><small>强度分钟</small><b>{{ healthData.moderateIntensityMinutes ?? 0 }}/{{ healthData.vigorousIntensityMinutes ?? 0 }} 分</b></span>
           <span><small>静息心率</small><b>{{ healthData.restingHeartRateBpm ?? '--' }} bpm</b></span>
           <span><small>压力</small><b>{{ healthData.avgStressLevel ?? '--' }}</b></span>
-          <span><small>身体电量</small><b>{{ healthData.bodyBatteryCharged ?? '--' }}</b></span>
           <span><small>睡眠</small><b>{{ healthData.sleepScore ?? '--' }}/100</b></span>
           <span><small>深睡</small><b>{{ healthData.deepSleepS ? (healthData.deepSleepS/3600).toFixed(1) : '--' }}h</b></span>
-          <span><small>HRV</small><b>{{ healthData.avgHrv ?? '--' }}</b></span>
+          <span><small>HRV</small><b>{{ healthData.avgHrv ?? '--' }} <template v-if="healthData.hrvStatus">({{ healthData.hrvStatus }})</template></b></span>
           <span><small>睡眠心率</small><b>{{ healthData.avgHeartRateDuringSleep ?? '--' }} bpm</b></span>
-          <span><small>呼吸率</small><b>{{ healthData.avgWakingRespiration ?? '--' }}</b></span>
+          <span v-if="healthData.trainingStatus"><small>训练状态</small><b>{{ healthData.trainingStatus }}</b></span>
+          <span v-if="healthData.vo2max"><small>VO2max</small><b>{{ healthData.vo2max }}</b></span>
+          <span v-if="healthData.cyclingFtp"><small>FTP</small><b>{{ healthData.cyclingFtp }} W</b></span>
+        </div>
+        <div class="section-footer">
+          <RouterLink to="/health" class="text-link">查看完整健康详情 →</RouterLink>
         </div>
       </section>
 

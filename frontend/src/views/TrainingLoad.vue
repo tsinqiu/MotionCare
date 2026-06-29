@@ -14,6 +14,10 @@
       </div>
     </section>
 
+    <div v-if="healthExtras.length" class="metric-grid">
+      <MetricCard v-for="item in healthExtras" :key="item.label" :label="item.label" :value="item.value" />
+    </div>
+
     <StateBlock v-if="loading" title="正在加载训练负荷" message="正在读取体能、疲劳和状态曲线。" />
     <StateBlock v-else-if="error" title="训练负荷加载失败" :message="error" action-label="重试" tone="danger" @action="load" />
     <StateBlock v-else-if="loadRows.length === 0" title="暂无训练负荷" message="当前数据源没有 activity_training_load。" />
@@ -49,7 +53,14 @@
 import { computed, reactive, ref, watch } from 'vue'
 
 import ChartPanel from '@/components/ChartPanel.vue'
+import MetricCard from '@/components/MetricCard.vue'
 import StateBlock from '@/components/StateBlock.vue'
+import {
+  getLatestCyclingFtp,
+  getLatestRacePredictions,
+  getLatestLactateThreshold,
+  getLatestTrainingStatus,
+} from '@/services/health'
 import { getLoadBalance } from '@/services/training'
 
 const ranges = [
@@ -64,6 +75,10 @@ const filters = reactive({ range: '3m' })
 const loadRows = ref([])
 const error = ref('')
 const loading = ref(false)
+const trainingStatus = ref(null)
+const racePredictions = ref(null)
+const lactateThreshold = ref(null)
+const cyclingFtp = ref(null)
 
 const current = computed(() => loadRows.value.at(-1) || { ctl: '--', atl: '--', tsb: '--', dailyTrainingLoad: 0 })
 const currentLoad = computed(() => Math.round(current.value.dailyTrainingLoad || current.value.ctl || 0))
@@ -81,6 +96,18 @@ const suggestion = computed(() => {
   if (statusLabel.value === '灰色地带') return '处于训练刺激窗口，建议关注睡眠与静息心率，避免连续高强度。'
   if (statusLabel.value === '最佳') return '训练负荷平衡良好，可以按照计划继续推进。'
   return '当前状态较轻松，可以安排一次有氧或技术训练。'
+})
+
+const healthExtras = computed(() => {
+  const items = []
+  if (trainingStatus.value?.trainingStatus) items.push({ label: 'Garmin 训练状态', value: trainingStatus.value.trainingStatus })
+  if (trainingStatus.value?.vo2max != null) items.push({ label: 'VO2max', value: `${trainingStatus.value.vo2max}` })
+  if (lactateThreshold.value?.heartRateBpm != null) items.push({ label: '乳酸阈值心率', value: `${lactateThreshold.value.heartRateBpm} bpm` })
+  if (lactateThreshold.value?.powerW != null) items.push({ label: '乳酸阈值功率', value: `${lactateThreshold.value.powerW} W` })
+  if (cyclingFtp.value?.ftpW != null) items.push({ label: '骑行 FTP', value: `${cyclingFtp.value.ftpW} W` })
+  if (racePredictions.value?.time5kS != null) items.push({ label: '5K 预测', value: formatRaceTime(racePredictions.value.time5kS) })
+  if (racePredictions.value?.time10kS != null) items.push({ label: '10K 预测', value: formatRaceTime(racePredictions.value.time10kS) })
+  return items
 })
 
 const loadOption = computed(() => ({
@@ -118,5 +145,30 @@ async function load() {
   }
 }
 
-watch(() => ({ ...filters }), load, { immediate: true })
+function formatRaceTime(seconds) {
+  const total = Number(seconds || 0)
+  if (!total) return '--'
+  const h = Math.floor(total / 3600)
+  const m = Math.floor((total % 3600) / 60)
+  const s = Math.floor(total % 60)
+  return h ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}` : `${m}:${String(s).padStart(2, '0')}`
+}
+
+async function loadHealthExtras() {
+  const [training, race, threshold, ftp] = await Promise.all([
+    getLatestTrainingStatus(),
+    getLatestRacePredictions(),
+    getLatestLactateThreshold(),
+    getLatestCyclingFtp(),
+  ])
+  trainingStatus.value = training
+  racePredictions.value = race
+  lactateThreshold.value = threshold
+  cyclingFtp.value = ftp
+}
+
+watch(() => ({ ...filters }), () => {
+  load()
+  loadHealthExtras()
+}, { immediate: true })
 </script>

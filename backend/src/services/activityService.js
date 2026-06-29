@@ -1143,11 +1143,14 @@ async function getDashboardOverview(filters = {}) {
   };
 }
 
-async function getTodayHealth(userId) {
-  const today = new Date().toISOString().slice(0, 10);
+async function getTodayHealth(userId, date) {
+  const target = date || new Date().toISOString().slice(0, 10);
   const [dhs] = await db.query(
     `SELECT
-      steps, resting_heart_rate_bpm AS restingHeartRateBpm,
+      steps, distance_m AS distanceM, calories, active_calories AS activeCalories,
+      moderate_intensity_minutes AS moderateIntensityMinutes,
+      vigorous_intensity_minutes AS vigorousIntensityMinutes,
+      resting_heart_rate_bpm AS restingHeartRateBpm,
       avg_stress_level AS avgStressLevel, max_stress_level AS maxStressLevel,
       body_battery_charged AS bodyBatteryCharged,
       stress_duration_s AS stressDurationS,
@@ -1158,20 +1161,38 @@ async function getTodayHealth(userId) {
     FROM DailyHealthSummaries
     WHERE user_id = ? AND summary_date = ?
     LIMIT 1`,
-    [userId, today]
+    [userId, target]
   );
   const [sleep] = await db.query(
     `SELECT
       duration_s AS durationS, sleep_score AS sleepScore,
       deep_sleep_s AS deepSleepS, light_sleep_s AS lightSleepS, rem_sleep_s AS remSleepS,
-      avg_hrv AS avgHrv, avg_heart_rate_during_sleep AS avgHeartRateDuringSleep,
+      avg_hrv AS avgHrv, hrv_status AS hrvStatus,
+      avg_heart_rate_during_sleep AS avgHeartRateDuringSleep,
       avg_sleep_stress AS avgSleepStress
     FROM SleepSummaries
     WHERE user_id = ? AND sleep_date = ?
     LIMIT 1`,
-    [userId, today]
+    [userId, target]
   );
-  return { ...(dhs || {}), ...(sleep || {}) };
+  const [training] = await db.query(
+    `SELECT snapshot_date AS snapshotDate, vo2max,
+            training_status AS trainingStatus, load_balance AS loadBalance
+     FROM TrainingStatusSnapshots
+     WHERE user_id = ? AND snapshot_date <= ?
+     ORDER BY snapshot_date DESC
+     LIMIT 1`,
+    [userId, target]
+  );
+  const [ftp] = await db.query(
+    `SELECT snapshot_date AS snapshotDate, ftp_w AS cyclingFtp, sport, source
+     FROM CyclingFtpSnapshots
+     WHERE user_id = ? AND snapshot_date <= ?
+     ORDER BY snapshot_date DESC
+     LIMIT 1`,
+    [userId, target]
+  );
+  return { ...(dhs || {}), ...(sleep || {}), ...(training || {}), ...(ftp || {}) };
 }
 
 async function updateActivityMeta(user, activityId, payload) {

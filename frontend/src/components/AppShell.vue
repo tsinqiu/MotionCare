@@ -85,6 +85,7 @@ function handleLogout() {
 
 const baseNavItems = [
   { to: '/today', label: '今日', icon: HeartPulse },
+  { to: '/health', label: '健康', icon: HeartPulse },
   { to: '/activities', label: '运动记录', icon: Activity },
   { to: '/statistics', label: '运动统计', icon: BarChart3 },
   { to: '/shoes', label: '跑鞋', icon: Footprints },
