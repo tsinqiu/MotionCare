@@ -15,3 +15,8 @@ export async function getLoadBalance(params = {}) {
   })
   return envelope.data || []
 }
+
+export async function getGarminImportSummary() {
+  const envelope = await getEnvelope('/training/garmin-import-summary')
+  return envelope.data || null
+}

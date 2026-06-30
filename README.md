@@ -86,16 +86,20 @@ cd ..\frontend
 npm install
 ```
 
-启动后端：
+一键启动（后端 + 前端）：
 
 ```powershell
-cd backend
-npm start
+.\start-services.ps1
 ```
 
-启动前端：
+或分别启动：
 
 ```powershell
+# 后端
+cd backend
+npm start
+
+# 前端（新开终端）
 cd frontend
 npm run dev -- --host 0.0.0.0
 ```

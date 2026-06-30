@@ -616,6 +616,121 @@ async function getLoadBalance({ range, endDate, ...filters }) {
   return result;
 }
 
+async function getGarminImportSummary(userId = 1) {
+  const [activitySummary] = await db.query(
+    `
+      SELECT
+        COUNT(*) AS totalRows,
+        COUNT(CASE WHEN avg_power_w IS NOT NULL OR max_power_w IS NOT NULL OR normalized_power_w IS NOT NULL THEN 1 END) AS powerRows,
+        COUNT(aerobic_training_effect) AS aerobicTrainingEffectRows,
+        COUNT(anaerobic_training_effect) AS anaerobicTrainingEffectRows,
+        COUNT(CASE
+          WHEN aerobic_training_effect_message IS NOT NULL
+            OR anaerobic_training_effect_message IS NOT NULL
+          THEN 1
+        END) AS trainingEffectMessageRows,
+        COUNT(activity_training_load) AS trainingLoadRows
+      FROM ActivitySummaries
+    `
+  );
+  const activityRows = await db.query(
+    `
+      SELECT
+        DATE_FORMAT(a.local_start_time, '%Y-%m-%d') AS date,
+        a.activity_name AS activityName,
+        js.avg_power_w AS avgPowerW,
+        js.max_power_w AS maxPowerW,
+        js.normalized_power_w AS normalizedPowerW,
+        js.aerobic_training_effect AS aerobicTrainingEffect,
+        js.anaerobic_training_effect AS anaerobicTrainingEffect,
+        js.training_effect_label AS trainingEffectLabel,
+        js.activity_training_load AS activityTrainingLoad
+      FROM ActivitySummaries js
+      JOIN Activities a ON a.id = js.activity_id
+      WHERE js.avg_power_w IS NOT NULL
+         OR js.max_power_w IS NOT NULL
+         OR js.normalized_power_w IS NOT NULL
+         OR js.aerobic_training_effect IS NOT NULL
+         OR js.anaerobic_training_effect IS NOT NULL
+         OR js.training_effect_label IS NOT NULL
+         OR js.activity_training_load IS NOT NULL
+      ORDER BY a.local_start_time DESC
+      LIMIT 12
+    `
+  );
+  const [trainingStatus] = await db.query(
+    `
+      SELECT
+        DATE_FORMAT(MIN(snapshot_date), '%Y-%m-%d') AS startDate,
+        DATE_FORMAT(MAX(snapshot_date), '%Y-%m-%d') AS endDate,
+        COUNT(*) AS totalDays,
+        COUNT(acute_training_load) AS acuteLoadRows,
+        COUNT(chronic_training_load) AS chronicLoadRows,
+        COUNT(CASE WHEN optimal_load_min IS NOT NULL AND optimal_load_max IS NOT NULL THEN 1 END) AS optimalRangeRows,
+        COUNT(CASE
+          WHEN low_aerobic_load IS NOT NULL
+            OR high_aerobic_load IS NOT NULL
+            OR anaerobic_load IS NOT NULL
+          THEN 1
+        END) AS categoryLoadRows
+      FROM TrainingStatusSnapshots
+      WHERE user_id = ?
+    `,
+    [userId]
+  );
+  const trainingRows = await db.query(
+    `
+      SELECT
+        DATE_FORMAT(snapshot_date, '%Y-%m-%d') AS snapshotDate,
+        training_status AS trainingStatus,
+        acute_training_load AS acuteTrainingLoad,
+        chronic_training_load AS chronicTrainingLoad,
+        optimal_load_min AS optimalLoadMin,
+        optimal_load_max AS optimalLoadMax,
+        low_aerobic_load AS lowAerobicLoad,
+        high_aerobic_load AS highAerobicLoad,
+        anaerobic_load AS anaerobicLoad
+      FROM TrainingStatusSnapshots
+      WHERE user_id = ?
+      ORDER BY snapshot_date DESC
+    `,
+    [userId]
+  );
+  const [lactateCounts] = await db.query(
+    `
+      SELECT
+        COUNT(heart_rate_bpm) AS heartRateRows,
+        COUNT(cycling_heart_rate_bpm) AS cyclingHeartRateRows,
+        COUNT(power_w) AS powerRows,
+        COUNT(power_to_weight) AS powerToWeightRows
+      FROM LactateThresholds
+      WHERE user_id = ?
+    `,
+    [userId]
+  );
+  const [lactateLatest] = await db.query(
+    `
+      SELECT
+        DATE_FORMAT(threshold_date, '%Y-%m-%d') AS thresholdDate,
+        heart_rate_bpm AS heartRateBpm,
+        cycling_heart_rate_bpm AS cyclingHeartRateBpm,
+        power_w AS powerW,
+        power_to_weight AS powerToWeight
+      FROM LactateThresholds
+      WHERE user_id = ?
+      ORDER BY threshold_date DESC
+      LIMIT 1
+    `,
+    [userId]
+  );
+
+  return {
+    activitySummary: { ...(activitySummary || {}), rows: activityRows },
+    trainingStatus: { ...(trainingStatus || {}), rows: trainingRows },
+    lactateThreshold: { ...(lactateCounts || {}), latest: lactateLatest || null }
+  };
+}
+
 async function getActivityTypeStats(filters) {
   const activityFilters = buildActivityFilters(filters);
 
@@ -1369,6 +1484,7 @@ module.exports = {
   getCalendarStats,
   getHeartRateZones,
   getLoadBalance,
+  getGarminImportSummary,
   getPersonalBests,
   getDashboardOverview,
   getTodayHealth,

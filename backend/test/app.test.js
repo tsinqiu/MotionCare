@@ -29,6 +29,11 @@ function buildApp(overrides = {}) {
     getCalendarStats: async () => ({ month: '2026-06', days: [] }),
     getHeartRateZones: async () => [{ zone: 'Zone 1', label: '轻松' }],
     getLoadBalance: async () => [{ date: '2026-06-01', dailyTrainingLoad: 100, ctl: 20, atl: 50, tsb: -30, activities: [] }],
+    getGarminImportSummary: async () => ({
+      activitySummary: { powerRows: 121, trainingLoadRows: 183, rows: [] },
+      trainingStatus: { startDate: '2026-04-01', endDate: '2026-06-29', totalDays: 90, rows: [] },
+      lactateThreshold: { latest: { heartRateBpm: 184, cyclingHeartRateBpm: 174, powerW: 353, powerToWeight: 6.418181818181818 } }
+    }),
     getPersonalBests: async () => ({ steps: [], running: [], cycling: [], swimming: [], overall: [] }),
     getDashboardOverview: async () => ({ recentActivities: [], monthlySummary: {}, yearlySummary: {}, trainingLoad: [], personalBests: {} })
   };
@@ -356,6 +361,15 @@ test('GET /api/health reports degraded database state', async () => {
   assert.equal(response.status, 200);
   assert.equal(response.body.data.status, 'degraded');
   assert.equal(response.body.data.database.ok, false);
+});
+
+test('GET /api/training/garmin-import-summary returns imported Garmin fields', async () => {
+  const response = await request(buildApp()).get('/api/training/garmin-import-summary');
+
+  assert.equal(response.status, 200);
+  assert.equal(response.body.data.activitySummary.powerRows, 121);
+  assert.equal(response.body.data.trainingStatus.totalDays, 90);
+  assert.equal(response.body.data.lactateThreshold.latest.powerW, 353);
 });
 
 test('GET /api/activities validates limit', async () => {
