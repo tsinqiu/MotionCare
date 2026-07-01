@@ -89,23 +89,12 @@ Authorization: Bearer <token>
 GET  /api/ai/health
 POST /api/ai/chat
 GET  /api/ai/daily-brief
+POST /api/ai/feedback
 POST /api/ai/activity-analysis
 ```
 
-The backend supports DeepSeek, Ollama, and rule fallback. Recommended local
-development values:
-
-```text
-AI_PROVIDER=auto
-AI_PROVIDER_ORDER=deepseek,ollama
-AI_DEEPSEEK_MODEL=deepseek-chat
-AI_DEEPSEEK_BASE_URL=https://api.deepseek.com
-DEEPSEEK_API_KEY=your_deepseek_key
-AI_OLLAMA_MODEL=qwen2.5:1.5b-instruct
-AI_OLLAMA_BASE_URL=http://127.0.0.1:11434
-```
-
-Cloud servers with limited memory should use DeepSeek only:
+The backend uses DeepSeek for AI coach responses and falls back to local rules
+when DeepSeek is unavailable. Recommended local development values:
 
 ```text
 AI_PROVIDER=deepseek
@@ -114,7 +103,15 @@ AI_DEEPSEEK_BASE_URL=https://api.deepseek.com
 DEEPSEEK_API_KEY=your_deepseek_key
 ```
 
-When the configured provider is unavailable and `AI_FALLBACK_RULES=true`,
+`POST /api/ai/chat` retrieves recent activities, training load, sleep, HRV,
+stress, Body Battery, and weather data, compresses them into a hidden coach
+context, and sends that context as the DeepSeek `system` message. The user
+message is sent separately as the `user` message. The hidden context also
+includes the local coach model output when available: recovery score, risk
+level, load action, weather risk, recommendation type, and top factors. Full
+feature vectors are not returned to the frontend.
+
+When DeepSeek is unavailable and `AI_FALLBACK_RULES=true`,
 responses keep the same shape and include fallback metadata:
 
 ```json
@@ -148,6 +145,51 @@ responses keep the same shape and include fallback metadata:
 
 AI output is for training reference only and is not a medical diagnosis. Chat
 history, prompts, and model responses are not persisted in MySQL.
+
+`GET /api/ai/daily-brief` includes the same safe ML summary under `data.ml`
+when available:
+
+```json
+{
+  "readinessScore": 62,
+  "readinessLevel": "medium",
+  "recoveryRisk": "medium",
+  "riskLevel": "orange",
+  "loadAction": "reduce",
+  "trainingModifier": "reduce_intensity",
+  "weatherRisk": "high",
+  "primaryRecommendation": "hydration",
+  "recommendationTypes": ["hydration", "sleep_focus"],
+  "topFactors": ["高温高湿", "睡眠评分偏低"],
+  "dataCompleteness": {
+    "sleepCoverage14d": 0.86,
+    "weatherCoverage14d": 0.64,
+    "hrvCoverage14d": 0.86,
+    "trainingStatusCoverage14d": 1,
+    "score": 84
+  },
+  "confidence": 0.82,
+  "modelVersion": "coach-v1",
+  "provider": "rules",
+  "fallback": true
+}
+```
+
+`POST /api/ai/feedback` stores user feedback for future supervised training.
+It does not store DeepSeek prompts or hidden RAG context:
+
+```json
+{
+  "suggestionType": "daily_brief",
+  "feedback": "helpful",
+  "suggestionDate": "2026-06-29",
+  "modelVersion": "coach-v1",
+  "note": "optional short note"
+}
+```
+
+Allowed `feedback` values are `helpful`, `too_conservative`,
+`too_aggressive`, and `not_matching_body`.
 
 ## Manual Upload
 
@@ -450,6 +492,39 @@ It returns:
   "meta": {}
 }
 ```
+
+## ML Coach Model
+
+The AI coach uses the local coach model when `ML_COACH_MODEL_PATH` exists and
+falls back to local rules otherwise. Configure paths with:
+
+```text
+ML_COACH_PREDICT_SCRIPT=./ml/predict_coach.py
+ML_COACH_MODEL_PATH=./ml/models/coach_model.joblib
+```
+
+Train the coach model from existing MySQL data:
+
+```powershell
+cd backend
+python ./ml/train_coach_model.py --env ./.env --out ./ml/models/coach_model.joblib
+```
+
+The coach model uses existing activity, sleep, HRV, stress, Body Battery,
+training status, and activity weather fields. It does not require new tables,
+real-time weather APIs, AQI, or a vector database.
+
+Training writes:
+
+```text
+backend/ml/models/coach_model.joblib
+backend/ml/models/coach_model_metadata.json
+backend/ml/models/coach_feature_columns.json
+backend/ml/models/coach_training_report.json
+```
+
+`backend/ml/feature_schema.json` is the shared feature schema used by both
+Node.js inference and Python training.
 
 ## Response Style
 

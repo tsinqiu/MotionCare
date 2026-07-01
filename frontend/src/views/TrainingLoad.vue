@@ -130,6 +130,10 @@
             <span><small>状态 TSB</small><b>{{ current.tsb }}</b></span>
           </div>
           <p>{{ suggestion }}</p>
+          <div class="inline-advice" :class="loadAdviceTone">
+            <small>{{ loadAdviceTitle }}</small>
+            <b>{{ loadAdviceText }}</b>
+          </div>
         </section>
         <section class="dark-panel risk-panel">
           <h2>状态区间</h2>
@@ -152,6 +156,7 @@ import { computed, reactive, ref, watch } from 'vue'
 import ChartPanel from '@/components/ChartPanel.vue'
 import MetricCard from '@/components/MetricCard.vue'
 import StateBlock from '@/components/StateBlock.vue'
+import { getDailyBrief } from '@/services/ai'
 import {
   getLatestCyclingFtp,
   getLatestRacePredictions,
@@ -178,6 +183,7 @@ const lactateThreshold = ref(null)
 const cyclingFtp = ref(null)
 const importSummary = ref(null)
 const importError = ref('')
+const aiBrief = ref(null)
 
 const current = computed(() => loadRows.value.at(-1) || { ctl: '--', atl: '--', tsb: '--', dailyTrainingLoad: 0 })
 const currentLoad = computed(() => Math.round(current.value.dailyTrainingLoad || current.value.ctl || 0))
@@ -196,6 +202,17 @@ const suggestion = computed(() => {
   if (statusLabel.value === '最佳') return '训练负荷平衡良好，可以按照计划继续推进。'
   return '当前状态较轻松，可以安排一次有氧或技术训练。'
 })
+const loadAdvice = computed(() => aiBrief.value?.placements?.trainingLoad || null)
+const mlLoadActionLabel = computed(() => {
+  const labels = { rest: '休息', reduce: '降负荷', maintain: '维持', progress: '推进' }
+  return labels[aiBrief.value?.ml?.loadAction] || ''
+})
+const loadAdviceTitle = computed(() => {
+  const base = loadAdvice.value?.title || '负荷建议'
+  return mlLoadActionLabel.value ? `${base} · ${mlLoadActionLabel.value}` : base
+})
+const loadAdviceText = computed(() => loadAdvice.value?.text || '智能建议会结合近期负荷、睡眠恢复和天气因素给出更具体的安排。')
+const loadAdviceTone = computed(() => loadAdvice.value?.tone || 'steady')
 
 const healthExtras = computed(() => {
   const items = []
@@ -295,9 +312,51 @@ async function loadGarminImportSummary() {
   }
 }
 
+async function loadAiBrief() {
+  try {
+    const envelope = await getDailyBrief()
+    aiBrief.value = envelope.data || null
+  } catch (_error) {
+    aiBrief.value = null
+  }
+}
+
 watch(() => ({ ...filters }), () => {
   load()
   loadHealthExtras()
   loadGarminImportSummary()
+  loadAiBrief()
 }, { immediate: true })
 </script>
+
+<style scoped>
+.inline-advice {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--panel-soft);
+}
+
+.inline-advice small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.inline-advice b {
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.inline-advice.warning b,
+.inline-advice.danger b {
+  color: var(--orange);
+}
+
+.inline-advice.good b {
+  color: var(--green);
+}
+</style>

@@ -2,7 +2,7 @@
   <div class="assistant-page">
     <section class="assistant-header dark-panel">
       <div>
-        <p class="overline">Local AI</p>
+        <p class="overline">DeepSeek Coach</p>
         <h2>AI 助手</h2>
         <p>围绕近期运动、训练负荷、恢复和今日安排提供建议。</p>
       </div>
@@ -85,7 +85,6 @@ const modelStatus = computed(() => {
   if (health.value.status === 'ok') {
     const provider = health.value.activeProvider || health.value.provider
     if (provider === 'deepseek') return { label: `DeepSeek ${health.value.model || ''}`.trim(), fallback: false }
-    if (provider === 'ollama') return { label: `Ollama ${health.value.model || ''}`.trim(), fallback: false }
     return { label: health.value.model || 'AI 在线', fallback: false }
   }
   return { label: '规则助手模式', fallback: true }

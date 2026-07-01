@@ -96,6 +96,15 @@ function buildApp(overrides = {}) {
       },
       meta: { ai: { provider: 'rules', fallback: true } }
     }),
+    submitFeedback: async (payload, user) => ({
+      data: {
+        id: 12,
+        saved: true,
+        feedback: payload.feedback,
+        userId: user.id
+      },
+      meta: {}
+    }),
     analyzeActivity: async (payload, user) => {
       if (payload.activityId === 999) {
         const error = new Error('activity not found');
@@ -326,6 +335,23 @@ test('GET /api/ai/daily-brief returns stable brief structure', async () => {
   assert.equal(response.body.data.headline, '负荷平稳');
   assert.equal(response.body.data.sections.length, 3);
   assert.equal(response.body.meta.ai.provider, 'rules');
+});
+
+test('POST /api/ai/feedback saves coach feedback', async () => {
+  const response = await request(buildApp())
+    .post('/api/ai/feedback')
+    .set('Authorization', 'Bearer valid-user-token')
+    .send({
+      suggestionType: 'daily_brief',
+      feedback: 'helpful',
+      suggestionDate: '2026-06-29',
+      modelVersion: 'coach-v1'
+    });
+
+  assert.equal(response.status, 200);
+  assert.equal(response.body.data.saved, true);
+  assert.equal(response.body.data.feedback, 'helpful');
+  assert.equal(response.body.data.userId, 2);
 });
 
 test('POST /api/ai/activity-analysis returns activity suggestions', async () => {

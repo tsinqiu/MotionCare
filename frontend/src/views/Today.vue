@@ -33,8 +33,36 @@
           </div>
           <div class="ai-brief-copy">
             <strong>{{ aiHeadline }}</strong>
+            <span v-if="aiRiskLabel" class="status-chip" :class="aiRiskTone">{{ aiRiskLabel }}</span>
             <p>{{ aiRecommendation }}</p>
           </div>
+          <div v-if="mlSignals.length" class="ml-signal-row">
+            <span v-for="signal in mlSignals" :key="signal.label">
+              <small>{{ signal.label }}</small>
+              <b>{{ signal.value }}</b>
+            </span>
+          </div>
+          <details v-if="mlInsightItems.length" class="ml-insight-panel">
+            <summary>智能依据</summary>
+            <div>
+              <span v-for="item in mlInsightItems" :key="item.label">
+                <small>{{ item.label }}</small>
+                <b>{{ item.value }}</b>
+              </span>
+            </div>
+          </details>
+          <div v-if="aiBrief.ml" class="feedback-row">
+            <button
+              v-for="item in feedbackOptions"
+              :key="item.value"
+              type="button"
+              :disabled="feedbackSending || feedbackValue === item.value"
+              @click="submitFeedback(item.value)"
+            >
+              {{ feedbackValue === item.value ? '已记录' : item.label }}
+            </button>
+          </div>
+          <p v-if="feedbackMessage" class="feedback-message">{{ feedbackMessage }}</p>
           <div class="ai-brief-sections">
             <span
               v-for="section in aiSections"
@@ -123,7 +151,7 @@ import ActivityCard from '@/components/ActivityCard.vue'
 import MetricCard from '@/components/MetricCard.vue'
 import StateBlock from '@/components/StateBlock.vue'
 import { useAsyncData } from '@/composables/useAsyncData'
-import { getDailyBrief } from '@/services/ai'
+import { getDailyBrief, sendAiFeedback } from '@/services/ai'
 import { getDashboardOverview } from '@/services/dashboard'
 import { formatDistance } from '@/utils/formatters'
 import { getTodayHealth } from '@/services/dashboard'
@@ -139,7 +167,9 @@ const defaultBrief = {
   headline: '正在生成智能运动简报',
   sections: [
     { key: 'recent', title: '近期运动', tone: 'steady', text: '正在读取最近运动记录。' },
-    { key: 'body', title: '身体状态', tone: 'steady', text: '正在分析训练负荷和恢复状态。' },
+    { key: 'body', title: '负荷状态', tone: 'steady', text: '正在分析训练负荷和恢复状态。' },
+    { key: 'sleep', title: '睡眠恢复', tone: 'steady', text: '正在读取睡眠、HRV 和压力数据。' },
+    { key: 'weather', title: '天气影响', tone: 'steady', text: '正在结合活动天气和体感温度。' },
     { key: 'today', title: '今日安排', tone: 'steady', text: '正在生成今日训练建议。' },
   ],
   metrics: [
@@ -153,7 +183,9 @@ const defaultBrief = {
 
 const sectionDefaults = [
   { key: 'recent', title: '近期运动', tone: 'steady', text: '已读取最近运动记录，可结合活动频率、距离和类型判断训练连续性。' },
-  { key: 'body', title: '身体状态', tone: 'steady', text: '已读取训练负荷指标，可结合 CTL、ATL、TSB 判断恢复状态。' },
+  { key: 'body', title: '负荷状态', tone: 'steady', text: '已读取训练负荷指标，可结合 CTL、ATL、TSB 判断恢复状态。' },
+  { key: 'sleep', title: '睡眠恢复', tone: 'steady', text: '睡眠、HRV 和压力数据会用于判断恢复优先级。' },
+  { key: 'weather', title: '天气影响', tone: 'steady', text: '温度、湿度和天气状况会用于修正训练建议。' },
   { key: 'today', title: '今日安排', tone: 'steady', text: '建议结合近期负荷安排训练强度，避免连续高强度刺激。' },
 ]
 
@@ -164,9 +196,12 @@ function normalizeBrief(brief) {
 
   return {
     headline: source.headline || defaultBrief.headline,
+    riskLevel: source.riskLevel || '',
+    ml: source.ml || null,
     recommendation: source.recommendation || defaultBrief.recommendation,
+    placements: source.placements || {},
     sections: sectionDefaults.map((fallback, index) => {
-      const item = sections[index] || {}
+      const item = sections.find((candidate) => candidate?.key === fallback.key) || sections[index] || {}
       return {
         key: item.key || fallback.key,
         title: item.title || fallback.title,
@@ -216,6 +251,9 @@ const aiBrief = ref(normalizeBrief(defaultBrief))
 const aiMeta = ref({ ai: { fallback: true, provider: 'loading' } })
 const aiLoading = ref(true)
 const aiError = ref('')
+const feedbackSending = ref(false)
+const feedbackValue = ref('')
+const feedbackMessage = ref('')
 
 const overview = computed(() => overviewData.value || defaultOverview)
 const aiFallback = computed(() => aiLoading.value || aiMeta.value?.ai?.fallback !== false)
@@ -224,13 +262,70 @@ const aiModeLabel = computed(() => {
   if (aiFallback.value) return '规则模式'
   const provider = aiMeta.value?.ai?.provider
   if (provider === 'deepseek') return 'DeepSeek'
-  if (provider === 'ollama') return '本地 Ollama'
   return 'AI 模型'
 })
 const aiHeadline = computed(() => (aiLoading.value ? defaultBrief.headline : aiBrief.value.headline))
+const aiRiskLabel = computed(() => {
+  const labels = { green: '风险低', yellow: '注意恢复', orange: '恢复优先', red: '高风险' }
+  return labels[aiBrief.value.riskLevel] || ''
+})
+const aiRiskTone = computed(() => (['orange', 'red'].includes(aiBrief.value.riskLevel) ? 'danger' : aiBrief.value.riskLevel === 'green' ? 'good' : 'neutral'))
 const aiRecommendation = computed(() => (aiLoading.value ? defaultBrief.recommendation : aiBrief.value.recommendation))
 const aiSections = computed(() => (aiLoading.value ? defaultBrief.sections : aiBrief.value.sections))
 const aiMetrics = computed(() => aiBrief.value.metrics)
+const mlSignals = computed(() => {
+  const ml = aiBrief.value.ml
+  if (!ml) return []
+  const readinessLabels = { low: '偏低', medium: '中等', high: '较好' }
+  const loadActionLabels = { rest: '休息', reduce: '降负荷', maintain: '维持', progress: '推进' }
+  const weatherLabels = { low: '低', medium: '中', high: '高' }
+  return [
+    { label: '恢复分', value: ml.readinessScore != null ? `${ml.readinessScore}` : '--' },
+    { label: '恢复状态', value: readinessLabels[ml.readinessLevel] || '--' },
+    { label: '负荷动作', value: loadActionLabels[ml.loadAction] || '--' },
+    { label: '天气风险', value: weatherLabels[ml.weatherRisk] || '--' },
+  ]
+})
+const feedbackOptions = [
+  { label: '有用', value: 'helpful' },
+  { label: '太保守', value: 'too_conservative' },
+  { label: '太激进', value: 'too_aggressive' },
+  { label: '不符合身体状态', value: 'not_matching_body' },
+]
+const mlInsightItems = computed(() => {
+  const ml = aiBrief.value.ml
+  if (!ml) return []
+  const items = []
+  const factorText = Array.isArray(ml.topFactors) && ml.topFactors.length ? ml.topFactors.join('、') : '未发现明显异常信号'
+  items.push({ label: '关键原因', value: factorText })
+  if (ml.dataCompleteness?.score != null) {
+    items.push({ label: '数据完整度', value: `${ml.dataCompleteness.score}%` })
+  }
+  if (ml.confidence != null) {
+    items.push({ label: '模型置信度', value: `${Math.round(Number(ml.confidence) * 100)}%` })
+  }
+  return items
+})
+async function submitFeedback(value) {
+  if (!aiBrief.value.ml || feedbackSending.value) return
+  feedbackSending.value = true
+  feedbackMessage.value = ''
+  try {
+    await sendAiFeedback({
+      suggestionType: 'daily_brief',
+      feedback: value,
+      suggestionDate: aiMeta.value?.ai?.contextSignals?.latestDate,
+      modelVersion: aiBrief.value.ml.modelVersion,
+      ml: aiBrief.value.ml,
+    })
+    feedbackValue.value = value
+    feedbackMessage.value = '反馈已保存'
+  } catch (err) {
+    feedbackMessage.value = err instanceof Error ? err.message : '反馈保存失败'
+  } finally {
+    feedbackSending.value = false
+  }
+}
 const recentActivities = computed(() => (overview.value?.recentActivities || []).slice(0, 6))
 
 onMounted(loadAiBrief)
@@ -256,5 +351,98 @@ onMounted(loadAiBrief)
 }
 .health-grid b {
   font-size: 18px;
+}
+
+.ml-signal-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin: 12px 0;
+}
+
+.ml-signal-row span {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  background: var(--panel-soft);
+  display: grid;
+  gap: 4px;
+}
+
+.ml-signal-row small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.ml-signal-row b {
+  color: var(--text);
+}
+
+.ml-insight-panel {
+  margin: 8px 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--panel-soft);
+  padding: 10px 12px;
+}
+
+.ml-insight-panel summary {
+  cursor: pointer;
+  color: var(--text);
+  font-weight: 700;
+}
+
+.ml-insight-panel div {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.ml-insight-panel span {
+  display: grid;
+  gap: 4px;
+}
+
+.ml-insight-panel small,
+.feedback-message {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.ml-insight-panel b {
+  color: var(--text);
+  line-height: 1.45;
+}
+
+.feedback-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0 12px;
+}
+
+.feedback-row button {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--panel-soft);
+  color: var(--text);
+  padding: 7px 10px;
+  cursor: pointer;
+}
+
+.feedback-row button:disabled {
+  cursor: default;
+  color: var(--green);
+}
+
+@media (max-width: 800px) {
+  .ml-signal-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .ml-insight-panel div {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

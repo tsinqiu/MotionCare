@@ -297,8 +297,8 @@ async function finishWorkout(workoutId, payload, user) {
         INSERT INTO Activities (
           activity_key, activity_name, activity_type, start_time_utc, local_start_time,
           location_name, start_latitude, start_longitude, end_latitude, end_longitude,
-          owner_user_id, data_source, is_manual, match_status, raw_json
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'live_workout', FALSE, 'live_recorded', ?)
+          owner_user_id, data_source, is_manual, match_status
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'live_workout', FALSE, 'live_recorded')
       `,
       [
         activityKey,
@@ -311,8 +311,7 @@ async function finishWorkout(workoutId, payload, user) {
         summary.startLongitude,
         summary.endLatitude,
         summary.endLongitude,
-        user.id,
-        rawJson
+        user.id
       ]
     );
     const newActivityId = activityResult.insertId;

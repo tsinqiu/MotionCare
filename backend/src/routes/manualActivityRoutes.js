@@ -240,8 +240,8 @@ async function createManualActivity(payload, user) {
       `
         INSERT INTO Activities (
           activity_key, activity_name, activity_type, local_start_time, start_time_utc,
-          location_name, owner_user_id, data_source, is_manual, match_status, raw_json
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, 'manual_upload', TRUE, 'manual_upload', ?)
+          location_name, owner_user_id, data_source, is_manual, match_status
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, 'manual_upload', TRUE, 'manual_upload')
       `,
       [
         activityKey,
@@ -250,8 +250,7 @@ async function createManualActivity(payload, user) {
         payload.localStartTime,
         payload.startTimeUtc || payload.localStartTime,
         payload.locationName,
-        user.id,
-        JSON.stringify({ manualUpload: payload })
+        user.id
       ]
     );
 
@@ -278,7 +277,7 @@ async function updateManualActivity(activityId, payload, user) {
       `
         UPDATE Activities
         SET activity_name = ?, activity_type = ?, local_start_time = ?, start_time_utc = ?,
-            location_name = ?, raw_json = ?
+            location_name = ?
         WHERE id = ? AND is_manual = TRUE
       `,
       [
@@ -287,7 +286,6 @@ async function updateManualActivity(activityId, payload, user) {
         payload.localStartTime,
         payload.startTimeUtc || payload.localStartTime,
         payload.locationName,
-        JSON.stringify({ manualUpload: payload }),
         activityId
       ]
     );
