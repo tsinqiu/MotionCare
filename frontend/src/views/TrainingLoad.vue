@@ -29,7 +29,13 @@
 
     <StateBlock v-if="loading" title="正在加载训练负荷" message="正在读取体能、疲劳和状态曲线。" />
     <StateBlock v-else-if="error" title="训练负荷加载失败" :message="error" action-label="重试" tone="danger" @action="load" />
-    <StateBlock v-else-if="loadRows.length === 0" title="暂无训练负荷" message="当前数据源没有 activity_training_load。" />
+    <StateBlock
+      v-else-if="loadRows.length === 0"
+      title="还没有训练负荷"
+      message="同步带有训练负荷的运动后，这里会显示体能、疲劳和状态趋势。"
+      action-label="前往同步"
+      @action="router.push('/me/sync')"
+    />
 
     <template v-else>
       <ChartPanel title="体能 / 疲劳 / 状态" eyebrow="CTL · ATL · TSB" :option="loadOption" />
@@ -60,6 +66,7 @@
 
 <script setup>
 import { computed, reactive, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 
 import ChartPanel from '@/components/ChartPanel.vue'
 import MetricCard from '@/components/MetricCard.vue'
@@ -71,6 +78,8 @@ import {
   getLatestTrainingStatus,
 } from '@/services/health'
 import { getLoadBalance } from '@/services/training'
+
+const router = useRouter()
 
 const ranges = [
   { label: '42天', value: '42d' },

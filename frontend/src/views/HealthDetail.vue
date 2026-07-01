@@ -16,6 +16,13 @@
 
     <StateBlock v-if="loading" title="加载中..." message="正在获取健康数据" />
     <StateBlock v-else-if="error" title="加载失败" :message="error" tone="danger" action-label="重试" @action="loadAll" />
+    <StateBlock
+      v-else-if="!hasHealthData"
+      title="当天没有健康数据"
+      message="同步 Garmin 后再回来查看这一天的身体状态。"
+      action-label="前往同步"
+      @action="router.push('/me/sync')"
+    />
 
     <template v-else>
       <div class="metric-grid">
@@ -50,6 +57,7 @@
 
 <script setup>
 import { computed, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 
 import ChartPanel from '@/components/ChartPanel.vue'
 import MetricCard from '@/components/MetricCard.vue'
@@ -65,6 +73,7 @@ import {
 
 const loading = ref(false)
 const error = ref('')
+const router = useRouter()
 const selectedDate = ref(new Date().toISOString().slice(0, 10))
 
 const summary = ref({})
@@ -90,6 +99,12 @@ const intensitySummary = computed(() => {
 })
 
 const ftpText = computed(() => (cyclingFtp.value?.ftpW != null ? `${cyclingFtp.value.ftpW} W` : '--'))
+const hasHealthData = computed(() => (
+  Object.values(summary.value || {}).some((value) => value !== null && value !== undefined && value !== '')
+  || [heartRateMonitorData, heartRateSleepData, stressMonitorData, stressSleepData, stepData, intensityData, sleepStages, hrvSampleData, sleepMovementData]
+    .some((rows) => rows.value.length > 0)
+  || Boolean(trainingStatus.value || racePredictions.value || lactateThreshold.value || cyclingFtp.value)
+))
 
 function toTimestamp(ts) {
   return ts ? new Date(ts).getTime() : 0

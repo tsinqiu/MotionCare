@@ -24,7 +24,9 @@
         </div>
       </form>
 
-      <div v-if="!shoes.length" class="empty-state">暂无跑鞋，添加一双吧</div>
+      <StateBlock v-if="loading" title="正在加载跑鞋" message="正在读取跑鞋和累计里程。" />
+      <StateBlock v-else-if="error" title="跑鞋加载失败" :message="error" action-label="重试" tone="danger" @action="load" />
+      <StateBlock v-else-if="!shoes.length" title="还没有跑鞋" message="添加常用跑鞋后，可以跟踪里程和使用状态。" action-label="添加跑鞋" @action="openCreate" />
       <div v-else class="shoe-list">
         <div
           v-for="s in shoes"
@@ -105,6 +107,7 @@ import { useRouter } from 'vue-router'
 import { apiClient } from '@/services/http'
 import { normalizeActivity } from '@/services/activities'
 import ActivityCard from '@/components/ActivityCard.vue'
+import StateBlock from '@/components/StateBlock.vue'
 
 const router = useRouter()
 const shoes = ref([])
@@ -120,10 +123,21 @@ const editForm = ref({ name: '', brand: '', model: '', purchaseDate: '', targetD
 const editPhoto = ref(null)
 const editPhotoPreview = ref('')
 const isSavingEdit = ref(false)
+const loading = ref(false)
+const error = ref('')
 
 async function load() {
-  const { data } = await apiClient.get('/shoes')
-  shoes.value = data || []
+  loading.value = true
+  error.value = ''
+  try {
+    const { data } = await apiClient.get('/shoes')
+    shoes.value = data || []
+  } catch (err) {
+    shoes.value = []
+    error.value = err instanceof Error ? err.message : '跑鞋加载失败'
+  } finally {
+    loading.value = false
+  }
 }
 
 function photoUrl(path) {
@@ -156,27 +170,32 @@ function openCreate() {
 }
 
 async function save() {
-  const name = form.value.name?.trim()
-  const createRes = await apiClient.post('/shoes', {
-    name,
-    brand: form.value.brand || null,
-    model: form.value.model || null,
-    purchaseDate: form.value.purchaseDate || null,
-    targetDistanceKm: form.value.targetDistanceKm || null,
-    initialDistanceKm: form.value.initialDistanceKm || null,
-    price: form.value.price || null,
-  })
-  const shoeId = createRes.data?.id
+  error.value = ''
+  try {
+    const name = form.value.name?.trim()
+    const createRes = await apiClient.post('/shoes', {
+      name,
+      brand: form.value.brand || null,
+      model: form.value.model || null,
+      purchaseDate: form.value.purchaseDate || null,
+      targetDistanceKm: form.value.targetDistanceKm || null,
+      initialDistanceKm: form.value.initialDistanceKm || null,
+      price: form.value.price || null,
+    })
+    const shoeId = createRes.data?.id
 
-  if (shoeId && formPhoto.value) {
-    const photoForm = new FormData()
-    photoForm.append('photo', formPhoto.value)
-    await apiClient.post(`/shoes/${shoeId}/photo`, photoForm)
+    if (shoeId && formPhoto.value) {
+      const photoForm = new FormData()
+      photoForm.append('photo', formPhoto.value)
+      await apiClient.post(`/shoes/${shoeId}/photo`, photoForm)
+    }
+
+    showForm.value = false
+    formPhoto.value = null
+    await load()
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : '跑鞋保存失败'
   }
-
-  showForm.value = false
-  formPhoto.value = null
-  load()
 }
 
 function openEdit(s) {
@@ -226,7 +245,7 @@ async function saveEdit() {
     closeEdit()
     load()
   } catch (err) {
-    alert(err instanceof Error ? err.message : '保存失败')
+    error.value = err instanceof Error ? err.message : '保存失败'
   } finally {
     isSavingEdit.value = false
   }
@@ -239,17 +258,27 @@ function closeEdit() {
 }
 
 async function retire(id) {
-  await apiClient.patch(`/shoes/${id}`, { isRetired: true })
-  load()
+  error.value = ''
+  try {
+    await apiClient.patch(`/shoes/${id}`, { isRetired: true })
+    await load()
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : '跑鞋状态更新失败'
+  }
 }
 
 async function remove(id) {
   if (!confirm('确定删除？')) return
-  await apiClient.delete(`/shoes/${id}`)
-  selectedShoe.value = null
-  shoeActivities.value = []
-  shoeActivitiesError.value = ''
-  load()
+  error.value = ''
+  try {
+    await apiClient.delete(`/shoes/${id}`)
+    selectedShoe.value = null
+    shoeActivities.value = []
+    shoeActivitiesError.value = ''
+    await load()
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : '跑鞋删除失败'
+  }
 }
 
 async function selectShoe(s) {

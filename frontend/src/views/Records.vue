@@ -6,14 +6,21 @@
           <h2>最佳记录</h2>
         </div>
         <button class="secondary-link" type="button" :disabled="isSyncing" @click="refreshRecords">
-          <CloudUpload :size="17" />
-          {{ isSyncing ? '同步中' : '同步' }}
+          <RefreshCw :size="17" />
+          {{ isSyncing ? '刷新中' : '刷新' }}
         </button>
       </div>
     </section>
 
     <StateBlock v-if="loading" title="正在加载最佳记录" message="正在读取最佳记录。" />
     <StateBlock v-else-if="error" title="最佳记录加载失败" :message="error" action-label="重试" tone="danger" @action="load" />
+    <StateBlock
+      v-else-if="!hasRecords"
+      title="还没有个人纪录"
+      message="完成并同步运动后，MotionCare 会根据已有活动生成个人最佳。"
+      action-label="记录运动"
+      @action="router.push('/record')"
+    />
 
     <div v-else class="records-grid">
       <RecordGroup title="跑步记录" :items="filteredRecords(records.running || [])" />
@@ -26,7 +33,7 @@
 <script setup>
 import { computed, h, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { CloudUpload, ChevronRight } from '@lucide/vue'
+import { ChevronRight, RefreshCw } from '@lucide/vue'
 
 import StateBlock from '@/components/StateBlock.vue'
 import { useAsyncData } from '@/composables/useAsyncData'
@@ -36,6 +43,7 @@ import { formatPaceSeconds } from '@/utils/formatters'
 const router = useRouter()
 const { data, error, load, loading } = useAsyncData(getPersonalBests, {})
 const records = computed(() => data.value || {})
+const hasRecords = computed(() => ['running', 'cycling', 'swimming', 'overall'].some((key) => filteredRecords(records.value[key] || []).length > 0))
 const isSyncing = ref(false)
 
 async function refreshRecords() {

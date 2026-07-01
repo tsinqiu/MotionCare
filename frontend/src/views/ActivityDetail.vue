@@ -232,7 +232,7 @@ const isRunningActivity = computed(() => {
 const canEditActivity = computed(() => {
   if (!authSession.user) return false
   if (authSession.user.role === 'admin') return true
-  return authSession.user.id === activity.value?.ownerUserId
+  return Number(authSession.user.id) === Number(activity.value?.ownerUserId)
 })
 const analysisInsights = computed(() => analysis.value?.insights || [])
 const analysisSuggestions = computed(() => analysis.value?.suggestions || [])

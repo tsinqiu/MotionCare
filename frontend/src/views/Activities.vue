@@ -3,12 +3,14 @@
     <section class="dark-panel">
       <div class="section-heading">
         <div>
-          <h2>运动记录</h2>
+          <p class="overline">我最近完成了什么</p>
+          <h2>最近运动</h2>
+          <p>筛选、回顾和管理自己的运动历史。</p>
         </div>
-        <button class="primary-link" type="button" @click="openCreate">
-          <Plus :size="17" />
-          手动添加
-        </button>
+        <RouterLink class="primary-link" to="/record">
+          <CirclePlus :size="17" />
+          记录运动
+        </RouterLink>
       </div>
 
       <SportTabs v-model="filters.activity_type" :items="sportFilters" />
@@ -61,8 +63,10 @@
     />
     <StateBlock
       v-else-if="activities.length === 0"
-      title="暂无活动"
-      message="当前筛选条件没有匹配的运动记录。"
+      title="没有找到运动"
+      message="当前筛选条件没有匹配记录，也可以同步或手工添加一次运动。"
+      action-label="记录运动"
+      @action="router.push('/record')"
     />
 
     <section v-else class="activity-list-section">
@@ -103,14 +107,14 @@
 <script setup>
 import { computed, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { Plus } from '@lucide/vue'
+import { CirclePlus } from '@lucide/vue'
 
 import ActivityCard from '@/components/ActivityCard.vue'
 import ManualActivityModal from '@/components/ManualActivityModal.vue'
 import SportTabs from '@/components/SportTabs.vue'
 import StateBlock from '@/components/StateBlock.vue'
 import { sportFilters } from '@/constants/sports'
-import { createManualActivity, deleteManualActivity, getActivityPage, updateManualActivity } from '@/services/activities'
+import { deleteManualActivity, getActivityPage, updateManualActivity } from '@/services/activities'
 import { authSession, hasAuthToken, normalizeRedirect } from '@/stores/authStore'
 
 const router = useRouter()
@@ -156,16 +160,6 @@ function canManageManualActivity(activity) {
   return isAdmin.value || Number(activity.ownerUserId) === Number(authSession.user.id)
 }
 
-function openCreate() {
-  if (!hasAuthToken()) {
-    error.value = '请先登录后再手动添加运动'
-    router.push({ name: 'login', query: { redirect: normalizeRedirect(router.currentRoute.value.fullPath) } })
-    return
-  }
-  editingActivity.value = null
-  modalOpen.value = true
-}
-
 function openEdit(activity) {
   if (!canManageManualActivity(activity)) {
     error.value = '无法编辑不属于你的运动记录'
@@ -199,10 +193,7 @@ function closeModal() {
 }
 
 async function saveManualActivity(payload) {
-  if (editingActivity.value) {
-    return updateManualActivity(editingActivity.value.id, payload)
-  }
-  return createManualActivity(payload)
+  return updateManualActivity(editingActivity.value.id, payload)
 }
 
 async function handleSaved() {

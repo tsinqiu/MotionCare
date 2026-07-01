@@ -20,6 +20,7 @@ Thumbs.db
 # Local agent, cache, coverage, and temporary artifacts
 .agents/
 .codex/
+docs/superpowers/
 .cache/
 coverage/
 .nyc_output/

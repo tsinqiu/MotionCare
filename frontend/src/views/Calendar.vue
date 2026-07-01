@@ -5,10 +5,10 @@
         <div>
           <h2>运动日历</h2>
         </div>
-        <button v-if="isAdmin" class="primary-link" type="button" @click="openCreate">
-          <Plus :size="17" />
-          添加
-        </button>
+        <RouterLink class="primary-link" to="/record">
+          <CirclePlus :size="17" />
+          记录运动
+        </RouterLink>
       </div>
       <div class="date-stepper">
         <button type="button" @click="stepMonth(-1)">‹</button>
@@ -52,7 +52,9 @@
         <StateBlock
           v-if="selectedActivities.length === 0"
           title="当天暂无运动"
-          message="可以点击右上角添加手动运动记录。"
+          message="这一天还没有运动记录，可以同步或手工补充。"
+          action-label="记录运动"
+          @action="router.push('/record')"
         />
         <div v-else class="activity-card-grid">
           <ActivityCard
@@ -65,36 +67,26 @@
       </section>
     </template>
 
-    <ManualActivityModal
-      v-if="modalOpen"
-      :save="createManualActivity"
-      @close="modalOpen = false"
-      @saved="handleSaved"
-    />
   </div>
 </template>
 
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { Plus } from '@lucide/vue'
+import { CirclePlus } from '@lucide/vue'
 
 import ActivityCard from '@/components/ActivityCard.vue'
-import ManualActivityModal from '@/components/ManualActivityModal.vue'
 import StateBlock from '@/components/StateBlock.vue'
-import { createManualActivity } from '@/services/activities'
 import { getCalendarStats } from '@/services/stats'
-import { authSession } from '@/stores/authStore'
 
 const router = useRouter()
 const weekDays = ['日', '一', '二', '三', '四', '五', '六']
-const month = ref('2026-06')
+const today = new Date()
+const month = ref(formatMonthKey(today))
 const calendar = ref({ days: [] })
-const selectedDate = ref('2026-06-10')
+const selectedDate = ref(`${formatMonthKey(today)}-${String(today.getDate()).padStart(2, '0')}`)
 const error = ref('')
 const loading = ref(false)
-const modalOpen = ref(false)
-const isAdmin = computed(() => authSession.user?.role === 'admin')
 
 const monthLabel = computed(() => `${month.value.slice(0, 4)}年${Number(month.value.slice(5, 7))}月`)
 const leadingBlanks = computed(() => new Date(`${month.value}-01T00:00:00`).getDay())
@@ -116,37 +108,8 @@ function stepMonth(offset) {
   selectedDate.value = `${month.value}-01`
 }
 
-function openCreate() {
-  if (!isAdmin.value) return
-  modalOpen.value = true
-}
-
 function formatMonthKey(date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
-}
-
-async function handleSaved(activity) {
-  modalOpen.value = false
-  const normalizedDate = normalizeDateKey(activity.local_start_time)
-  month.value = normalizedDate.slice(0, 7)
-  selectedDate.value = normalizedDate
-  await load()
-}
-
-function normalizeDateKey(value) {
-  if (!value) return new Date().toISOString().slice(0, 10)
-  if (typeof value === 'string') {
-    const normalized = value.replace(' ', 'T')
-    const parsed = new Date(normalized)
-    if (!Number.isNaN(parsed.getTime())) return formatDateKey(parsed)
-    return value.slice(0, 10)
-  }
-  const parsed = new Date(value)
-  return Number.isNaN(parsed.getTime()) ? formatDateKey(new Date()) : formatDateKey(parsed)
-}
-
-function formatDateKey(date) {
-  return `${formatMonthKey(date)}-${String(date.getDate()).padStart(2, '0')}`
 }
 
 async function load() {

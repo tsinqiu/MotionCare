@@ -7,7 +7,7 @@
         </div>
         <span class="status-chip good">隐私优先</span>
       </div>
-      <p class="muted-copy">系统只展示必要的账号和运动数据，不在页面中暴露数据库密码、密钥或个人轨迹原始文件。</p>
+      <p class="muted-copy">MotionCare 只展示必要的账号和运动信息，不会在页面中显示密码、密钥或完整轨迹文件。</p>
     </section>
 
     <section class="dark-panel">

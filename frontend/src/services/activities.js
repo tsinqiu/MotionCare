@@ -76,6 +76,7 @@ export function normalizeActivity(row = {}) {
     start_time_utc: firstDefined(row.start_time_utc, row.startTimeUtc),
     local_start_time: firstDefined(row.local_start_time, row.localStartTime),
     location_name: firstDefined(row.location_name, row.locationName),
+    ownerUserId: toNumber(firstDefined(row.owner_user_id, row.ownerUserId)),
     owner_username: firstDefined(row.owner_username, row.ownerUsername),
     data_source: firstDefined(row.data_source, row.dataSource, row.is_manual ? 'manual_upload' : 'garmin_import'),
     is_manual: Boolean(firstDefined(row.is_manual, row.isManual, false)),

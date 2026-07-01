@@ -140,7 +140,7 @@
             <LinkIcon :size="16" />
             {{ authorizing ? '绑定中' : '保存绑定' }}
           </button>
-          <p class="sync-note">密码不会保存在数据库中，只用于本次连接验证。</p>
+          <p class="sync-note">凭据只用于完成连接验证，不会在页面中显示。</p>
         </form>
       </div>
 

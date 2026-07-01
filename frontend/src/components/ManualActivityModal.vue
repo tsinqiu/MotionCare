@@ -3,7 +3,7 @@
     <section class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="manual-activity-title">
       <header class="modal-header">
         <div>
-          <p class="overline">Manual activity</p>
+          <p class="overline">已完成的运动</p>
           <h2 id="manual-activity-title">{{ activity ? '编辑手动运动' : '手动添加运动' }}</h2>
         </div>
         <button class="icon-button" type="button" aria-label="关闭" @click="$emit('close')">×</button>
@@ -101,7 +101,7 @@ const form = reactive({
 function fillForm(activity) {
   form.activityName = activity?.activity_name || ''
   form.activityType = activity?.raw_activity_type || 'running'
-  form.localStartTime = (activity?.local_start_time || new Date().toISOString().slice(0, 16)).replace(' ', 'T').slice(0, 16)
+  form.localStartTime = (activity?.local_start_time || localDateTimeValue()).replace(' ', 'T').slice(0, 16)
   form.locationName = activity?.location_name || ''
   form.distanceM = activity?.total_distance_m || 0
   form.durationS = activity?.total_timer_time_s || 1800
@@ -109,6 +109,11 @@ function fillForm(activity) {
   form.avgHeartRateBpm = activity?.avg_heart_rate_bpm || null
   form.maxHeartRateBpm = activity?.max_heart_rate_bpm || null
   form.activityTrainingLoad = activity?.activity_training_load || null
+}
+
+function localDateTimeValue(date = new Date()) {
+  const pad = (value) => String(value).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
 watch(() => props.activity, fillForm, { immediate: true })

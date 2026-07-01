@@ -21,6 +21,13 @@
 
     <StateBlock v-if="loading" title="正在加载统计" message="正在读取运动统计。" />
     <StateBlock v-else-if="error" title="统计加载失败" :message="error" action-label="重试" tone="danger" @action="load" />
+    <StateBlock
+      v-else-if="!hasStats"
+      title="还没有趋势数据"
+      message="同步或记录运动后，这里会展示距离、时长和运动类型趋势。"
+      action-label="记录运动"
+      @action="router.push('/record')"
+    />
 
     <template v-else>
       <div class="metric-grid">
@@ -108,7 +115,7 @@ const tabs = [
 
 const router = useRouter()
 const mode = ref('month')
-const selected = ref('2026-06')
+const selected = ref(todayText().slice(0, 7))
 const activityType = ref('all')
 const selectedBarMetric = ref('distance')
 const summary = ref({})
@@ -159,6 +166,13 @@ const cyclingAchievementKeys = ['longest_distance', 'fastest_avg_speed', 'highes
 const runningAchievements = computed(() => pickAchievements(personalBests.value.running, runningAchievementKeys))
 const cyclingAchievements = computed(() => pickAchievements(personalBests.value.cycling, cyclingAchievementKeys))
 const activeBarMetric = computed(() => barMetrics.find((metric) => metric.key === selectedBarMetric.value) || barMetrics[0])
+const hasStats = computed(() => (
+  Number(summary.value.activityCount || summary.value.totalActivities || 0) > 0
+  || Number(summary.value.totalDistanceKm || 0) > 0
+  || Number(summary.value.totalDurationS || 0) > 0
+  || typeStats.value.some((item) => Number(item.activity_count || 0) > 0)
+  || [...(personalBests.value.running || []), ...(personalBests.value.cycling || [])].some((item) => item.value != null)
+))
 
 const barOption = computed(() => {
   const metric = activeBarMetric.value

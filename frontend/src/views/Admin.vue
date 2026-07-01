@@ -44,9 +44,11 @@
       </form>
     </section>
 
-    <StateBlock v-if="usersError" title="用户管理失败" :message="usersError" tone="danger" />
+    <StateBlock v-if="usersLoading" title="正在加载用户" message="正在读取可管理的账号。" />
+    <StateBlock v-else-if="usersError" title="用户管理失败" :message="usersError" action-label="重试" tone="danger" @action="loadUsers" />
+    <StateBlock v-else-if="users.length === 0" title="还没有用户" message="添加首个用户后会显示在这里。" />
 
-    <section class="dark-panel">
+    <section v-else class="dark-panel">
       <div class="section-heading">
         <div>
           <h2>用户列表</h2>
