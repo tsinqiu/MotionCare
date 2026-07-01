@@ -497,7 +497,7 @@ async function saveMeta() {
 
 function photoUrl(path) {
   if (!path) return ''
-  const base = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api'
+  const base = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8089/api'
   return base.replace(/\/api$/, '') + path
 }
 
