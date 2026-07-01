@@ -12,6 +12,13 @@ const CACHE_TTL_MS = 5 * 60 * 1000;
 
 const RISK_ORDER = { green: 0, yellow: 1, orange: 2, red: 3 };
 const WEATHER_RISK_ORDER = { low: 0, medium: 1, high: 2 };
+const DEFAULT_LABEL_SOURCE_SUMMARY = {
+  aggregate: { rule_pseudo: 1 },
+  realLabelRatio: 0,
+  pseudoLabelRatio: 1,
+  perceivedEffortCoverage: 0,
+  sampleWeights: { user_feedback: 5, delayed_objective: 3, rule_pseudo: 1 }
+};
 
 function toNumber(value, fallback = 0) {
   const numberValue = Number(value);
@@ -326,7 +333,16 @@ function rulePrediction(features) {
     confidence: 0.62,
     modelVersion: MODEL_VERSION,
     provider: 'rules',
-    fallback: true
+    fallback: true,
+    rulesBaseline: {
+      readinessLevel,
+      riskLevel,
+      loadAction,
+      weatherRisk: weather.level,
+      primaryRecommendation
+    },
+    learnedSignals: null,
+    labelSourceSummary: DEFAULT_LABEL_SOURCE_SUMMARY
   };
 }
 
@@ -340,6 +356,14 @@ function normalizeModelPrediction(rawPrediction, fallbackPrediction) {
     trainingModifier: ['normal', 'reduce_intensity', 'indoor_preferred', 'avoid_hard_session'],
     weatherRisk: ['low', 'medium', 'high'],
     primaryRecommendation: ['rest', 'easy_aerobic', 'normal_training', 'interval', 'strength', 'mobility', 'sleep_focus', 'hydration']
+  };
+  const learnedSignals = {
+    readinessLevel: prediction.readinessLevel || null,
+    loadAction: prediction.loadAction || null,
+    primaryRecommendation: prediction.primaryRecommendation || null,
+    perceivedEffortLevel: prediction.perceivedEffortLevel || null,
+    adviceFeedbackClass: prediction.adviceFeedbackClass || null,
+    confidence: round(prediction.confidence, 4) ?? null
   };
 
   const merged = {
@@ -364,7 +388,12 @@ function normalizeModelPrediction(rawPrediction, fallbackPrediction) {
     confidence: round(prediction.confidence, 4) ?? fallbackPrediction.confidence,
     modelVersion: prediction.modelVersion || MODEL_VERSION,
     provider: 'local_model',
-    fallback: false
+    fallback: false,
+    perceivedEffortLevel: prediction.perceivedEffortLevel || null,
+    adviceFeedbackClass: prediction.adviceFeedbackClass || null,
+    rulesBaseline: fallbackPrediction.rulesBaseline,
+    learnedSignals,
+    labelSourceSummary: prediction.labelSourceSummary || fallbackPrediction.labelSourceSummary || DEFAULT_LABEL_SOURCE_SUMMARY
   };
 
   if (fallbackPrediction.riskLevel === 'red') {
@@ -511,7 +540,10 @@ function summarizePrediction(prediction) {
     modelVersion: prediction.modelVersion,
     provider: prediction.provider,
     fallback: prediction.fallback,
-    dataCompleteness: prediction.dataCompleteness
+    dataCompleteness: prediction.dataCompleteness,
+    rulesBaseline: prediction.rulesBaseline || null,
+    learnedSignals: prediction.learnedSignals || null,
+    labelSourceSummary: prediction.labelSourceSummary || DEFAULT_LABEL_SOURCE_SUMMARY
   });
 }
 
@@ -538,6 +570,7 @@ async function getHealth() {
     scriptAvailable,
     modelVersion: metadata.modelVersion || MODEL_VERSION,
     sampleCount: metadata.sampleCount || 0,
+    labelSourceSummary: metadata.labelSourceSummary || DEFAULT_LABEL_SOURCE_SUMMARY,
     trainedAt,
     fallbackRules: true,
     featureCount: FEATURE_NAMES.length,

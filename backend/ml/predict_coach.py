@@ -88,6 +88,16 @@ def main() -> None:
         readiness_level, readiness_confidence = predict_label(models["readinessLevel"], values)
         load_action, load_confidence = predict_label(models["loadAction"], values)
         primary_recommendation, recommendation_confidence = predict_label(models["primaryRecommendation"], values)
+        perceived_effort_level, perceived_effort_confidence = (
+            predict_label(models["perceivedEffortLevel"], values)
+            if "perceivedEffortLevel" in models
+            else (None, None)
+        )
+        advice_feedback_class, advice_feedback_confidence = (
+            predict_label(models["adviceFeedbackClass"], values)
+            if "adviceFeedbackClass" in models
+            else (None, None)
+        )
         weather_level = "high" if float(payload.get("weather_risk_level", 0)) >= 2 else "medium" if float(payload.get("weather_risk_level", 0)) >= 1 else "low"
     except (
         KeyError,
@@ -105,6 +115,13 @@ def main() -> None:
         raise SystemExit(1) from error
 
     risk_level = RISK_FROM_ACTION.get(load_action, "yellow")
+    confidence_values = [
+        readiness_confidence,
+        load_confidence,
+        recommendation_confidence,
+        perceived_effort_confidence,
+        advice_feedback_confidence,
+    ]
     result = {
         "readinessScore": readiness_score(readiness_level, load_action, weather_level),
         "readinessLevel": readiness_level,
@@ -115,6 +132,8 @@ def main() -> None:
         "weatherRisk": weather_level,
         "primaryRecommendation": primary_recommendation,
         "recommendationTypes": DEFAULT_RECOMMENDATION_TYPES.get(load_action, [primary_recommendation]),
+        "perceivedEffortLevel": perceived_effort_level,
+        "adviceFeedbackClass": advice_feedback_class,
         "dataCompleteness": {
             "sleepCoverage14d": round(float(payload.get("sleep_coverage_14d", 0)), 3),
             "weatherCoverage14d": round(float(payload.get("weather_coverage_14d", 0)), 3),
@@ -122,8 +141,9 @@ def main() -> None:
             "trainingStatusCoverage14d": round(float(payload.get("training_status_coverage_14d", 0)), 3),
             "score": round(float(payload.get("data_completeness_score", 0)), 1),
         },
-        "confidence": round(float(np.mean([readiness_confidence, load_confidence, recommendation_confidence])), 4),
+        "confidence": round(float(np.mean([value for value in confidence_values if value is not None])), 4),
         "modelVersion": bundle.get("modelVersion", "coach-v1"),
+        "labelSourceSummary": bundle.get("labelSourceSummary", {}),
     }
     print(json.dumps(result, ensure_ascii=False))
 

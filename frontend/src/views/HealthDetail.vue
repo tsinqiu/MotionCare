@@ -45,6 +45,50 @@
         <p v-if="recoveryFactors" class="recovery-factors">{{ recoveryFactors }}</p>
       </section>
 
+      <section class="dark-panel morning-panel">
+        <div class="section-heading">
+          <div>
+            <p class="overline">Morning Readiness</p>
+            <h2>晨间状态打分</h2>
+          </div>
+          <button class="save-btn" type="button" :disabled="morningSaving" @click="submitMorningForm">
+            {{ morningSaving ? '保存中' : '保存' }}
+          </button>
+        </div>
+        <div class="morning-grid">
+          <label>
+            <span>今日感觉</span>
+            <input v-model.number="morningForm.readinessScore" type="number" min="1" max="5" />
+          </label>
+          <label>
+            <span>肌肉酸痛</span>
+            <select v-model="morningForm.muscleSoreness">
+              <option value="none">无</option>
+              <option value="mild">轻微</option>
+              <option value="obvious">明显</option>
+            </select>
+          </label>
+          <label>
+            <span>精神状态</span>
+            <select v-model="morningForm.mentalState">
+              <option value="poor">差</option>
+              <option value="normal">一般</option>
+              <option value="good">好</option>
+            </select>
+          </label>
+          <label>
+            <span>训练意愿</span>
+            <select v-model="morningForm.trainingWillingness">
+              <option value="rest">休息</option>
+              <option value="easy">轻松练</option>
+              <option value="normal">正常练</option>
+            </select>
+          </label>
+        </div>
+        <textarea v-model="morningForm.note" rows="2" maxlength="500" placeholder="可选备注，例如腿部酸痛、睡眠不踏实" />
+        <p v-if="morningMessage" class="morning-message">{{ morningMessage }}</p>
+      </section>
+
       <div class="detail-grid">
         <ChartPanel v-if="heartRateMonitorData.length" title="全天心率" eyebrow="监测心率" :option="lineOption(heartRateMonitorData, 'bpm', '#33b5ff')" />
         <ChartPanel v-if="heartRateSleepData.length" title="睡眠心率" eyebrow="夜间心率" :option="lineOption(heartRateSleepData, 'bpm', '#21d47b')" />
@@ -66,7 +110,7 @@ import { computed, ref, watch } from 'vue'
 import ChartPanel from '@/components/ChartPanel.vue'
 import MetricCard from '@/components/MetricCard.vue'
 import StateBlock from '@/components/StateBlock.vue'
-import { getDailyBrief } from '@/services/ai'
+import { getDailyBrief, sendMorningReadiness } from '@/services/ai'
 import {
   getHealthSamples,
   getLatestCyclingFtp,
@@ -102,6 +146,15 @@ const racePredictions = ref(null)
 const lactateThreshold = ref(null)
 const cyclingFtp = ref(null)
 const aiBrief = ref(null)
+const morningSaving = ref(false)
+const morningMessage = ref('')
+const morningForm = ref({
+  readinessScore: 3,
+  muscleSoreness: 'none',
+  mentalState: 'normal',
+  trainingWillingness: 'easy',
+  note: '',
+})
 
 const intensitySummary = computed(() => {
   const moderate = summary.value.moderateIntensityMinutes
@@ -209,6 +262,23 @@ function nextDay() {
   const d = new Date(`${selectedDate.value}T00:00:00`)
   d.setDate(d.getDate() + 1)
   selectedDate.value = formatLocalDate(d)
+}
+
+async function submitMorningForm() {
+  if (morningSaving.value) return
+  morningSaving.value = true
+  morningMessage.value = ''
+  try {
+    await sendMorningReadiness({
+      feedbackDate: selectedDate.value,
+      ...morningForm.value,
+    })
+    morningMessage.value = '晨间状态已保存'
+  } catch (err) {
+    morningMessage.value = err instanceof Error ? err.message : '保存失败'
+  } finally {
+    morningSaving.value = false
+  }
 }
 
 async function loadAll() {
@@ -320,6 +390,60 @@ watch(selectedDate, loadAll, { immediate: true })
   margin-top: 16px;
 }
 
+.morning-panel {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.morning-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.morning-grid label {
+  display: grid;
+  gap: 6px;
+}
+
+.morning-grid span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.morning-grid input,
+.morning-grid select,
+.morning-panel textarea {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--panel-strong);
+  color: var(--text);
+  padding: 8px 10px;
+}
+
+.save-btn {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--green);
+  color: #04130b;
+  font-weight: 700;
+  padding: 8px 14px;
+  cursor: pointer;
+}
+
+.save-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.morning-message {
+  margin: 0;
+  color: var(--green);
+  font-size: 13px;
+}
+
 .recovery-advice-panel p {
   margin: 0;
   color: var(--muted);
@@ -334,6 +458,10 @@ watch(selectedDate, loadAll, { immediate: true })
 @media (max-width: 800px) {
   .detail-grid {
     grid-template-columns: 1fr;
+  }
+
+  .morning-grid {
+    grid-template-columns: 1fr 1fr;
   }
 }
 </style>

@@ -20,3 +20,7 @@ export function analyzeActivity(activityId) {
 export function sendAiFeedback(payload) {
   return mutateEnvelope('post', '/ai/feedback', payload)
 }
+
+export function sendMorningReadiness(payload) {
+  return mutateEnvelope('post', '/ai/morning-readiness', payload)
+}

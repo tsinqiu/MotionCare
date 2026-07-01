@@ -55,8 +55,9 @@
             <input v-model="editForm.activityName" type="text" placeholder="输入活动名称" />
           </label>
           <label>
-            <span>体感程度 (1-10)</span>
+            <span>训练后体感 RPE (1-10)</span>
             <input v-model.number="editForm.effort" type="number" min="1" max="10" placeholder="1-10" />
+            <small>1 很轻松，10 接近极限疲劳</small>
           </label>
           <div class="edit-form-actions">
             <button type="button" class="primary-link" :disabled="isSavingMeta" @click="saveMeta">

@@ -9,6 +9,9 @@ const HEALTH_WINDOW_DAYS = 14;
 const CHAT_TIMEOUT_BUFFER_MS = 1000;
 const FEEDBACK_VALUES = new Set(['helpful', 'too_conservative', 'too_aggressive', 'not_matching_body']);
 const SUGGESTION_TYPES = new Set(['daily_brief', 'chat', 'training_load', 'sleep_recovery']);
+const MUSCLE_SORENESS_VALUES = new Set(['none', 'mild', 'obvious']);
+const MENTAL_STATE_VALUES = new Set(['poor', 'normal', 'good']);
+const TRAINING_WILLINGNESS_VALUES = new Set(['rest', 'easy', 'normal']);
 
 const EMPTY_OVERVIEW = {
   recentActivities: [],
@@ -397,7 +400,10 @@ function buildDailyBrief(overview = EMPTY_OVERVIEW, context = EMPTY_RAG_CONTEXT)
       confidence: advice.mlPrediction.confidence,
       modelVersion: advice.mlPrediction.modelVersion,
       provider: advice.mlPrediction.provider,
-      fallback: advice.mlPrediction.fallback
+      fallback: advice.mlPrediction.fallback,
+      rulesBaseline: advice.mlPrediction.rulesBaseline || null,
+      learnedSignals: advice.mlPrediction.learnedSignals || null,
+      labelSourceSummary: advice.mlPrediction.labelSourceSummary || null
     } : null,
     disclaimer: 'AI 建议仅用于训练参考，不替代医疗建议。'
   };
@@ -492,6 +498,40 @@ function sanitizeFeedback(payload = {}) {
   };
 }
 
+function sanitizeMorningReadiness(payload = {}) {
+  const feedbackDate = String(payload.feedbackDate || payload.date || '').slice(0, 10);
+  const readinessScore = Number(payload.readinessScore ?? payload.morningReadiness);
+  const muscleSoreness = String(payload.muscleSoreness || '').trim();
+  const mentalState = String(payload.mentalState || '').trim();
+  const trainingWillingness = String(payload.trainingWillingness || '').trim();
+  const note = String(payload.note || '').trim().slice(0, 500) || null;
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(feedbackDate)) {
+    throw new ApiError(400, 'feedbackDate is required', 'INVALID_MORNING_READINESS');
+  }
+  if (!Number.isInteger(readinessScore) || readinessScore < 1 || readinessScore > 5) {
+    throw new ApiError(400, 'readinessScore must be an integer from 1 to 5', 'INVALID_MORNING_READINESS');
+  }
+  if (!MUSCLE_SORENESS_VALUES.has(muscleSoreness)) {
+    throw new ApiError(400, 'invalid muscleSoreness', 'INVALID_MORNING_READINESS');
+  }
+  if (!MENTAL_STATE_VALUES.has(mentalState)) {
+    throw new ApiError(400, 'invalid mentalState', 'INVALID_MORNING_READINESS');
+  }
+  if (!TRAINING_WILLINGNESS_VALUES.has(trainingWillingness)) {
+    throw new ApiError(400, 'invalid trainingWillingness', 'INVALID_MORNING_READINESS');
+  }
+
+  return {
+    feedbackDate,
+    readinessScore,
+    muscleSoreness,
+    mentalState,
+    trainingWillingness,
+    note
+  };
+}
+
 async function ensureFeedbackTable() {
   await db.query(`
     CREATE TABLE IF NOT EXISTS AiCoachFeedback (
@@ -511,6 +551,26 @@ async function ensureFeedbackTable() {
       CONSTRAINT FK_AiCoachFeedback_user FOREIGN KEY (user_id) REFERENCES Users(id) ON DELETE CASCADE,
       KEY IX_AiCoachFeedback_user_date (user_id, suggestion_date),
       KEY IX_AiCoachFeedback_feedback (feedback)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+}
+
+async function ensureMorningReadinessTable() {
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS MorningReadinessFeedback (
+      id BIGINT AUTO_INCREMENT PRIMARY KEY,
+      user_id INT NOT NULL,
+      feedback_date DATE NOT NULL,
+      readiness_score TINYINT NOT NULL,
+      muscle_soreness VARCHAR(20) NOT NULL,
+      mental_state VARCHAR(20) NOT NULL,
+      training_willingness VARCHAR(20) NOT NULL,
+      note VARCHAR(500) NULL,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      CONSTRAINT UQ_MorningReadinessFeedback_user_date UNIQUE (user_id, feedback_date),
+      CONSTRAINT FK_MorningReadinessFeedback_user FOREIGN KEY (user_id) REFERENCES Users(id) ON DELETE CASCADE,
+      KEY IX_MorningReadinessFeedback_user_date (user_id, feedback_date)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `);
 }
@@ -770,7 +830,7 @@ function buildCoachSystemPrompt(context, overview) {
     `上下文日期: ${context.latestDate || '未知'}；窗口: 运动 ${CONTEXT_WINDOW_DAYS} 天，健康/睡眠/训练状态 ${HEALTH_WINDOW_DAYS} 天。`,
     `综合风险等级: ${advice.riskLevel}；原因: ${advice.reasons.length ? advice.reasons.join('、') : '未发现明显风险信号'}。`,
     `核心建议: ${advice.recommendation}`,
-    `本地模型输出(JSON): ${coachMlService.summarizePrediction(context.mlPrediction)}。该输出是训练建议的硬约束；当 riskLevel 为 orange 或 red 时，不要建议高强度间歇、长距离堆量或强行推进；当 weatherRisk 为 high 时，必须提醒降强度、补水并避开高温时段。`,
+    `本地模型输出(JSON): ${coachMlService.summarizePrediction(context.mlPrediction)}。其中 rulesBaseline 是规则安全基线，learnedSignals 是本地模型学习到的结构化信号，labelSourceSummary 表示训练标签来源质量。若 realLabelRatio 较低，说明模型仍主要依赖规则伪标签，回答时要更保守，不要包装成确定结论。该输出是训练建议的硬约束；当 riskLevel 为 orange 或 red 时，不要建议高强度间歇、长距离堆量或强行推进；当 weatherRisk 为 high 时，必须提醒降强度、补水并避开高温时段。`,
     `负荷建议: ${advice.loadAdvice}`,
     `睡眠恢复建议: ${advice.sleepAdvice}`,
     `天气建议: ${advice.weatherAdvice}`,
@@ -1059,6 +1119,54 @@ async function submitFeedback(payload, user) {
   };
 }
 
+async function submitMorningReadiness(payload, user) {
+  const input = sanitizeMorningReadiness(payload);
+  await ensureMorningReadinessTable();
+  const result = await db.query(
+    `
+      INSERT INTO MorningReadinessFeedback (
+        user_id,
+        feedback_date,
+        readiness_score,
+        muscle_soreness,
+        mental_state,
+        training_willingness,
+        note
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+      ON DUPLICATE KEY UPDATE
+        readiness_score = VALUES(readiness_score),
+        muscle_soreness = VALUES(muscle_soreness),
+        mental_state = VALUES(mental_state),
+        training_willingness = VALUES(training_willingness),
+        note = VALUES(note),
+        updated_at = CURRENT_TIMESTAMP
+    `,
+    [
+      user?.id || 1,
+      input.feedbackDate,
+      input.readinessScore,
+      input.muscleSoreness,
+      input.mentalState,
+      input.trainingWillingness,
+      input.note
+    ]
+  );
+
+  return {
+    data: {
+      id: result.insertId || null,
+      saved: true,
+      feedbackDate: input.feedbackDate,
+      readinessScore: input.readinessScore,
+      muscleSoreness: input.muscleSoreness,
+      mentalState: input.mentalState,
+      trainingWillingness: input.trainingWillingness
+    },
+    meta: {}
+  };
+}
+
 async function chat({ message }, user) {
   const question = sanitizeQuestion(message);
   const overview = await getOverviewForUser(user);
@@ -1116,6 +1224,7 @@ module.exports = {
   getDailyBrief,
   chat,
   submitFeedback,
+  submitMorningReadiness,
   analyzeActivity,
   __private: {
     buildCoachSystemPrompt,
@@ -1124,6 +1233,7 @@ module.exports = {
     mergeDeepSeekBrief,
     getRagContext,
     withCoachMlContext,
-    sanitizeFeedback
+    sanitizeFeedback,
+    sanitizeMorningReadiness
   }
 };

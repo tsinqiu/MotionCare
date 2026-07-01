@@ -90,6 +90,7 @@ GET  /api/ai/health
 POST /api/ai/chat
 GET  /api/ai/daily-brief
 POST /api/ai/feedback
+POST /api/ai/morning-readiness
 POST /api/ai/activity-analysis
 ```
 
@@ -108,8 +109,9 @@ stress, Body Battery, and weather data, compresses them into a hidden coach
 context, and sends that context as the DeepSeek `system` message. The user
 message is sent separately as the `user` message. The hidden context also
 includes the local coach model output when available: recovery score, risk
-level, load action, weather risk, recommendation type, and top factors. Full
-feature vectors are not returned to the frontend.
+level, load action, weather risk, recommendation type, top factors, rule
+baseline, learned signals, and label source summary. Full feature vectors are
+not returned to the frontend.
 
 When DeepSeek is unavailable and `AI_FALLBACK_RULES=true`,
 responses keep the same shape and include fallback metadata:
@@ -171,7 +173,12 @@ when available:
   "confidence": 0.82,
   "modelVersion": "coach-v1",
   "provider": "rules",
-  "fallback": true
+  "fallback": true,
+  "labelSourceSummary": {
+    "realLabelRatio": 0.12,
+    "pseudoLabelRatio": 0.88,
+    "perceivedEffortCoverage": 0.2
+  }
 }
 ```
 
@@ -190,6 +197,29 @@ It does not store DeepSeek prompts or hidden RAG context:
 
 Allowed `feedback` values are `helpful`, `too_conservative`,
 `too_aggressive`, and `not_matching_body`.
+
+`POST /api/ai/morning-readiness` stores daily subjective readiness labels for
+future supervised training:
+
+```json
+{
+  "feedbackDate": "2026-06-30",
+  "readinessScore": 4,
+  "muscleSoreness": "mild",
+  "mentalState": "good",
+  "trainingWillingness": "easy",
+  "note": "optional short note"
+}
+```
+
+Allowed `muscleSoreness` values are `none`, `mild`, and `obvious`. Allowed
+`mentalState` values are `poor`, `normal`, and `good`. Allowed
+`trainingWillingness` values are `rest`, `easy`, and `normal`.
+
+The local coach training script uses labels in this priority order: user
+feedback, delayed next-day recovery labels, then rule pseudo-labels. Sample
+weights are `5.0`, `3.0`, and `1.0` respectively, and
+`coach_training_report.json` records label source ratios.
 
 ## Manual Upload
 

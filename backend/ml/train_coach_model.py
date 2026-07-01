@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
-from collections import defaultdict
+from collections import Counter, defaultdict
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
@@ -22,6 +22,11 @@ SCHEMA_PATH = Path(__file__).resolve().parent / "feature_schema.json"
 FEATURE_SCHEMA = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
 FEATURE_NAMES = [item["name"] for item in FEATURE_SCHEMA["features"]]
 WINDOWS = [1, 3, 7, 14, 28]
+SOURCE_WEIGHTS = {
+    "user_feedback": 5.0,
+    "delayed_objective": 3.0,
+    "rule_pseudo": 1.0,
+}
 
 
 def read_env(path: Path) -> dict[str, str]:
@@ -64,6 +69,14 @@ def fetch_rows(connection, sql: str) -> list[dict[str, object]]:
     return rows
 
 
+def table_exists(connection, table_name: str) -> bool:
+    cursor = connection.cursor()
+    cursor.execute("SHOW TABLES LIKE %s", (table_name,))
+    exists = cursor.fetchone() is not None
+    cursor.close()
+    return exists
+
+
 def weather_condition_risk(condition: object) -> int:
     text = str(condition or "").lower()
     if any(token in text for token in ["雷", "暴", "storm", "thunder", "snow", "冰", "雪"]):
@@ -104,7 +117,8 @@ def build_daily_features(connection) -> list[dict[str, object]]:
           a.temperature_c,
           a.humidity_percent,
           a.feels_like_c,
-          a.weather_condition
+          a.weather_condition,
+          a.perceived_effort
         FROM Activities a
         LEFT JOIN ActivitySummaries js ON js.activity_id = a.id
         WHERE a.local_start_time IS NOT NULL
@@ -131,6 +145,28 @@ def build_daily_features(connection) -> list[dict[str, object]]:
         FROM TrainingStatusSnapshots
         """,
     ) if parse_date(row["snapshot_date"])}
+    morning_feedback = {}
+    if table_exists(connection, "MorningReadinessFeedback"):
+        morning_feedback = {parse_date(row["feedback_date"]): row for row in fetch_rows(
+            connection,
+            """
+            SELECT feedback_date, readiness_score, muscle_soreness, mental_state, training_willingness
+            FROM MorningReadinessFeedback
+            """,
+        ) if parse_date(row["feedback_date"])}
+    advice_feedback: dict[date, list[dict[str, object]]] = defaultdict(list)
+    if table_exists(connection, "AiCoachFeedback"):
+        for row in fetch_rows(
+            connection,
+            """
+            SELECT suggestion_date, suggestion_type, feedback, ml_risk_level, ml_load_action, ml_weather_risk
+            FROM AiCoachFeedback
+            WHERE suggestion_date IS NOT NULL
+            """,
+        ):
+            feedback_day = parse_date(row["suggestion_date"])
+            if feedback_day:
+                advice_feedback[feedback_day].append(row)
 
     by_day: dict[date, list[dict[str, object]]] = defaultdict(list)
     all_dates: set[date] = set()
@@ -220,6 +256,18 @@ def build_daily_features(connection) -> list[dict[str, object]]:
             + features["hrv_coverage_14d"]
             + features["training_status_coverage_14d"]
         ) / 4 * 100
+        day_rows = by_day.get(day, [])
+        perceived_values = [
+            float(row["perceived_effort"])
+            for row in day_rows
+            if row.get("perceived_effort") is not None
+        ]
+        features["_perceived_effort_avg"] = sum(perceived_values) / len(perceived_values) if perceived_values else None
+        features["_perceived_effort_count"] = len(perceived_values)
+        features["_morning_feedback"] = morning_feedback.get(day)
+        features["_advice_feedback"] = advice_feedback.get(day, [])
+        features["_next_health"] = health.get(day + timedelta(days=1))
+        features["_next_sleep"] = sleep.get(day + timedelta(days=1))
         result.append(features)
     return result
 
@@ -255,7 +303,175 @@ def make_labels(row: dict[str, object]) -> dict[str, str]:
     }
 
 
-def train_classifier(features: np.ndarray, labels: np.ndarray):
+def readiness_from_morning_feedback(feedback: dict[str, object] | None) -> str | None:
+    if not feedback:
+        return None
+    score = int(feedback.get("readiness_score") or 0)
+    soreness = str(feedback.get("muscle_soreness") or "")
+    mental = str(feedback.get("mental_state") or "")
+    willingness = str(feedback.get("training_willingness") or "")
+    penalty = 0
+    if soreness == "obvious":
+        penalty += 1
+    if mental == "poor":
+        penalty += 1
+    if willingness == "rest":
+        penalty += 1
+    adjusted = score - penalty
+    if adjusted <= 2:
+        return "low"
+    if adjusted == 3:
+        return "medium"
+    return "high"
+
+
+def delayed_recovery_label(row: dict[str, object]) -> str | None:
+    next_sleep = row.get("_next_sleep") or {}
+    next_health = row.get("_next_health") or {}
+    if not next_sleep and not next_health:
+        return None
+
+    bad_signals = 0
+    next_sleep_score = float(next_sleep.get("sleep_score") or 0)
+    if next_sleep_score and float(row.get("sleep_score") or 0) and next_sleep_score <= float(row.get("sleep_score") or 0) - 10:
+        bad_signals += 1
+    next_hrv = float(next_sleep.get("avg_hrv") or 0)
+    if next_hrv and float(row.get("avg_hrv") or 0) and next_hrv <= float(row.get("avg_hrv") or 0) * 0.85:
+        bad_signals += 1
+    next_resting_hr = float(next_health.get("resting_heart_rate_bpm") or 0)
+    if next_resting_hr and float(row.get("resting_hr") or 0) and next_resting_hr >= float(row.get("resting_hr") or 0) + 5:
+        bad_signals += 1
+    next_stress = float(next_health.get("avg_stress_level") or 0)
+    if next_stress >= 50:
+        bad_signals += 1
+    next_body_drain = float(next_health.get("body_battery_drained") or 0)
+    if next_body_drain >= 60:
+        bad_signals += 1
+
+    if bad_signals >= 2:
+        return "low"
+    if bad_signals == 1:
+        return "medium"
+    if next_sleep or next_health:
+        return "high"
+    return None
+
+
+def perceived_effort_label(row: dict[str, object]) -> tuple[str, str]:
+    effort = row.get("_perceived_effort_avg")
+    if effort is not None:
+        effort = float(effort)
+        if effort <= 3:
+            return "easy", "user_feedback"
+        if effort <= 6:
+            return "moderate", "user_feedback"
+        return "hard", "user_feedback"
+    if float(row.get("load_1d") or 0) >= 150 or float(row.get("hard_minutes_7d") or 0) >= 45:
+        return "hard", "rule_pseudo"
+    if float(row.get("load_1d") or 0) >= 50:
+        return "moderate", "rule_pseudo"
+    return "easy", "rule_pseudo"
+
+
+def advice_feedback_label(row: dict[str, object]) -> tuple[str, str]:
+    feedback_rows = row.get("_advice_feedback") or []
+    for item in feedback_rows:
+        feedback = str(item.get("feedback") or "")
+        if feedback in {"helpful", "too_conservative", "too_aggressive", "not_matching_body"}:
+            return feedback, "user_feedback"
+    return "helpful", "rule_pseudo"
+
+
+def load_action_from_feedback(row: dict[str, object], rule_load_action: str) -> tuple[str | None, str | None]:
+    feedback_rows = row.get("_advice_feedback") or []
+    for item in feedback_rows:
+        feedback = str(item.get("feedback") or "")
+        suggestion_type = str(item.get("suggestion_type") or "")
+        if suggestion_type not in {"daily_brief", "training_load", "chat"}:
+            continue
+        if feedback == "too_aggressive":
+            return "reduce", "user_feedback"
+        if feedback == "too_conservative":
+            return "progress", "user_feedback"
+        if feedback == "not_matching_body":
+            return "maintain", "user_feedback"
+        if feedback == "helpful":
+            return rule_load_action, "user_feedback"
+    delayed = delayed_recovery_label(row)
+    if delayed == "low":
+        return "reduce", "delayed_objective"
+    if delayed == "medium" and rule_load_action == "progress":
+        return "maintain", "delayed_objective"
+    return None, None
+
+
+def build_label_bundle(row: dict[str, object]) -> dict[str, dict[str, object]]:
+    rules = make_labels(row)
+    bundle: dict[str, dict[str, object]] = {}
+
+    readiness = readiness_from_morning_feedback(row.get("_morning_feedback"))
+    readiness_source = "user_feedback" if readiness else None
+    if not readiness:
+        readiness = delayed_recovery_label(row)
+        readiness_source = "delayed_objective" if readiness else None
+    if not readiness:
+        readiness = rules["readinessLevel"]
+        readiness_source = "rule_pseudo"
+    bundle["readinessLevel"] = {
+        "label": readiness,
+        "source": readiness_source,
+        "weight": SOURCE_WEIGHTS[readiness_source],
+    }
+
+    load_action, load_source = load_action_from_feedback(row, rules["loadAction"])
+    if not load_action:
+        load_action = rules["loadAction"]
+        load_source = "rule_pseudo"
+    bundle["loadAction"] = {
+        "label": load_action,
+        "source": load_source,
+        "weight": SOURCE_WEIGHTS[load_source],
+    }
+
+    effort_label, effort_source = perceived_effort_label(row)
+    bundle["perceivedEffortLevel"] = {
+        "label": effort_label,
+        "source": effort_source,
+        "weight": SOURCE_WEIGHTS[effort_source],
+    }
+
+    advice_label, advice_source = advice_feedback_label(row)
+    bundle["adviceFeedbackClass"] = {
+        "label": advice_label,
+        "source": advice_source,
+        "weight": SOURCE_WEIGHTS[advice_source],
+    }
+
+    bundle["primaryRecommendation"] = {
+        "label": rules["primaryRecommendation"],
+        "source": "rule_pseudo",
+        "weight": SOURCE_WEIGHTS["rule_pseudo"],
+    }
+    return bundle
+
+
+def label_source_summary(source_by_name: dict[str, list[str]]) -> dict[str, object]:
+    summary = {}
+    for target, sources in source_by_name.items():
+        counts = Counter(sources)
+        total = sum(counts.values())
+        real_count = counts.get("user_feedback", 0) + counts.get("delayed_objective", 0)
+        pseudo_count = counts.get("rule_pseudo", 0)
+        summary[target] = {
+            "counts": dict(counts),
+            "realLabelRatio": real_count / total if total else 0,
+            "pseudoLabelRatio": pseudo_count / total if total else 0,
+            "dominantSource": counts.most_common(1)[0][0] if counts else "none",
+        }
+    return summary
+
+
+def train_classifier(features: np.ndarray, labels: np.ndarray, sample_weights: np.ndarray):
     pipeline = Pipeline(
         steps=[
             ("imputer", SimpleImputer(strategy="median")),
@@ -269,6 +485,11 @@ def train_classifier(features: np.ndarray, labels: np.ndarray):
         "featureImportance": [],
         "classDistribution": {label: int(count) for label, count in zip(*np.unique(labels, return_counts=True))},
         "warnings": [],
+        "sampleWeight": {
+            "min": float(np.min(sample_weights)) if len(sample_weights) else None,
+            "max": float(np.max(sample_weights)) if len(sample_weights) else None,
+            "mean": float(np.mean(sample_weights)) if len(sample_weights) else None,
+        },
     }
     majority_count = max(report["classDistribution"].values()) if report["classDistribution"] else 0
     report["baselineAccuracy"] = float(majority_count / len(labels)) if len(labels) else None
@@ -278,14 +499,15 @@ def train_classifier(features: np.ndarray, labels: np.ndarray):
         report["warnings"].append("minority class has fewer than 5 samples")
 
     if len(set(labels)) > 1 and min(np.bincount(np.unique(labels, return_inverse=True)[1])) >= 2 and len(labels) >= 20:
-        x_train, x_test, y_train, y_test = train_test_split(
+        x_train, x_test, y_train, y_test, weights_train, weights_test = train_test_split(
             features,
             labels,
+            sample_weights,
             test_size=0.2,
             random_state=42,
             stratify=labels,
         )
-        pipeline.fit(x_train, y_train)
+        pipeline.fit(x_train, y_train, classifier__sample_weight=weights_train)
         y_pred = pipeline.predict(x_test)
         report["testAccuracy"] = float(accuracy_score(y_test, y_pred))
         classes = list(pipeline.named_steps["classifier"].classes_)
@@ -314,7 +536,7 @@ def train_classifier(features: np.ndarray, labels: np.ndarray):
         except Exception as error:
             report["warnings"].append(f"feature importance unavailable: {error}")
     else:
-        pipeline.fit(features, labels)
+        pipeline.fit(features, labels, classifier__sample_weight=sample_weights)
     return pipeline, report
 
 
@@ -336,19 +558,38 @@ def main() -> None:
 
     features = np.array([[float(row[name] or 0) for name in FEATURE_NAMES] for row in rows], dtype=float)
     labels_by_name: dict[str, list[str]] = defaultdict(list)
+    weights_by_name: dict[str, list[float]] = defaultdict(list)
+    sources_by_name: dict[str, list[str]] = defaultdict(list)
     for row in rows:
-        labels = make_labels(row)
-        for name, value in labels.items():
-            labels_by_name[name].append(value)
+        label_bundle = build_label_bundle(row)
+        for name, value in label_bundle.items():
+            labels_by_name[name].append(str(value["label"]))
+            weights_by_name[name].append(float(value["weight"]))
+            sources_by_name[name].append(str(value["source"]))
 
     models = {}
     reports = {}
     classes = {}
     for name, labels in labels_by_name.items():
-        model, report = train_classifier(features, np.array(labels))
+        model, report = train_classifier(features, np.array(labels), np.array(weights_by_name[name], dtype=float))
         models[name] = model
         reports[name] = report
         classes[name] = list(model.named_steps["classifier"].classes_)
+
+    source_summary = label_source_summary(sources_by_name)
+    aggregate_sources = Counter(source for sources in sources_by_name.values() for source in sources)
+    aggregate_total = sum(aggregate_sources.values())
+    real_total = aggregate_sources.get("user_feedback", 0) + aggregate_sources.get("delayed_objective", 0)
+    pseudo_total = aggregate_sources.get("rule_pseudo", 0)
+    perceived_effort_real = sources_by_name.get("perceivedEffortLevel", []).count("user_feedback")
+    label_source_summary_payload = {
+        "byTarget": source_summary,
+        "aggregate": dict(aggregate_sources),
+        "realLabelRatio": real_total / aggregate_total if aggregate_total else 0,
+        "pseudoLabelRatio": pseudo_total / aggregate_total if aggregate_total else 0,
+        "perceivedEffortCoverage": perceived_effort_real / len(rows) if rows else 0,
+        "sampleWeights": SOURCE_WEIGHTS,
+    }
 
     output_path = Path(args.out)
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -359,6 +600,7 @@ def main() -> None:
         "sampleCount": len(rows),
         "classes": classes,
         "testAccuracy": {name: report["testAccuracy"] for name, report in reports.items()},
+        "labelSourceSummary": label_source_summary_payload,
     }
     joblib.dump(bundle, output_path)
 
@@ -370,6 +612,11 @@ def main() -> None:
         "modelVersion": MODEL_VERSION,
         "sampleCount": len(rows),
         "features": FEATURE_SCHEMA,
+        "labelSources": label_source_summary_payload,
+        "sampleWeights": SOURCE_WEIGHTS,
+        "realLabelRatio": label_source_summary_payload["realLabelRatio"],
+        "pseudoLabelRatio": label_source_summary_payload["pseudoLabelRatio"],
+        "perceivedEffortCoverage": label_source_summary_payload["perceivedEffortCoverage"],
         "reports": reports,
     }, ensure_ascii=False, indent=2), encoding="utf-8")
     print(json.dumps(metadata, ensure_ascii=False, indent=2))

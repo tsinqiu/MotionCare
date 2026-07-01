@@ -373,6 +373,62 @@ test('aiService rejects invalid feedback payloads', async () => {
   );
 });
 
+test('aiService saves morning readiness feedback with upsert', async () => {
+  const queries = [];
+  await withAiEnvironment({
+    dbQuery: async (sql, params = []) => {
+      queries.push({ sql, params });
+      if (sql.includes('INSERT INTO MorningReadinessFeedback')) {
+        return { insertId: 52 };
+      }
+      return [];
+    }
+  }, async () => {
+    const result = await aiService.submitMorningReadiness({
+      feedbackDate: '2026-06-30',
+      readinessScore: 3,
+      muscleSoreness: 'mild',
+      mentalState: 'normal',
+      trainingWillingness: 'easy',
+      note: '腿有点酸'
+    }, { id: 7 });
+
+    assert.equal(result.data.saved, true);
+    assert.equal(result.data.id, 52);
+    const insert = queries.find((item) => item.sql.includes('INSERT INTO MorningReadinessFeedback'));
+    assert.ok(insert);
+    assert.equal(insert.params[0], 7);
+    assert.equal(insert.params[1], '2026-06-30');
+    assert.equal(insert.params[2], 3);
+    assert.equal(insert.params[3], 'mild');
+    assert.equal(insert.params[4], 'normal');
+    assert.equal(insert.params[5], 'easy');
+  });
+});
+
+test('aiService rejects invalid morning readiness payloads', async () => {
+  await assert.rejects(
+    () => aiService.submitMorningReadiness({
+      feedbackDate: '2026-06-30',
+      readinessScore: 8,
+      muscleSoreness: 'mild',
+      mentalState: 'normal',
+      trainingWillingness: 'easy'
+    }, { id: 7 }),
+    (error) => error.code === 'INVALID_MORNING_READINESS'
+  );
+  await assert.rejects(
+    () => aiService.submitMorningReadiness({
+      feedbackDate: '2026-06-30',
+      readinessScore: 3,
+      muscleSoreness: 'bad',
+      mentalState: 'normal',
+      trainingWillingness: 'easy'
+    }, { id: 7 }),
+    (error) => error.code === 'INVALID_MORNING_READINESS'
+  );
+});
+
 test('aiService analyzes existing activities and returns 404 for missing activity', async () => {
   await withActivityStubs({
     getActivityById: async (id) => (id === 1

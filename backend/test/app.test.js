@@ -105,6 +105,15 @@ function buildApp(overrides = {}) {
       },
       meta: {}
     }),
+    submitMorningReadiness: async (payload, user) => ({
+      data: {
+        saved: true,
+        feedbackDate: payload.feedbackDate,
+        readinessScore: payload.readinessScore,
+        userId: user.id
+      },
+      meta: {}
+    }),
     analyzeActivity: async (payload, user) => {
       if (payload.activityId === 999) {
         const error = new Error('activity not found');
@@ -351,6 +360,25 @@ test('POST /api/ai/feedback saves coach feedback', async () => {
   assert.equal(response.status, 200);
   assert.equal(response.body.data.saved, true);
   assert.equal(response.body.data.feedback, 'helpful');
+  assert.equal(response.body.data.userId, 2);
+});
+
+test('POST /api/ai/morning-readiness saves daily readiness feedback', async () => {
+  const response = await request(buildApp())
+    .post('/api/ai/morning-readiness')
+    .set('Authorization', 'Bearer valid-user-token')
+    .send({
+      feedbackDate: '2026-06-29',
+      readinessScore: 4,
+      muscleSoreness: 'mild',
+      mentalState: 'good',
+      trainingWillingness: 'easy'
+    });
+
+  assert.equal(response.status, 200);
+  assert.equal(response.body.data.saved, true);
+  assert.equal(response.body.data.feedbackDate, '2026-06-29');
+  assert.equal(response.body.data.readinessScore, 4);
   assert.equal(response.body.data.userId, 2);
 });
 

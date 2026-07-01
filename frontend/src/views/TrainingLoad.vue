@@ -133,6 +133,19 @@
           <div class="inline-advice" :class="loadAdviceTone">
             <small>{{ loadAdviceTitle }}</small>
             <b>{{ loadAdviceText }}</b>
+            <div v-if="aiBrief?.ml" class="load-feedback">
+              <span>负荷判断准确吗</span>
+              <button
+                v-for="item in feedbackOptions"
+                :key="item.value"
+                type="button"
+                :disabled="feedbackSending || feedbackValue === item.value"
+                @click="sendLoadFeedback(item.value)"
+              >
+                {{ feedbackValue === item.value ? '已记录' : item.label }}
+              </button>
+            </div>
+            <small v-if="feedbackMessage" class="feedback-message">{{ feedbackMessage }}</small>
           </div>
         </section>
         <section class="dark-panel risk-panel">
@@ -156,7 +169,7 @@ import { computed, reactive, ref, watch } from 'vue'
 import ChartPanel from '@/components/ChartPanel.vue'
 import MetricCard from '@/components/MetricCard.vue'
 import StateBlock from '@/components/StateBlock.vue'
-import { getDailyBrief } from '@/services/ai'
+import { getDailyBrief, sendAiFeedback } from '@/services/ai'
 import {
   getLatestCyclingFtp,
   getLatestRacePredictions,
@@ -184,6 +197,15 @@ const cyclingFtp = ref(null)
 const importSummary = ref(null)
 const importError = ref('')
 const aiBrief = ref(null)
+const aiMeta = ref(null)
+const feedbackSending = ref(false)
+const feedbackValue = ref('')
+const feedbackMessage = ref('')
+const feedbackOptions = [
+  { label: '准确', value: 'helpful' },
+  { label: '偏保守', value: 'too_conservative' },
+  { label: '偏激进', value: 'too_aggressive' },
+]
 
 const current = computed(() => loadRows.value.at(-1) || { ctl: '--', atl: '--', tsb: '--', dailyTrainingLoad: 0 })
 const currentLoad = computed(() => Math.round(current.value.dailyTrainingLoad || current.value.ctl || 0))
@@ -316,8 +338,31 @@ async function loadAiBrief() {
   try {
     const envelope = await getDailyBrief()
     aiBrief.value = envelope.data || null
+    aiMeta.value = envelope.meta || null
   } catch (_error) {
     aiBrief.value = null
+    aiMeta.value = null
+  }
+}
+
+async function sendLoadFeedback(value) {
+  if (!aiBrief.value?.ml || feedbackSending.value) return
+  feedbackSending.value = true
+  feedbackMessage.value = ''
+  try {
+    await sendAiFeedback({
+      suggestionType: 'training_load',
+      feedback: value,
+      suggestionDate: aiMeta.value?.ai?.contextSignals?.latestDate,
+      modelVersion: aiBrief.value.ml.modelVersion,
+      ml: aiBrief.value.ml,
+    })
+    feedbackValue.value = value
+    feedbackMessage.value = '负荷反馈已保存'
+  } catch (err) {
+    feedbackMessage.value = err instanceof Error ? err.message : '反馈保存失败'
+  } finally {
+    feedbackSending.value = false
   }
 }
 
@@ -358,5 +403,33 @@ watch(() => ({ ...filters }), () => {
 
 .inline-advice.good b {
   color: var(--green);
+}
+
+.load-feedback {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.load-feedback span,
+.feedback-message {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.load-feedback button {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--panel-strong);
+  color: var(--text);
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.load-feedback button:disabled {
+  color: var(--green);
+  cursor: not-allowed;
 }
 </style>

@@ -60,4 +60,5 @@ database/scripts/import_garmin_health.py      健康 JSON 转 SQL
 database/sql/01_schema.sql              基础表
 database/sql/15_garmin_timeseries.sql   Garmin 时序表
 database/sql/17_ai_coach_feedback.sql   AI 教练反馈闭环表
+database/sql/18_morning_readiness_feedback.sql 晨间状态真实标签表
 ```
