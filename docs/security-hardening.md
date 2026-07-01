@@ -56,7 +56,7 @@
 - 使用仍在安全支持期内的 Node.js；当前后端依赖要求 Node.js 22 或更高版本。
 - MySQL 只监听内网或本机地址，并通过主机防火墙、安全组或云防火墙禁止公网访问 3306。
 - Node API 设置 `HOST=127.0.0.1`，不直接监听公网网卡；只允许 Nginx 代理访问后端端口。
-- 使用 `backend/docs/nginx-motion-analysis.conf` 作为反向代理基础，生产环境由 Nginx 对外提供 HTTPS，并转发到 `127.0.0.1:8080`。
+- 使用 `backend/docs/nginx-motion-analysis.conf` 作为反向代理基础，生产环境由 Nginx 对外提供 HTTPS，并转发到 `127.0.0.1:8089`。
 - 仅在 Node 前方确实只有一层可信 Nginx 时设置 `TRUST_PROXY=true`；不要信任客户端直接提供的转发头。
 - 生产数据库使用 `motion_api` 等专用最小权限账号，禁止后端使用 MySQL `root` 账号。
 - `JWT_SECRET` 必须配置为不可预测的高强度随机值；为空时不得上线。管理员密码和数据库密码同样必须通过部署环境注入。

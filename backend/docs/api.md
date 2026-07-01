@@ -3,7 +3,7 @@
 Base URL for local frontend development:
 
 ```text
-http://localhost:8080/api
+http://localhost:8089/api
 ```
 
 ## Auth

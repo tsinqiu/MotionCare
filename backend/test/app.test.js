@@ -985,7 +985,7 @@ test('POST /api/ml/running-prediction allows local API origin', async () => {
 
   const response = await request(buildApp())
     .post('/api/ml/running-prediction')
-    .set('Origin', 'http://127.0.0.1:8080')
+    .set('Origin', 'http://127.0.0.1:8089')
     .send(payload);
 
   assert.equal(response.status, 200);

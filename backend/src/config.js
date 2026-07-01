@@ -57,7 +57,7 @@ function resolveProjectPath(value, fallback) {
   return path.resolve(PROJECT_ROOT, target);
 }
 
-const serverPort = parseInteger(process.env.PORT, 8080);
+const serverPort = parseInteger(process.env.PORT, 8089);
 
 const config = {
   server: {

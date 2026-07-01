@@ -107,14 +107,14 @@ npm run dev -- --host 0.0.0.0
 地址：
 
 ```text
-后端: http://127.0.0.1:8080/api
+后端: http://127.0.0.1:8089/api
 前端: http://localhost:5173/
 ```
 
 健康检查：
 
 ```powershell
-Invoke-RestMethod http://127.0.0.1:8080/api/health
+Invoke-RestMethod http://127.0.0.1:8089/api/health
 ```
 
 ## 常用命令
