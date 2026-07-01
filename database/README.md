@@ -59,4 +59,16 @@ database/scripts/import_garmin_health.py      健康 JSON 转 SQL
 ```text
 database/sql/01_schema.sql              基础表
 database/sql/15_garmin_timeseries.sql   Garmin 时序表
+database/sql/16_drop_redundant_columns.sql 清理冗余列
+database/sql/17_security_hardening.sql  登录尝试与安全审计表
+```
+
+`import_shared_seed.ps1` 会在共享 seed 导入完成后自动执行
+`database/sql/17_security_hardening.sql`，确保登录审计表不会因数据库重建而缺失。
+
+对于没有重新导入共享 seed 的现有数据库，在启动新版后端前手动执行：
+
+```powershell
+cd backend
+node scripts/applyMigration.js ..\database\sql\17_security_hardening.sql
 ```

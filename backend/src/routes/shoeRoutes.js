@@ -7,6 +7,7 @@ const config = require('../config');
 const { ApiError } = require('../errors');
 const { asyncHandler, parsePositiveId } = require('../http');
 const { authenticate } = require('../middleware/authMiddleware');
+const { removeUploadedFile, validateUploadedFile } = require('../services/uploadSecurity');
 
 fs.mkdirSync(config.uploads.shoeImagesDir, { recursive: true });
 
@@ -69,18 +70,24 @@ function createShoeRouter(shoeService, authService) {
   }));
 
   router.post('/shoes/:id/photo', authenticate(authService), uploadShoeImage.single('photo'), asyncHandler(async (req, res) => {
-    const shoeId = parsePositiveId(req.params.id);
     const file = req.file;
     if (!file) {
       throw new ApiError(400, 'photo file is required', 'INVALID_UPLOAD');
     }
-    const result = await shoeService.updatePhoto(req.user.id, shoeId, {
-      path: `/uploads/shoe-images/${file.filename}`,
-      originalName: file.originalname || null,
-      mimeType: file.mimetype || null,
-      size: file.size
-    });
-    res.json(result);
+    try {
+      const shoeId = parsePositiveId(req.params.id);
+      await validateUploadedFile(file, { kind: 'image' });
+      const result = await shoeService.updatePhoto(req.user.id, shoeId, {
+        path: `/uploads/shoe-images/${file.filename}`,
+        originalName: file.originalname || null,
+        mimeType: file.mimetype || null,
+        size: file.size
+      });
+      res.json(result);
+    } catch (error) {
+      await removeUploadedFile(file);
+      throw error;
+    }
   }));
 
   router.post('/activities/:id/shoe', authenticate(authService), asyncHandler(async (req, res) => {

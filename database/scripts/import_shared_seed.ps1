@@ -112,6 +112,9 @@ default-character-set=utf8mb4
         Invoke-MysqlFile -Path $seedPath.Path -Label "Importing shared seed"
     }
 
+    $securityMigration = Join-Path $repoRoot "database/sql/17_security_hardening.sql"
+    Invoke-MysqlFile -Path $securityMigration -Label "Applying database/sql/17_security_hardening.sql"
+
     & $Mysql --defaults-extra-file="$defaultsFile" --database=MotionAnalysis --table --execute="
 SELECT 'Activities' AS table_name, COUNT(*) AS row_count FROM Activities
 UNION ALL SELECT 'TrackPoints', COUNT(*) FROM TrackPoints

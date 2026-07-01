@@ -8,7 +8,8 @@ const defaultWeatherService = require('../services/weatherService');
 const defaultAuthService = require('../services/authService');
 const config = require('../config');
 const { ApiError } = require('../errors');
-const { authenticate, optionalAuthenticate } = require('../middleware/authMiddleware');
+const { authenticate } = require('../middleware/authMiddleware');
+const { parseOwnerFilter } = require('./analyticsHelpers');
 const {
   asyncHandler,
   parseActivityType,
@@ -22,6 +23,7 @@ const {
   parseSort
 } = require('../http');
 const { sendData, sendPaged } = require('../response');
+const { removeUploadedFile, validateUploadedFile } = require('../services/uploadSecurity');
 
 const ACTIVITY_SORT_FIELDS = [
   'local_start_time',
@@ -32,7 +34,6 @@ const ACTIVITY_SORT_FIELDS = [
   'avg_pace',
   'activity_training_load'
 ];
-const OWNER_FILTERS = ['all', 'admin', 'mine'];
 const SOURCE_FILTERS = ['garmin_import', 'manual_upload', 'live_workout'];
 
 fs.mkdirSync(config.uploads.activityImagesDir, { recursive: true });
@@ -61,17 +62,11 @@ const uploadActivityImage = multer({
 
 function createActivityRouter(activityService = defaultActivityService, authService = defaultAuthService) {
   const router = express.Router();
-
-  async function requireActivity(activityId) {
-    const exists = await activityService.activityExists(activityId);
-    if (!exists) {
-      throw new ApiError(404, 'activity not found');
-    }
-  }
+  const requireAuth = authenticate(authService);
 
   router.get(
     '/activities',
-    optionalAuthenticate(authService),
+    requireAuth,
     asyncHandler(async (req, res) => {
       const pageSize = parsePageSize(req.query.page_size ?? req.query.limit, 50, 200);
       const page = req.query.page === undefined && req.query.offset !== undefined
@@ -80,12 +75,8 @@ function createActivityRouter(activityService = defaultActivityService, authServ
       const offset = req.query.offset !== undefined ? parseOffset(req.query.offset) : (page - 1) * pageSize;
       const { startDate, endDate } = parseDateRange(req.query, { maxDays: 1095 });
       const { sortBy, sortOrder } = parseSort(req.query, ACTIVITY_SORT_FIELDS, 'local_start_time');
-      const owner = parseEnum(req.query.owner, OWNER_FILTERS, 'owner', 'all');
+      const ownerFilter = parseOwnerFilter(req.query.owner, req.user);
       const source = parseEnum(req.query.source, SOURCE_FILTERS, 'source', undefined);
-
-      if (owner === 'mine' && !req.user) {
-        throw new ApiError(401, 'login is required to filter your activities', 'AUTH_REQUIRED');
-      }
 
       const activities = await activityService.listActivities({
         activityType: parseActivityType(req.query.activity_type),
@@ -93,8 +84,7 @@ function createActivityRouter(activityService = defaultActivityService, authServ
         endDate,
         keyword: parseKeyword(req.query.keyword),
         source,
-        owner,
-        ownerUserId: req.user?.id,
+        ...ownerFilter,
         limit: pageSize,
         offset,
         page,
@@ -109,12 +99,14 @@ function createActivityRouter(activityService = defaultActivityService, authServ
 
   router.get(
     '/activities/:id',
+    requireAuth,
     asyncHandler(async (req, res) => {
       const activityId = parsePositiveId(req.params.id, 'activity id');
+      await activityService.assertActivityReadable(req.user, activityId);
       const activity = await activityService.getActivityById(activityId);
 
       if (!activity) {
-        throw new ApiError(404, 'activity not found');
+        throw new ApiError(404, 'activity not found', 'ACTIVITY_NOT_FOUND');
       }
 
       sendData(res, activity);
@@ -123,11 +115,12 @@ function createActivityRouter(activityService = defaultActivityService, authServ
 
   router.get(
     '/activities/:id/track-points',
+    requireAuth,
     asyncHandler(async (req, res) => {
       const activityId = parsePositiveId(req.params.id, 'activity id');
       const limit = parsePageSize(req.query.limit, 1000, 5000);
       const offset = parseOffset(req.query.offset);
-      await requireActivity(activityId);
+      await activityService.assertActivityReadable(req.user, activityId);
       const points = await activityService.getTrackPoints(activityId, { limit, offset });
 
       sendData(res, points);
@@ -136,11 +129,12 @@ function createActivityRouter(activityService = defaultActivityService, authServ
 
   router.get(
     '/activities/:id/heart-rate',
+    requireAuth,
     asyncHandler(async (req, res) => {
       const activityId = parsePositiveId(req.params.id, 'activity id');
       const limit = parsePageSize(req.query.limit, 2000, 10000);
       const offset = parseOffset(req.query.offset);
-      await requireActivity(activityId);
+      await activityService.assertActivityReadable(req.user, activityId);
       const series = await activityService.getHeartRateSeries(activityId, { limit, offset });
 
       sendData(res, series);
@@ -149,11 +143,12 @@ function createActivityRouter(activityService = defaultActivityService, authServ
 
   router.get(
     '/activities/:id/speed',
+    requireAuth,
     asyncHandler(async (req, res) => {
       const activityId = parsePositiveId(req.params.id, 'activity id');
       const limit = parsePageSize(req.query.limit, 2000, 10000);
       const offset = parseOffset(req.query.offset);
-      await requireActivity(activityId);
+      await activityService.assertActivityReadable(req.user, activityId);
       const series = await activityService.getSpeedSeries(activityId, { limit, offset });
 
       sendData(res, series);
@@ -162,9 +157,10 @@ function createActivityRouter(activityService = defaultActivityService, authServ
 
   router.get(
     '/activities/:id/laps',
+    requireAuth,
     asyncHandler(async (req, res) => {
       const activityId = parsePositiveId(req.params.id, 'activity id');
-      await requireActivity(activityId);
+      await activityService.assertActivityReadable(req.user, activityId);
       const laps = await activityService.getLaps(activityId);
 
       sendData(res, laps);
@@ -173,9 +169,10 @@ function createActivityRouter(activityService = defaultActivityService, authServ
 
   router.get(
     '/activities/:id/zones',
+    requireAuth,
     asyncHandler(async (req, res) => {
       const activityId = parsePositiveId(req.params.id, 'activity id');
-      await requireActivity(activityId);
+      await activityService.assertActivityReadable(req.user, activityId);
       const zones = await activityService.getZones(activityId);
 
       sendData(res, zones);
@@ -197,18 +194,24 @@ function createActivityRouter(activityService = defaultActivityService, authServ
     authenticate(authService),
     uploadActivityImage.single('photo'),
     asyncHandler(async (req, res) => {
-      const activityId = parsePositiveId(req.params.id, 'activity id');
       const file = req.file;
       if (!file) {
         throw new ApiError(400, 'photo file is required', 'INVALID_UPLOAD');
       }
-      const activity = await activityService.updateActivityPhoto(req.user, activityId, {
-        path: `/uploads/activity-images/${file.filename}`,
-        originalName: file.originalname || null,
-        mimeType: file.mimetype || null,
-        size: file.size
-      });
-      sendData(res, activity);
+      try {
+        const activityId = parsePositiveId(req.params.id, 'activity id');
+        await validateUploadedFile(file, { kind: 'image' });
+        const activity = await activityService.updateActivityPhoto(req.user, activityId, {
+          path: `/uploads/activity-images/${file.filename}`,
+          originalName: file.originalname || null,
+          mimeType: file.mimetype || null,
+          size: file.size
+        });
+        sendData(res, activity);
+      } catch (error) {
+        await removeUploadedFile(file);
+        throw error;
+      }
     })
   );
 

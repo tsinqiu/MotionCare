@@ -1,4 +1,5 @@
 const db = require('../db');
+const { ApiError } = require('../errors');
 
 const SORT_COLUMNS = {
   local_start_time: 'a.local_start_time',
@@ -372,6 +373,22 @@ async function getActivityById(activityId) {
 async function activityExists(activityId) {
   const rows = await db.query('SELECT id FROM Activities WHERE id = ? LIMIT 1', [activityId]);
   return rows.length > 0;
+}
+
+async function getActivityAccess(activityId) {
+  const rows = await db.query(
+    'SELECT id, owner_user_id AS ownerUserId FROM Activities WHERE id = ? LIMIT 1',
+    [activityId]
+  );
+  return rows[0] || null;
+}
+
+async function assertActivityReadable(user, activityId) {
+  const activity = await getActivityAccess(activityId);
+  if (!activity || (user.role !== 'admin' && Number(activity.ownerUserId) !== Number(user.id))) {
+    throw new ApiError(404, 'activity not found', 'ACTIVITY_NOT_FOUND');
+  }
+  return activity;
 }
 
 async function getTrackPoints(activityId, { limit, offset }) {
@@ -1472,6 +1489,8 @@ module.exports = {
   listActivities,
   getActivityById,
   activityExists,
+  getActivityAccess,
+  assertActivityReadable,
   getTrackPoints,
   getHeartRateSeries,
   getSpeedSeries,

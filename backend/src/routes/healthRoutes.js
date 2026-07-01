@@ -1,5 +1,7 @@
 const express = require('express');
 const db = require('../db');
+const defaultAuthService = require('../services/authService');
+const { authenticate } = require('../middleware/authMiddleware');
 const { asyncHandler, parseDate, parseEnum } = require('../http');
 const statsCache = require('../cache/statsCache');
 const { sendData } = require('../response');
@@ -21,12 +23,9 @@ async function checkDatabase() {
 
 const defaultHealthService = { checkDatabase };
 
-function getUserId(req) {
-  return req.user?.id || 1;
-}
-
-function createHealthRouter(healthService = defaultHealthService) {
+function createHealthRouter(healthService = defaultHealthService, authService = defaultAuthService) {
   const router = express.Router();
+  const requireAuth = authenticate(authService);
 
   router.get(
     '/health',
@@ -34,7 +33,10 @@ function createHealthRouter(healthService = defaultHealthService) {
       const database = await healthService.checkDatabase();
       sendData(res, {
         status: database.ok ? 'ok' : 'degraded',
-        database,
+        database: {
+          ok: database.ok,
+          message: database.ok ? 'connected' : 'unavailable'
+        },
         cache: { stats: statsCache.stats() }
       });
     })
@@ -42,8 +44,9 @@ function createHealthRouter(healthService = defaultHealthService) {
 
   router.get(
     '/health/trends',
+    requireAuth,
     asyncHandler(async (req, res) => {
-      const userId = getUserId(req);
+      const userId = req.user.id;
       const metric = parseEnum(req.query.metric,
         ['hrv', 'resting_heart_rate', 'sleep_score', 'steps', 'stress', 'ftp'],
         'metric', 'hrv');
@@ -55,8 +58,9 @@ function createHealthRouter(healthService = defaultHealthService) {
 
   router.get(
     '/health/samples/:type',
+    requireAuth,
     asyncHandler(async (req, res) => {
-      const userId = getUserId(req);
+      const userId = req.user.id;
       const type = parseEnum(req.params.type,
         ['heart-rate', 'stress', 'steps', 'intensity-minutes', 'sleep-stages', 'sleep-movement', 'hrv'],
         'type', 'heart-rate');
@@ -69,8 +73,9 @@ function createHealthRouter(healthService = defaultHealthService) {
 
   router.get(
     '/health/training-status/latest',
+    requireAuth,
     asyncHandler(async (req, res) => {
-      const userId = getUserId(req);
+      const userId = req.user.id;
       const data = await healthService.getLatestTrainingStatus(userId);
       sendData(res, data);
     })
@@ -78,8 +83,9 @@ function createHealthRouter(healthService = defaultHealthService) {
 
   router.get(
     '/health/race-predictions/latest',
+    requireAuth,
     asyncHandler(async (req, res) => {
-      const userId = getUserId(req);
+      const userId = req.user.id;
       const data = await healthService.getLatestRacePredictions(userId);
       sendData(res, data);
     })
@@ -87,8 +93,9 @@ function createHealthRouter(healthService = defaultHealthService) {
 
   router.get(
     '/health/lactate-threshold/latest',
+    requireAuth,
     asyncHandler(async (req, res) => {
-      const userId = getUserId(req);
+      const userId = req.user.id;
       const data = await healthService.getLatestLactateThreshold(userId);
       sendData(res, data);
     })
@@ -96,8 +103,9 @@ function createHealthRouter(healthService = defaultHealthService) {
 
   router.get(
     '/health/cycling-ftp/latest',
+    requireAuth,
     asyncHandler(async (req, res) => {
-      const userId = getUserId(req);
+      const userId = req.user.id;
       const data = await healthService.getLatestCyclingFtp(userId);
       sendData(res, data);
     })
