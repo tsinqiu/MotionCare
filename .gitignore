@@ -19,6 +19,9 @@ Thumbs.db
 
 # Local agent, cache, coverage, and temporary artifacts
 .agents/
+.claude/
+.cursor/
+.aider*
 .codex/
 docs/superpowers/
 .cache/

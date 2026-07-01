@@ -1,81 +1,54 @@
 <template>
-  <div class="app-shell">
-    <aside class="sidebar">
-      <RouterLink class="brand" to="/today">
-        <span class="brand-mark">MC</span>
-        <span>
-          <strong>MotionCare</strong>
-        </span>
-      </RouterLink>
-
-      <nav class="nav-list" aria-label="主导航">
-        <RouterLink v-for="item in navItems" :key="item.to" :to="item.to">
-          <component :is="iconMap[item.icon]" :size="18" aria-hidden="true" />
-          {{ item.label }}
-        </RouterLink>
-      </nav>
-    </aside>
-
-    <div class="content-shell">
-      <header class="topbar">
-        <h1>MotionCare</h1>
-        <div class="topbar-actions">
-          <button class="theme-toggle" type="button" @click="toggleTheme">
-            <component :is="isNightTheme ? Sun : Moon" :size="16" />
-            {{ isNightTheme ? '日间' : '夜晚' }}
-          </button>
-          <div class="user-chip" :title="authSession.user?.email">
-            <UserRound :size="16" />
-            <span>{{ userLabel }}</span>
-            <small>{{ roleLabel }}</small>
-          </div>
-          <RouterLink class="topbar-start" to="/record">
-            <CirclePlus :size="16" />
+  <div class="app-viewport">
+    <div class="phone-frame">
+      <van-nav-bar class="app-navbar" title="MotionCare">
+        <template #right>
+          <RouterLink class="app-navbar-action" to="/record">
+            <CirclePlus :size="18" />
             记录运动
           </RouterLink>
-          <button class="topbar-logout" type="button" @click="handleLogout">
-            <LogOut :size="16" />
-            退出
-          </button>
-        </div>
-      </header>
+        </template>
+      </van-nav-bar>
 
-      <main class="page-frame">
-        <RouterView />
-        <footer class="app-footer">
-          <span>MotionCare · 每一天都更懂自己的状态</span>
-        </footer>
+      <main ref="scrollEl" class="page-frame">
+        <RouterView v-slot="{ Component }">
+          <Transition name="page" mode="out-in">
+            <component :is="Component" />
+          </Transition>
+        </RouterView>
       </main>
+
+      <van-tabbar
+        class="app-tabbar"
+        :model-value="activeTab"
+        :fixed="false"
+        @change="goTab"
+      >
+        <van-tabbar-item
+          v-for="item in navItems"
+          :key="item.to"
+          :name="item.icon"
+        >
+          <span>{{ item.label }}</span>
+          <template #icon>
+            <component :is="iconMap[item.icon]" :size="22" aria-hidden="true" />
+          </template>
+        </van-tabbar-item>
+      </van-tabbar>
     </div>
   </div>
 </template>
 
 <script setup>
-import { computed } from 'vue'
-import {
-  Activity,
-  Bot,
-  CirclePlus,
-  Gauge,
-  HeartPulse,
-  LogOut,
-  Moon,
-  Sun,
-  UserRound,
-} from '@lucide/vue'
+import { computed, nextTick, ref, watch } from 'vue'
+import { Activity, Bot, CirclePlus, Gauge, HeartPulse, UserRound } from '@lucide/vue'
+import { useRoute, useRouter } from 'vue-router'
 
 import { primaryNavigation } from '@/constants/product'
-import { authSession, signOut } from '@/stores/authStore'
-import { useThemeMode } from '@/composables/useThemeMode'
 
-const { isNightTheme, toggleTheme } = useThemeMode()
-const userLabel = computed(() => authSession.user?.username || '已登录用户')
-const roleLabel = computed(() => authSession.user?.role === 'admin' ? '管理员' : '用户')
-
-function handleLogout() {
-  signOut()
-  window.location.assign('/login')
-}
+const route = useRoute()
+const router = useRouter()
+const scrollEl = ref(null)
 
 const iconMap = {
   today: HeartPulse,
@@ -85,4 +58,27 @@ const iconMap = {
   me: UserRound,
 }
 const navItems = primaryNavigation
+
+// Highlight the tab that owns the current route, including nested pages
+// (e.g. /status/health lights up 状态, /me/sync lights up 我的).
+const activeTab = computed(() => {
+  const segment = route.path.split('/')[1] || ''
+  return navItems.some((item) => item.icon === segment) ? segment : ''
+})
+
+function goTab(name) {
+  const target = navItems.find((item) => item.icon === name)
+  if (target && route.path !== target.to) router.push(target.to)
+}
+
+// The scroll container is the phone frame's body, not the window, so reset it
+// ourselves whenever the route changes.
+watch(
+  () => route.path,
+  () => {
+    nextTick(() => {
+      if (scrollEl.value) scrollEl.value.scrollTop = 0
+    })
+  },
+)
 </script>

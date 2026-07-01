@@ -1,0 +1,354 @@
+/* =============================================================================
+   MotionCare · app.css
+   Mobile-app layer, loaded AFTER styles.css so these tokens/overrides win.
+   Sections:
+     1. Extended design tokens (spacing / radius / shadow / type / layout)
+     2. Vant theme bridge — light (:root) + night (html[data-theme="night"])
+     3. Phone-frame shell (viewport / frame / top bar / scroll / tab bar)
+     4. Surface softening (cards / metrics / chips / state block / links)
+     5. Motion (page / card / message / press) + reduced-motion guard
+     6. Narrow-frame responsive fixes
+   The look stays MotionCare's own: calm light ground, one green accent,
+   generous whitespace — Vant supplies behaviour, not the brand.
+   ============================================================================= */
+
+/* 1. Extended design tokens ------------------------------------------------- */
+:root {
+  /* spacing scale */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
+  /* radii (keep legacy --radius: 8px from styles.css) */
+  --radius-lg: 16px;
+  --radius-xl: 22px;
+  --radius-pill: 999px;
+
+  /* softer, layered shadows */
+  --shadow-sm: 0 1px 2px rgb(15 23 42 / 0.04), 0 4px 14px rgb(15 23 42 / 0.05);
+  --shadow: 0 8px 26px rgb(15 23 42 / 0.07);
+  --shadow-lg: 0 24px 60px rgb(15 23 42 / 0.16);
+
+  /* type scale */
+  --fs-caption: 12px;
+  --fs-body: 14px;
+  --fs-title: 17px;
+  --fs-h2: 20px;
+  --fs-display: 30px;
+
+  /* layout */
+  --phone-max: 480px;
+  --navbar-h: 52px;
+  --tabbar-h: 60px;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+
+  /* soft brand tints for status/accents */
+  --green-soft: #e7faf0;
+  --green-strong: #14a058;
+  --orange-soft: #fff2e0;
+  --blue-soft: #e6f5ff;
+  --red-soft: #fdecec;
+}
+
+/* 2. Vant theme bridge ------------------------------------------------------- */
+/* Light: map Vant primitives onto MotionCare's palette. */
+:root {
+  --van-primary-color: var(--green);
+  --van-success-color: var(--green);
+  --van-danger-color: var(--red);
+  --van-warning-color: var(--orange);
+
+  --van-background: var(--bg);
+  --van-background-2: var(--panel);
+  --van-background-3: var(--panel-soft);
+
+  --van-text-color: var(--text);
+  --van-text-color-2: var(--muted);
+  --van-text-color-3: var(--faint);
+  --van-border-color: var(--border);
+  --van-active-color: var(--panel-soft);
+
+  --van-radius-md: 10px;
+  --van-radius-lg: var(--radius-lg);
+
+  --van-nav-bar-height: var(--navbar-h);
+  --van-nav-bar-background: var(--panel);
+  --van-nav-bar-title-text-color: var(--text);
+  --van-nav-bar-icon-color: var(--green);
+  --van-nav-bar-text-color: var(--green);
+
+  --van-tabbar-height: var(--tabbar-h);
+  --van-tabbar-background: var(--panel);
+  --van-tabbar-item-text-color: var(--nav-text);
+  --van-tabbar-item-active-color: var(--green);
+  --van-tabbar-item-active-background: transparent;
+
+  --van-cell-background: var(--panel);
+  --van-cell-text-color: var(--text);
+  --van-cell-group-background: var(--panel);
+  --van-cell-border-color: var(--border);
+
+  --van-field-input-text-color: var(--text);
+  --van-field-label-color: var(--muted);
+
+  --van-popup-background: var(--panel);
+  --van-action-sheet-item-background: var(--panel);
+  --van-action-sheet-item-text-color: var(--text);
+}
+
+/* Night: MotionCare already flips these primitives via data-theme; keep Vant
+   in step so NavBar / Tabbar / Popup / Field read correctly in the dark. */
+html[data-theme="night"] {
+  --van-primary-color: var(--green);
+  --van-background: var(--bg);
+  --van-background-2: var(--panel);
+  --van-background-3: var(--panel-soft);
+  --van-text-color: var(--text);
+  --van-text-color-2: var(--muted);
+  --van-text-color-3: var(--faint);
+  --van-border-color: var(--border);
+  --van-active-color: var(--panel-strong);
+  --van-nav-bar-background: var(--panel);
+  --van-nav-bar-title-text-color: var(--text);
+  --van-tabbar-background: var(--panel);
+  --van-tabbar-item-text-color: var(--nav-text);
+  --van-cell-background: var(--panel);
+  --van-cell-text-color: var(--text);
+  --van-cell-group-background: var(--panel);
+  --van-popup-background: var(--panel);
+  --van-action-sheet-item-background: var(--panel);
+  --van-action-sheet-item-text-color: var(--text);
+
+  --green-soft: #123021;
+  --green-strong: #34d98a;
+  --orange-soft: #3a2a12;
+  --blue-soft: #10283a;
+  --red-soft: #3a1c1c;
+}
+
+/* 3. Phone-frame shell ------------------------------------------------------- */
+.app-viewport {
+  min-height: 100dvh;
+  display: flex;
+  justify-content: center;
+  align-items: stretch;
+  background:
+    radial-gradient(120% 80% at 50% -10%, rgb(33 212 123 / 0.10), transparent 60%),
+    var(--bg);
+}
+
+.phone-frame {
+  position: relative;
+  /* establish a containing block so in-frame fixed overlays (filter sheet,
+     activity modal) stay inside the phone, not the whole desktop viewport */
+  transform: translateZ(0);
+  width: min(100%, var(--phone-max));
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  overflow: hidden;
+}
+
+/* Desktop: centre the frame as a phone preview. */
+@media (min-width: 540px) {
+  .app-viewport {
+    align-items: center;
+    padding: 24px;
+  }
+  .phone-frame {
+    height: min(100dvh - 48px, 924px);
+    border-radius: 34px;
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-lg);
+  }
+}
+
+.app-navbar.van-nav-bar {
+  flex: 0 0 auto;
+  padding-top: var(--safe-top);
+  border-bottom: 1px solid var(--border);
+}
+.app-navbar .van-nav-bar__title {
+  font-weight: 700;
+  letter-spacing: 0.2px;
+}
+.app-navbar .app-navbar-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--green);
+  font-weight: 600;
+  font-size: var(--fs-body);
+}
+
+/* the real scroll container (reuses legacy .page-frame class) */
+.phone-frame .page-frame {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-width: none;
+  margin: 0;
+  padding: var(--space-4);
+  padding-bottom: calc(var(--space-6) + var(--safe-bottom));
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.phone-frame .page-frame::-webkit-scrollbar { width: 0; height: 0; }
+
+.app-tabbar.van-tabbar {
+  flex: 0 0 auto;
+  height: auto;
+  padding-bottom: var(--safe-bottom);
+  border-top: 1px solid var(--border);
+  box-shadow: 0 -2px 16px rgb(15 23 42 / 0.05);
+}
+.app-tabbar .van-tabbar-item { padding: 6px 0; }
+.app-tabbar .van-tabbar-item__icon {
+  display: inline-flex;
+  transition: transform 180ms ease;
+}
+.app-tabbar .van-tabbar-item--active .van-tabbar-item__icon {
+  transform: translateY(-1px) scale(1.08);
+}
+.app-tabbar .van-tabbar-item__text {
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* 4. Surface softening ------------------------------------------------------- */
+.dark-panel,
+.panel,
+.metric-card {
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+.dark-panel,
+.panel {
+  padding: var(--space-5);
+}
+.page-stack { gap: var(--space-4); }
+
+.metric-card {
+  padding: var(--space-4);
+  gap: 4px;
+}
+.metric-card strong { font-size: var(--fs-h2); }
+
+.status-chip {
+  border-radius: var(--radius-pill);
+  padding: 5px 12px;
+  font-weight: 600;
+  transition: background-color 160ms ease, color 160ms ease;
+}
+
+/* State block reads like a product state, not an error dump. */
+.state-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--space-3);
+  padding: var(--space-6) var(--space-4);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+.state-block strong { font-size: var(--fs-title); }
+.state-block p { color: var(--muted); margin: 0; max-width: 34ch; }
+.state-block button {
+  border-radius: var(--radius-pill);
+  padding: 9px 20px;
+  border: none;
+  background: var(--green);
+  color: #04240f;
+  font-weight: 600;
+}
+
+/* Legacy dark secondary links → calm neutral surface. */
+.secondary-link {
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+.secondary-link small { color: var(--muted); }
+
+/* 5. Motion ------------------------------------------------------------------ */
+.page-enter-active,
+.page-leave-active { transition: opacity 180ms ease, transform 180ms ease; }
+.page-enter-from { opacity: 0; transform: translateY(6px); }
+.page-leave-to { opacity: 0; transform: translateY(-4px); }
+
+@keyframes card-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+.page-stack > * {
+  animation: card-in 320ms ease both;
+}
+.page-stack > *:nth-child(2) { animation-delay: 40ms; }
+.page-stack > *:nth-child(3) { animation-delay: 80ms; }
+.page-stack > *:nth-child(4) { animation-delay: 120ms; }
+.page-stack > *:nth-child(5) { animation-delay: 160ms; }
+.page-stack > *:nth-child(n + 6) { animation-delay: 200ms; }
+
+.msg-enter-active { transition: opacity 220ms ease, transform 220ms ease; }
+.msg-enter-from { opacity: 0; transform: translateY(8px); }
+
+.primary-link:active,
+.secondary-link:active,
+.van-button:active { transform: scale(0.97); }
+.primary-link,
+.secondary-link,
+.van-button { transition: transform 120ms ease; }
+
+@media (prefers-reduced-motion: reduce) {
+  .page-enter-active,
+  .page-leave-active,
+  .page-stack > *,
+  .msg-enter-active,
+  .primary-link,
+  .secondary-link,
+  .van-button,
+  .app-tabbar .van-tabbar-item__icon {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* 6. Narrow-frame responsive fixes ------------------------------------------ */
+/* Legacy grids keyed on viewport width won't fire inside a ~480px desktop
+   frame, so make the heavy grids fluid regardless of viewport. */
+.metric-grid,
+.health-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.activity-card-grid,
+.detail-grid,
+.status-summary-grid,
+.secondary-link-grid,
+.me-link-grid {
+  grid-template-columns: 1fr;
+}
+
+/* Legacy secondary-page grids keyed on viewport width won't collapse inside a
+   ~480px desktop frame, so pin them to sensible narrow layouts here. */
+.sync-layout,
+.sync-list-grid,
+.load-dashboard,
+.manual-form {
+  grid-template-columns: 1fr;
+}
+.prediction-grid,
+.ai-analysis-grid,
+.provider-meta {
+  grid-template-columns: 1fr 1fr;
+}
+.state-metrics {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
