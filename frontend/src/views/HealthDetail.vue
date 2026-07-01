@@ -280,14 +280,8 @@ watch(selectedDate, loadAll, { immediate: true })
 
 .detail-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: 16px;
   margin-top: 16px;
-}
-
-@media (max-width: 800px) {
-  .detail-grid {
-    grid-template-columns: 1fr;
-  }
 }
 </style>

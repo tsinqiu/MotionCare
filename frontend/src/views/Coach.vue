@@ -1,100 +1,97 @@
 <template>
-  <div class="page-stack">
-    <section class="dark-panel">
-      <div class="section-heading">
-        <div>
-          <p class="overline">接下来怎么练</p>
-          <h2>教练</h2>
-          <p>结合近期运动和恢复状态，安排下一步训练。</p>
-        </div>
-        <span class="ai-mode-pill" :class="{ fallback: modelStatus.fallback }">{{ modelStatus.label }}</span>
+  <div class="page-stack coach-page">
+    <section class="coach-head">
+      <div>
+        <p class="overline">接下来怎么练</p>
+        <h2>教练</h2>
       </div>
+      <span class="ai-mode-pill" :class="{ fallback: modelStatus.fallback }">
+        <span class="dot" aria-hidden="true"></span>
+        {{ modelStatus.label }}
+      </span>
     </section>
 
-    <div class="coach-grid">
-      <section class="assistant-surface">
-        <div class="section-heading">
-          <div><h2>训练问答</h2></div>
-        </div>
+    <section class="chat-surface">
+      <StateBlock
+        v-if="aiLoading"
+        title="正在连接教练"
+        message="正在确认训练建议服务是否可用。"
+      />
+      <StateBlock
+        v-else-if="aiError && messages.length === 0"
+        title="教练暂时不可用"
+        message="连接暂时不可用，稍后再试一次。"
+        action-label="重试"
+        tone="danger"
+        @action="loadCoach"
+      />
 
+      <template v-else>
         <StateBlock
-          v-if="aiLoading"
-          title="正在连接教练"
-          message="正在确认训练建议服务是否可用。"
+          v-if="messages.length === 0"
+          title="还没有对话"
+          message="选择一个常见问题，或直接说说你接下来的训练目标。"
         />
-        <StateBlock
-          v-else-if="aiError && messages.length === 0"
-          title="教练暂时不可用"
-          :message="aiError"
-          action-label="重试"
-          tone="danger"
-          @action="loadCoach"
-        />
-
-        <template v-else>
-          <StateBlock
-            v-if="messages.length === 0"
-            title="还没有对话"
-            message="选择一个常见问题，或直接说说你接下来的训练目标。"
-          />
-          <div v-else ref="messageListRef" class="assistant-messages">
-            <article v-for="message in messages" :key="message.id" class="assistant-message" :class="message.role">
-              <div class="assistant-avatar">{{ message.role === 'user' ? userInitial : '教练' }}</div>
-              <div class="assistant-bubble"><p>{{ message.content }}</p></div>
+        <div v-else ref="messageListRef" class="chat-messages">
+          <TransitionGroup name="msg">
+            <article v-for="message in messages" :key="message.id" class="chat-message" :class="message.role">
+              <div class="chat-avatar">{{ message.role === 'user' ? userInitial : '教练' }}</div>
+              <div class="chat-bubble"><p>{{ message.content }}</p></div>
             </article>
-            <article v-if="sending" class="assistant-message assistant">
-              <div class="assistant-avatar">教练</div>
-              <div class="assistant-bubble"><p>正在结合你的运动记录生成建议……</p></div>
+            <article v-if="sending" key="typing" class="chat-message assistant">
+              <div class="chat-avatar">教练</div>
+              <div class="chat-bubble typing"><span></span><span></span><span></span></div>
             </article>
-          </div>
-
-          <div class="assistant-prompts">
-            <button v-for="prompt in quickPrompts" :key="prompt" type="button" @click="ask(prompt)">{{ prompt }}</button>
-          </div>
-
-          <form class="assistant-composer" @submit.prevent="submit">
-            <textarea v-model.trim="draft" rows="2" placeholder="问问今天怎么练、如何恢复或下一次跑步安排……" @keydown.enter.exact.prevent="submit"></textarea>
-            <button class="primary-link" type="submit" :disabled="sending || !draft">
-              <Send :size="16" />
-              发送
-            </button>
-          </form>
-          <p v-if="chatError" class="form-error">{{ chatError }}</p>
-        </template>
-      </section>
-
-      <section class="dark-panel">
-        <div class="section-heading">
-          <div>
-            <h2>推荐训练</h2>
-            <p>从已有课程与训练建议中挑选适合继续阅读的内容。</p>
-          </div>
+          </TransitionGroup>
         </div>
-        <StateBlock v-if="recommendationLoading" title="正在加载推荐" message="正在读取训练建议和课程。" />
-        <StateBlock
-          v-else-if="recommendationError"
-          title="推荐暂时不可用"
-          :message="recommendationError"
-          action-label="重试"
-          tone="danger"
-          @action="loadRecommendations"
-        />
-        <StateBlock
-          v-else-if="recommendations.length === 0"
-          title="暂时没有推荐"
-          message="先记录几次运动，之后再来看看。"
-          action-label="记录运动"
-          @action="router.push('/record')"
-        />
-        <div v-else class="recommendation-list">
-          <article v-for="item in recommendations" :key="item.id" class="recommendation-card">
-            <small>{{ typeLabel(item.type) }}</small>
-            <h3>{{ item.title }}</h3>
-            <p>{{ item.summary || item.content || '打开教练对话，结合你的情况继续询问。' }}</p>
-          </article>
+
+        <div class="quick-prompts">
+          <button v-for="prompt in quickPrompts" :key="prompt" type="button" @click="ask(prompt)">{{ prompt }}</button>
         </div>
-      </section>
-    </div>
+
+        <form class="chat-composer" @submit.prevent="submit">
+          <textarea
+            v-model.trim="draft"
+            rows="1"
+            placeholder="问问今天怎么练、如何恢复或下一次安排……"
+            @keydown.enter.exact.prevent="submit"
+          ></textarea>
+          <button class="send-btn" type="submit" :disabled="sending || !draft" aria-label="发送">
+            <Send :size="18" />
+          </button>
+        </form>
+        <p v-if="chatError" class="form-error">建议生成失败，请稍后重试。</p>
+      </template>
+    </section>
+
+    <section class="dark-panel">
+      <div class="section-heading">
+        <div><h2>推荐训练</h2></div>
+      </div>
+      <StateBlock v-if="recommendationLoading" title="正在加载推荐" message="正在读取训练建议和课程。" />
+      <StateBlock
+        v-else-if="recommendationError"
+        title="推荐暂时不可用"
+        message="连接暂时不可用，稍后再试一次。"
+        action-label="重试"
+        tone="danger"
+        @action="loadRecommendations"
+      />
+      <StateBlock
+        v-else-if="recommendations.length === 0"
+        title="暂时没有推荐"
+        message="先记录几次运动，之后再来看看。"
+        action-label="记录运动"
+        @action="router.push('/record')"
+      />
+      <div v-else class="recommendation-list">
+        <article v-for="item in recommendations" :key="item.id" class="recommendation-card">
+          <small>{{ typeLabel(item.type) }}</small>
+          <h3>{{ item.title }}</h3>
+          <p>{{ item.summary || item.content || '打开教练对话，结合你的情况继续询问。' }}</p>
+        </article>
+      </div>
+    </section>
   </div>
 </template>
 
@@ -198,19 +195,155 @@ onMounted(loadCoach)
 </script>
 
 <style scoped>
-.coach-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.65fr);
-  gap: 18px;
-  align-items: start;
+.coach-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
 }
+.coach-head h2 { margin: 2px 0 0; }
+.coach-head .overline { margin: 0; }
+
+.ai-mode-pill .dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--green);
+  margin-right: 6px;
+  vertical-align: middle;
+}
+.ai-mode-pill.fallback .dot { background: var(--orange); }
+
+.chat-surface {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: var(--panel);
+  box-shadow: var(--shadow-sm);
+}
+
+.chat-messages {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 48vh;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.chat-messages::-webkit-scrollbar { display: none; }
+
+.chat-message {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+  max-width: 88%;
+}
+.chat-message.user { flex-direction: row-reverse; margin-left: auto; }
+.chat-avatar {
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--panel-soft);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+.chat-message.user .chat-avatar { background: var(--green); color: #04240f; }
+.chat-bubble {
+  padding: 10px 14px;
+  border-radius: 16px;
+  background: var(--panel-soft);
+  line-height: 1.5;
+}
+.chat-bubble p { margin: 0; }
+.chat-message.user .chat-bubble {
+  background: var(--green);
+  color: #04240f;
+  border-bottom-right-radius: 6px;
+}
+.chat-message.assistant .chat-bubble { border-bottom-left-radius: 6px; }
+
+.chat-bubble.typing { display: flex; gap: 4px; }
+.chat-bubble.typing span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--faint);
+  animation: typing-blink 1.2s infinite ease-in-out;
+}
+.chat-bubble.typing span:nth-child(2) { animation-delay: 0.2s; }
+.chat-bubble.typing span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes typing-blink {
+  0%, 60%, 100% { opacity: 0.3; transform: translateY(0); }
+  30% { opacity: 1; transform: translateY(-3px); }
+}
+
+.quick-prompts {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-bottom: 2px;
+}
+.quick-prompts::-webkit-scrollbar { display: none; }
+.quick-prompts button {
+  flex: 0 0 auto;
+  padding: 8px 14px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: var(--panel-soft);
+  color: var(--text);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.chat-composer {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  padding: 8px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: var(--panel-soft);
+}
+.chat-composer textarea {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  resize: none;
+  max-height: 96px;
+  line-height: 1.5;
+  padding: 6px;
+}
+.chat-composer textarea:focus { outline: none; }
+.send-btn {
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: none;
+  background: var(--green);
+  color: #04240f;
+}
+
 .recommendation-list { display: grid; gap: 12px; }
 .recommendation-card {
   padding: 14px;
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: var(--radius-lg);
   background: var(--panel-soft);
 }
-.recommendation-card h3 { margin: 6px 0; }
-@media (max-width: 900px) { .coach-grid { grid-template-columns: 1fr; } }
+.recommendation-card small { color: var(--green-strong); font-weight: 600; }
+.recommendation-card h3 { margin: 6px 0; font-size: var(--fs-title); }
+.recommendation-card p { margin: 0; color: var(--muted); line-height: 1.5; }
 </style>

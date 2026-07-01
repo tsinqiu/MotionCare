@@ -565,21 +565,21 @@ watch(() => route.params.id, loadActivity, { immediate: true })
 
 <style scoped>
 .shoe-bind { display: flex; align-items: center; gap: 12px; padding: 8px 0; }
-.shoe-bind select { padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border, #333); background: var(--bg-elevated, #1a1a2e); color: inherit; }
-.shoe-bind-info { font-size: 13px; color: var(--text-muted, #888); }
+.shoe-bind select { padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--panel-soft); color: var(--text); }
+.shoe-bind-info { font-size: 13px; color: var(--muted); }
 .edit-form { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; padding: 8px 0; }
-.edit-form label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--text-muted, #888); }
-.edit-form input { padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border, #333); background: var(--bg-elevated, #1a1a2e); color: inherit; }
+.edit-form label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); }
+.edit-form input { padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--panel-soft); color: var(--text); }
 .edit-form-actions { display: flex; align-items: flex-end; }
 .photo-section { padding: 8px 0; display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
-.photo-upload-label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--text-muted, #888); }
-.upload-status { font-size: 12px; color: var(--text-muted, #888); }
+.photo-upload-label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); }
+.upload-status { font-size: 12px; color: var(--muted); }
 .activity-photo { max-width: 240px; max-height: 180px; border-radius: 8px; object-fit: cover; margin-top: 8px; }
 .weather-grid { display: flex; flex-wrap: wrap; gap: 16px; padding: 8px 0; }
 .weather-grid span { display: flex; flex-direction: column; gap: 2px; }
-.weather-grid small { font-size: 12px; color: var(--text-muted, #888); }
+.weather-grid small { font-size: 12px; color: var(--muted); }
 .weather-form { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; padding: 8px 0; }
-.weather-form label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--text-muted, #888); }
-.weather-form input { width: 100px; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--border, #333); background: var(--bg-elevated, #1a1a2e); color: inherit; }
-.weather-source { font-size: 11px; color: var(--text-muted, #888); margin: 4px 0 0; }
+.weather-form label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); }
+.weather-form input { width: 100px; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--border); background: var(--panel-soft); color: var(--text); }
+.weather-source { font-size: 11px; color: var(--muted); margin: 4px 0 0; }
 </style>

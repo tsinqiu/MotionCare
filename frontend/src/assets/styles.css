@@ -568,7 +568,7 @@ html[data-theme="night"] .hero-panel {
   margin-left: 8px;
   border: 0;
   background: transparent;
-  color: var(--primary);
+  color: var(--green);
   font: inherit;
   font-weight: 700;
   cursor: pointer;

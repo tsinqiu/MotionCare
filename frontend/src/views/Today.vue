@@ -1,22 +1,10 @@
 <template>
   <div class="page-stack">
-    <section class="dark-panel today-hero">
-      <div>
-        <p class="overline">今天适合怎么运动</p>
-        <h2>今日</h2>
-        <p>先看恢复状态，再决定今天的运动强度。</p>
-      </div>
-      <RouterLink class="primary-link" to="/record">
-        <CirclePlus :size="18" />
-        记录运动
-      </RouterLink>
-    </section>
-
     <StateBlock v-if="loading" title="正在准备今日建议" message="正在读取身体状态、训练负荷和最近运动。" />
     <StateBlock
       v-else-if="!hasData && errors.length"
       title="今日数据加载失败"
-      :message="errors.join('；')"
+      message="连接暂时不可用，稍后再试一次。"
       action-label="重试"
       tone="danger"
       @action="loadToday"
@@ -30,19 +18,22 @@
     />
 
     <template v-else>
-      <p v-if="errors.length" class="form-error">部分内容暂时不可用：{{ errors.join('；') }}</p>
+      <p v-if="errors.length" class="soft-note">部分内容暂时不可用，已用现有数据为你生成建议。</p>
 
-      <section class="dark-panel recommendation-panel">
-        <div class="section-heading">
-          <div>
-            <p class="overline">今日建议</p>
-            <h2>{{ recommendationHeadline }}</h2>
-          </div>
+      <section class="today-hero">
+        <div class="today-hero__top">
+          <p class="overline">{{ greeting }}</p>
           <span class="status-chip" :class="statusBadge.tone">{{ statusBadge.label }}</span>
         </div>
-        <p>{{ recommendationText }}</p>
-        <small v-if="briefAvailable">建议已结合你的近期运动生成</small>
-        <small v-else>当前使用身体状态与训练负荷生成基础建议</small>
+        <h2 class="today-hero__headline">{{ recommendationHeadline }}</h2>
+        <p class="today-hero__text">{{ recommendationText }}</p>
+        <RouterLink class="primary-link today-hero__cta" to="/record">
+          <CirclePlus :size="18" />
+          记录一次运动
+        </RouterLink>
+        <small class="today-hero__note">
+          {{ briefAvailable ? '建议已结合你的近期运动生成' : '基于身体状态与训练负荷生成' }}
+        </small>
       </section>
 
       <div class="metric-grid">
@@ -55,7 +46,7 @@
       <section class="dark-panel">
         <div class="section-heading">
           <div><h2>今日身体摘要</h2></div>
-          <RouterLink to="/status/health">完整健康数据</RouterLink>
+          <RouterLink class="link-more" to="/status/health">查看详情</RouterLink>
         </div>
         <div class="health-grid">
           <span><small>步数</small><b>{{ metricValue(health.steps) }}</b></span>
@@ -68,7 +59,7 @@
       <section class="dark-panel">
         <div class="section-heading">
           <div><h2>最近运动</h2></div>
-          <RouterLink to="/activities">全部运动</RouterLink>
+          <RouterLink class="link-more" to="/activities">全部</RouterLink>
         </div>
         <StateBlock
           v-if="recentActivities.length === 0"
@@ -77,7 +68,7 @@
           action-label="记录运动"
           @action="router.push('/record')"
         />
-        <div v-else class="activity-card-grid">
+        <div v-else class="activity-list">
           <ActivityCard
             v-for="activity in recentActivities"
             :key="activity.id"
@@ -124,6 +115,14 @@ const hasData = computed(() => (
 ))
 const recommendationHeadline = computed(() => brief.value?.headline || statusBadge.value.label)
 const recommendationText = computed(() => brief.value?.recommendation || statusBadge.value.message)
+const greeting = computed(() => {
+  const hour = new Date().getHours()
+  if (hour < 6) return '凌晨好，注意休息'
+  if (hour < 11) return '早上好，今天适合怎么运动'
+  if (hour < 14) return '中午好，今天适合怎么运动'
+  if (hour < 18) return '下午好，今天适合怎么运动'
+  return '晚上好，回顾今天的状态'
+})
 const intensityMinutes = computed(() => {
   const moderate = Number(health.value.moderateIntensityMinutes || 0)
   const vigorous = Number(health.value.vigorousIntensityMinutes || 0)
@@ -168,19 +167,67 @@ onMounted(loadToday)
 </script>
 
 <style scoped>
-.today-hero { display: flex; justify-content: space-between; align-items: center; gap: 18px; }
-.health-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.soft-note {
+  margin: 0;
+  padding: 10px 14px;
+  font-size: 13px;
+  color: var(--muted);
+  background: var(--panel-soft);
+  border-radius: var(--radius-lg);
+}
+
+.today-hero {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: var(--space-5);
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--border);
+  background:
+    radial-gradient(140% 120% at 100% 0%, rgb(33 212 123 / 0.16), transparent 55%),
+    var(--panel);
+  box-shadow: var(--shadow-sm);
+}
+.today-hero__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.today-hero__top .overline { margin: 0; }
+.today-hero__headline {
+  margin: 0;
+  font-size: var(--fs-display);
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+.today-hero__text {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.55;
+}
+.today-hero__cta {
+  align-self: flex-start;
+  margin-top: 4px;
+}
+.today-hero__note {
+  color: var(--faint);
+  font-size: 12px;
+}
+
+.link-more { color: var(--green); font-weight: 600; font-size: 13px; }
+
+.health-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .health-grid span {
   display: grid;
-  gap: 5px;
+  gap: 4px;
   padding: 14px;
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: var(--radius-lg);
   background: var(--panel-soft);
 }
-.health-grid b { font-size: 18px; }
-@media (max-width: 760px) {
-  .today-hero { align-items: flex-start; flex-direction: column; }
-  .health-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
+.health-grid small { color: var(--muted); font-size: 12px; }
+.health-grid b { font-size: var(--fs-title); }
+
+.activity-list { display: grid; gap: 12px; }
 </style>

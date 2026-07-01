@@ -316,28 +316,28 @@ onMounted(load)
 
 <style scoped>
 .shoe-form { display: flex; flex-wrap: wrap; gap: 8px; padding: 16px 0; }
-.shoe-form input { flex: 1; min-width: 120px; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border, #333); background: var(--bg-elevated, #1a1a2e); color: inherit; }
+.shoe-form input { flex: 1; min-width: 120px; padding: 8px 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--panel-soft); color: var(--text); }
 .shoe-form-actions { display: flex; gap: 8px; width: 100%; }
-.photo-upload-label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--text-muted, #888); }
+.photo-upload-label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); }
 .shoe-list { display: flex; flex-direction: column; gap: 8px; }
-.shoe-card { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-radius: 10px; background: var(--bg-elevated, #1a1a2e); cursor: pointer; gap: 12px; }
+.shoe-card { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; padding: 12px 16px; border-radius: var(--radius-lg); border: 1px solid var(--border); background: var(--panel-soft); cursor: pointer; gap: 12px; }
 .shoe-card.retired { opacity: 0.5; }
-.shoe-card.selected { border: 1px solid var(--primary, #21d47b); }
-.shoe-card:hover { background: var(--bg-hover, #222); }
+.shoe-card.selected { border: 1px solid var(--green); }
+.shoe-card:hover { background: var(--panel); }
 .shoe-photo { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; flex-shrink: 0; }
-.shoe-info { display: flex; flex-direction: column; gap: 2px; flex: 1; }
-.shoe-detail { font-size: 12px; color: var(--text-muted, #888); }
-.shoe-stats { display: flex; flex-wrap: wrap; gap: 8px; font-size: 12px; color: var(--text-muted, #888); margin-top: 4px; }
+.shoe-info { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 140px; }
+.shoe-detail { font-size: 12px; color: var(--muted); }
+.shoe-stats { display: flex; flex-wrap: wrap; gap: 8px; font-size: 12px; color: var(--muted); margin-top: 4px; }
 .shoe-actions { display: flex; gap: 8px; }
-.shoe-actions button { padding: 4px 12px; border-radius: 6px; border: 1px solid var(--border, #333); background: transparent; color: inherit; cursor: pointer; white-space: nowrap; }
-.empty-state { padding: 32px; text-align: center; color: var(--text-muted, #888); }
+.shoe-actions button { padding: 6px 12px; border-radius: var(--radius-pill); border: 1px solid var(--border); background: var(--panel); color: var(--text); cursor: pointer; white-space: nowrap; }
+.empty-state { padding: 32px; text-align: center; color: var(--muted); }
 .shoe-activities-list { display: flex; flex-direction: column; gap: 8px; }
 
-.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 1000; }
-.modal-content { background: var(--bg-elevated, #1a1a2e); border-radius: 12px; padding: 24px; width: 90%; max-width: 480px; max-height: 90vh; overflow-y: auto; }
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.45); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 16px; }
+.modal-content { background: var(--panel); border-radius: var(--radius-lg); padding: 24px; width: 100%; max-width: 420px; max-height: 90vh; overflow-y: auto; box-shadow: var(--shadow-lg); }
 .modal-content h3 { margin: 0 0 16px; }
-.modal-content label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--text-muted, #888); margin-bottom: 12px; }
-.modal-content input { padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border, #333); background: var(--bg-card, #16162a); color: inherit; }
+.modal-content label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); margin-bottom: 12px; }
+.modal-content input { padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--panel-soft); color: var(--text); }
 .edit-photo-preview { max-width: 120px; max-height: 120px; border-radius: 8px; object-fit: cover; margin-top: 4px; }
 .modal-actions { display: flex; gap: 8px; margin-top: 16px; }
 </style>

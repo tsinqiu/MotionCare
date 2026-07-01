@@ -1,15 +1,11 @@
 <template>
   <div class="page-stack">
-    <section class="dark-panel">
-      <div class="section-heading">
-        <div>
-          <p class="overline">身体与训练</p>
-          <h2>状态</h2>
-          <p>看看身体恢复和近期训练是否平衡。</p>
-        </div>
+    <section class="status-hero">
+      <div class="status-hero__top">
+        <p class="overline">身体与训练</p>
         <span class="status-chip" :class="statusBadge.tone">{{ statusBadge.label }}</span>
       </div>
-      <p>{{ statusBadge.message }}</p>
+      <p class="status-hero__message">{{ statusBadge.message }}</p>
     </section>
 
     <StateBlock v-if="loading" title="正在加载状态" message="正在汇总健康、负荷、纪录和日历。" />
@@ -29,8 +25,8 @@
       @action="router.push('/record')"
     />
 
-    <template v-else>
-      <p v-if="errors.length" class="form-error">部分数据暂时不可用：{{ errors.join('；') }}</p>
+      <template v-else>
+      <p v-if="errors.length" class="soft-note">部分数据暂时不可用，其余内容已正常显示。</p>
 
       <div class="metric-grid">
         <MetricCard label="睡眠分数" :value="metricValue(health.sleepScore)" />
@@ -42,8 +38,9 @@
       <section class="dark-panel">
         <div class="section-heading">
           <div><h2>训练负荷</h2></div>
-          <RouterLink to="/status/training-load">查看详情</RouterLink>
+          <RouterLink class="link-more" to="/status/training-load">查看详情</RouterLink>
         </div>
+        <p class="load-reading">{{ loadReading }}</p>
         <div class="training-targets">
           <span><small>体能 CTL</small><b>{{ metricValue(currentLoad.ctl) }}</b></span>
           <span><small>疲劳 ATL</small><b>{{ metricValue(currentLoad.atl) }}</b></span>
@@ -80,14 +77,14 @@
         </section>
       </div>
 
-      <section class="dark-panel">
+      <section class="dark-panel continue-panel">
         <div class="section-heading"><div><h2>继续查看</h2></div></div>
-        <div class="secondary-link-grid">
-          <RouterLink to="/status/health">健康详情</RouterLink>
-          <RouterLink to="/status/trends">运动趋势</RouterLink>
-          <RouterLink to="/status/training-load">训练负荷</RouterLink>
-          <RouterLink to="/status/calendar">运动日历</RouterLink>
-        </div>
+        <van-cell-group inset>
+          <van-cell title="健康详情" is-link to="/status/health" />
+          <van-cell title="运动趋势" is-link to="/status/trends" />
+          <van-cell title="训练负荷" is-link to="/status/training-load" />
+          <van-cell title="运动日历" is-link to="/status/calendar" />
+        </van-cell-group>
       </section>
     </template>
   </div>
@@ -119,6 +116,17 @@ const statusBadge = computed(() => deriveStatusBadge({
   tsb: currentLoad.value.tsb,
 }))
 const activeDays = computed(() => (calendar.value.days || []).filter((day) => day.activities?.length))
+const loadReading = computed(() => {
+  const tsb = currentLoad.value.tsb
+  if (tsb === null || tsb === undefined || tsb === '') {
+    return '继续记录运动，就能看到体能与疲劳之间的平衡。'
+  }
+  const value = Number(tsb)
+  if (value <= -20) return '疲劳明显高于体能，最近练得比较猛，注意安排恢复。'
+  if (value < -8) return '正在积累训练负荷，保持节奏，别忽略睡眠和放松。'
+  if (value <= 10) return '体能和疲劳比较平衡，可以按计划继续训练。'
+  return '身体比较轻松，适合安排一次高质量训练或比赛。'
+})
 const pbHighlights = computed(() => {
   const groups = [
     ['跑步', personalBests.value.running],
@@ -169,20 +177,45 @@ onMounted(load)
 </script>
 
 <style scoped>
-.status-summary-grid,
-.secondary-link-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
-}
-.secondary-link-grid a {
-  padding: 14px;
+.status-hero {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: var(--space-5);
+  border-radius: var(--radius-xl);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  background:
+    radial-gradient(140% 120% at 0% 0%, rgb(51 181 255 / 0.12), transparent 55%),
+    var(--panel);
+  box-shadow: var(--shadow-sm);
+}
+.status-hero__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.status-hero__top .overline { margin: 0; }
+.status-hero__message {
+  margin: 0;
+  font-size: var(--fs-h2);
+  line-height: 1.4;
+  letter-spacing: -0.01em;
+}
+
+.soft-note {
+  margin: 0;
+  padding: 10px 14px;
+  font-size: 13px;
+  color: var(--muted);
   background: var(--panel-soft);
+  border-radius: var(--radius-lg);
 }
-@media (max-width: 760px) {
-  .status-summary-grid,
-  .secondary-link-grid { grid-template-columns: 1fr; }
-}
+.link-more { color: var(--green); font-weight: 600; font-size: 13px; }
+.load-reading { margin: 0 0 14px; color: var(--muted); line-height: 1.55; }
+.continue-panel :deep(.van-cell-group--inset) { margin: 0; }
+
+.status-summary-grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
+.log-list { display: grid; gap: 8px; }
+.log-list span { color: var(--muted); font-size: 14px; }
 </style>

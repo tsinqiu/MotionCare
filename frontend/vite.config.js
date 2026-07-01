@@ -13,6 +13,7 @@ export default defineConfig({
       output: {
         manualChunks: {
           echarts: ['echarts'],
+          vant: ['vant'],
           vendor: ['vue', 'vue-router', 'axios'],
         },
       },
