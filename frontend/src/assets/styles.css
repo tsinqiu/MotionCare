@@ -440,8 +440,7 @@ html[data-theme="night"] .hero-panel {
 .today-layout,
 .load-dashboard,
 .detail-grid,
-.analytics-grid,
-.schema-grid {
+.analytics-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 18px;
@@ -450,8 +449,7 @@ html[data-theme="night"] .hero-panel {
 .today-layout > *,
 .load-dashboard > *,
 .detail-grid > *,
-.analytics-grid > *,
-.schema-grid > * {
+.analytics-grid > * {
   min-width: 0;
 }
 
@@ -2150,55 +2148,18 @@ html[data-theme="night"] .route-map .leaflet-control-attribution {
   line-height: 1;
 }
 
-.schema-table-tabs {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.schema-table-tabs button {
-  min-height: 70px;
-  padding: 10px;
-  border-radius: var(--radius);
-  border: 1px solid var(--border);
-  background: var(--panel-soft);
-  color: var(--text);
-  text-align: left;
-}
-
-.schema-table-tabs button.active {
-  border-color: var(--green);
-}
-
-.schema-table-tabs span,
-.schema-purpose,
-.schema-safety-list {
-  color: var(--muted);
-}
-
-.schema-relations,
-.schema-safety-list,
 .quality-grid,
 .log-list {
   display: grid;
   gap: 10px;
 }
 
-.schema-relations article,
-.schema-safety-list span,
 .quality-grid article,
 .log-list span {
   padding: 12px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--panel-soft);
-}
-
-.schema-relations article {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-  gap: 12px;
-  align-items: center;
 }
 
 .quality-grid {
@@ -2749,7 +2710,6 @@ html[data-theme="night"] .input-with-icon {
   .load-dashboard,
   .detail-grid,
   .analytics-grid,
-  .schema-grid,
   .activity-card-grid,
   .health-grid,
   .metric-grid,
@@ -2845,7 +2805,6 @@ html[data-theme="night"] .input-with-icon {
   .load-dashboard,
   .detail-grid,
   .analytics-grid,
-  .schema-grid,
   .activity-card-grid,
   .health-grid,
   .metric-grid,
@@ -2903,10 +2862,6 @@ html[data-theme="night"] .input-with-icon {
   .calendar-day {
     min-height: 64px;
     padding: 8px;
-  }
-
-  .schema-table-tabs {
-    grid-template-columns: 1fr;
   }
 
   .api-banner,

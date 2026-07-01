@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
+    "check:course": "node scripts/course-delivery-check.mjs",
     "smoke": "node scripts/smoke-check.mjs"
   },
   "dependencies": {

@@ -40,7 +40,7 @@ function parseOwnerFilter(value, user) {
     value,
     OWNER_FILTERS,
     'owner',
-    user.role === 'admin' ? 'all' : 'mine'
+    'mine'
   );
 
   return {

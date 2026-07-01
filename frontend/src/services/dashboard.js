@@ -15,7 +15,7 @@ export async function getDashboardOverview(params = {}) {
   }
 }
 
-export async function getTodayHealth() {
-  const res = await fetch('/api/dashboard/health', { credentials: 'include' })
-  return res.ok ? res.json() : {}
+export async function getTodayHealth(params = {}) {
+  const envelope = await getEnvelope('/dashboard/health', { params })
+  return envelope.data || {}
 }

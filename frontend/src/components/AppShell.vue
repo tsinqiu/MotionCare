@@ -2,9 +2,9 @@
   <div class="app-shell">
     <aside class="sidebar">
       <RouterLink class="brand" to="/today">
-        <span class="brand-mark">GS</span>
+        <span class="brand-mark">MC</span>
         <span>
-          <strong>GarSync Motion</strong>
+          <strong>MotionCare</strong>
         </span>
       </RouterLink>
 
@@ -18,7 +18,7 @@
 
     <div class="content-shell">
       <header class="topbar">
-        <h1>Garmin 运动数据分析数据库系统</h1>
+        <h1>MotionCare 运动健康中心</h1>
         <div class="topbar-actions">
           <button class="theme-toggle" type="button" @click="toggleTheme">
             <component :is="isNightTheme ? Sun : Moon" :size="16" />
@@ -43,7 +43,7 @@
       <main class="page-frame">
         <RouterView />
         <footer class="app-footer">
-          <span>Garmin 运动数据分析数据库系统</span>
+          <span>MotionCare · 让运动数据更好理解</span>
         </footer>
       </main>
     </div>
@@ -57,7 +57,6 @@ import {
   BarChart3,
   Bot,
   Compass,
-  Database,
   Flame,
   HeartPulse,
   LogOut,
@@ -95,7 +94,6 @@ const baseNavItems = [
   { to: '/assistant', label: 'AI 助手', icon: Bot },
   { to: '/explore', label: '探索', icon: Compass },
   { to: '/community', label: '运动圈', icon: Users },
-  { to: '/schema', label: '数据库', icon: Database },
   { to: '/settings', label: '设置', icon: Settings },
 ]
 

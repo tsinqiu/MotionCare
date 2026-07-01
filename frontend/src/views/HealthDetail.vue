@@ -54,6 +54,7 @@ import { computed, ref, watch } from 'vue'
 import ChartPanel from '@/components/ChartPanel.vue'
 import MetricCard from '@/components/MetricCard.vue'
 import StateBlock from '@/components/StateBlock.vue'
+import { getTodayHealth } from '@/services/dashboard'
 import {
   getHealthSamples,
   getLatestCyclingFtp,
@@ -188,7 +189,7 @@ async function loadAll() {
       thresholdRes,
       ftpRes,
     ] = await Promise.all([
-      fetch(`/api/dashboard/health?date=${date}`).then((r) => (r.ok ? r.json() : {})),
+      getTodayHealth({ date }),
       getHealthSamples('heart-rate', { date, source: 'monitoring' }),
       getHealthSamples('heart-rate', { date, source: 'sleep' }),
       getHealthSamples('stress', { date, source: 'monitoring' }),

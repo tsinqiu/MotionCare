@@ -44,11 +44,6 @@ function buildApp(overrides = {}) {
     getCalendarStats: async () => ({ month: '2026-06', days: [] }),
     getHeartRateZones: async () => [{ zone: 'Zone 1', label: '轻松' }],
     getLoadBalance: async () => [{ date: '2026-06-01', dailyTrainingLoad: 100, ctl: 20, atl: 50, tsb: -30, activities: [] }],
-    getGarminImportSummary: async () => ({
-      activitySummary: { powerRows: 121, trainingLoadRows: 183, rows: [] },
-      trainingStatus: { startDate: '2026-04-01', endDate: '2026-06-29', totalDays: 90, rows: [] },
-      lactateThreshold: { latest: { heartRateBpm: 184, cyclingHeartRateBpm: 174, powerW: 353, powerToWeight: 6.418181818181818 } }
-    }),
     getPersonalBests: async () => ({ steps: [], running: [], cycling: [], swimming: [], overall: [] }),
     getDashboardOverview: async () => ({ recentActivities: [], monthlySummary: {}, yearlySummary: {}, trainingLoad: [], personalBests: {} }),
     getTodayHealth: async () => ({ steps: 1000 })
@@ -277,7 +272,8 @@ function buildApp(overrides = {}) {
     communityService,
     exploreService,
     settingsService,
-    workoutService
+    workoutService,
+    securityConfig: overrides.securityConfig
   });
 }
 
@@ -386,15 +382,13 @@ test('GET /api/health reports degraded database state', async () => {
   assert.equal(response.body.data.database.ok, false);
 });
 
-test('GET /api/training/garmin-import-summary returns imported Garmin fields', async () => {
+test('GET /api/training/garmin-import-summary is removed', async () => {
   const response = await request(buildApp())
     .get('/api/training/garmin-import-summary')
     .set('Authorization', 'Bearer valid-user-token');
 
-  assert.equal(response.status, 200);
-  assert.equal(response.body.data.activitySummary.powerRows, 121);
-  assert.equal(response.body.data.trainingStatus.totalDays, 90);
-  assert.equal(response.body.data.lactateThreshold.latest.powerW, 353);
+  assert.equal(response.status, 404);
+  assert.equal(response.body.error.code, 'ROUTE_NOT_FOUND');
 });
 
 test('GET /api/activities validates limit', async () => {
@@ -441,7 +435,7 @@ test('GET /api/activities passes filters and sort options', async () => {
     endDate: '2026-06-09',
     keyword: undefined,
     source: undefined,
-    owner: 'all',
+    owner: 'mine',
     ownerUserId: 1,
     limit: 20,
     offset: 5,
@@ -571,7 +565,7 @@ test('GET /api/stats/summary passes date filters', async () => {
     endDate: '2026-06-09',
     keyword: undefined,
     source: undefined,
-    owner: 'all',
+    owner: 'mine',
     ownerUserId: 1
   });
 });
@@ -876,8 +870,18 @@ test('GET /api/ml/health returns model status', async () => {
   assert.equal(response.body.data.modelVersion, 'running-v1');
 });
 
-test('POST /api/ml/running-prediction validates missing feature', async () => {
+test('POST /api/ml/running-prediction requires login', async () => {
   const response = await request(buildApp()).post('/api/ml/running-prediction').send({ distanceM: 5000 });
+
+  assert.equal(response.status, 401);
+  assert.equal(response.body.error.code, 'AUTH_REQUIRED');
+});
+
+test('POST /api/ml/running-prediction validates missing feature', async () => {
+  const response = await request(buildApp())
+    .post('/api/ml/running-prediction')
+    .set('Authorization', 'Bearer valid-user-token')
+    .send({ distanceM: 5000 });
 
   assert.equal(response.status, 400);
   assert.equal(response.body.error.code, 'INVALID_ML_INPUT');
@@ -901,7 +905,10 @@ test('POST /api/ml/running-prediction returns running analysis result', async ()
     normalizedPowerW: 220
   };
 
-  const response = await request(buildApp()).post('/api/ml/running-prediction').send(payload);
+  const response = await request(buildApp())
+    .post('/api/ml/running-prediction')
+    .set('Authorization', 'Bearer valid-user-token')
+    .send(payload);
 
   assert.equal(response.status, 200);
   assert.equal(response.body.data.predictedTrainingLoadLevel, 'medium');
@@ -958,7 +965,10 @@ test('POST /api/ml/running-prediction fills optional frontend detail fields', as
     avgPowerW: 210
   };
 
-  const response = await request(app).post('/api/ml/running-prediction').send(payload);
+  const response = await request(app)
+    .post('/api/ml/running-prediction')
+    .set('Authorization', 'Bearer valid-user-token')
+    .send(payload);
 
   assert.equal(response.status, 200);
   assert.equal(captured.maxCadenceSpm, 165);
@@ -985,6 +995,7 @@ test('POST /api/ml/running-prediction allows local API origin', async () => {
 
   const response = await request(buildApp())
     .post('/api/ml/running-prediction')
+    .set('Authorization', 'Bearer valid-user-token')
     .set('Origin', 'http://127.0.0.1:8089')
     .send(payload);
 
@@ -1092,17 +1103,29 @@ test('POST /api/manual-activities creates manual activity without running ML pre
   assert.equal(predictionCalled, false);
 });
 
-test('POST /api/manual-activities rejects non-admin users', async () => {
-  const response = await request(buildApp())
+test('POST /api/manual-activities allows normal users to create their own activity', async () => {
+  let capturedUser;
+  const response = await request(buildApp({
+    manualActivityService: {
+      createManualActivity: async (_payload, user) => {
+        capturedUser = user;
+        return { id: 10, activityType: 'running', isManual: true, ownerUserId: user.id };
+      },
+      getManualActivity: async () => ({}),
+      updateManualActivity: async () => ({}),
+      deleteManualActivity: async () => ({})
+    }
+  }))
     .post('/api/manual-activities')
     .set('Authorization', 'Bearer valid-user-token')
     .send(manualPayload);
 
-  assert.equal(response.status, 403);
-  assert.equal(response.body.error.code, 'FORBIDDEN');
+  assert.equal(response.status, 201);
+  assert.equal(response.body.data.ownerUserId, 2);
+  assert.equal(capturedUser.id, 2);
 });
 
-test('PUT and DELETE /api/manual-activities/:id reject non-admin users', async () => {
+test('PUT and DELETE /api/manual-activities/:id allow normal users to manage owned activities', async () => {
   const app = buildApp();
   const updated = await request(app)
     .put('/api/manual-activities/10')
@@ -1112,10 +1135,35 @@ test('PUT and DELETE /api/manual-activities/:id reject non-admin users', async (
     .delete('/api/manual-activities/10')
     .set('Authorization', 'Bearer valid-user-token');
 
-  assert.equal(updated.status, 403);
-  assert.equal(updated.body.error.code, 'FORBIDDEN');
-  assert.equal(deleted.status, 403);
-  assert.equal(deleted.body.error.code, 'FORBIDDEN');
+  assert.equal(updated.status, 200);
+  assert.equal(updated.body.data.isManual, true);
+  assert.equal(deleted.status, 200);
+  assert.equal(deleted.body.data.deleted, true);
+});
+
+test('GET /api/manual-activities/:id hides activities owned by another user', async () => {
+  const originalQuery = db.query;
+  db.query = async (sql) => {
+    if (sql.includes('FROM Activities a')) {
+      return [{ id: 10, ownerUserId: 3, isManual: true, activityType: 'running' }];
+    }
+    return [];
+  };
+
+  try {
+    const response = await request(createApp({
+      authService: {
+        verifyToken: async () => ({ id: 2, username: 'tester', role: 'user', status: 'active' })
+      }
+    }))
+      .get('/api/manual-activities/10')
+      .set('Authorization', 'Bearer valid-user-token');
+
+    assert.equal(response.status, 404);
+    assert.equal(response.body.error.code, 'ACTIVITY_NOT_FOUND');
+  } finally {
+    db.query = originalQuery;
+  }
 });
 
 test('PUT and DELETE /api/manual-activities/:id allow administrators', async () => {
@@ -2186,7 +2234,6 @@ test('personal health, activity analytics, training, and dashboard routes requir
     '/api/activities/1/zones',
     '/api/stats/summary',
     '/api/training/load-balance',
-    '/api/training/garmin-import-summary',
     '/api/dashboard/overview',
     '/api/dashboard/health'
   ];
@@ -2238,6 +2285,24 @@ test('GET /api/activities preserves administrator owner filters', async () => {
   assert.equal(captured[1].ownerUserId, 1);
 });
 
+test('GET /api/activities defaults administrators to their own activities', async () => {
+  let captured;
+  const response = await request(buildApp({
+    activityService: {
+      listActivities: async (filters) => {
+        captured = filters;
+        return { items: [], page: 1, pageSize: 50, total: 0, totalPages: 0 };
+      }
+    }
+  }))
+    .get('/api/activities')
+    .set('Authorization', 'Bearer valid-admin-token');
+
+  assert.equal(response.status, 200);
+  assert.equal(captured.owner, 'mine');
+  assert.equal(captured.ownerUserId, 1);
+});
+
 test('activity detail checks object-level read access for the authenticated user', async () => {
   let checked;
   const response = await request(buildApp({
@@ -2282,8 +2347,15 @@ test('oversized JSON requests return the stable payload-too-large error', async 
   assert.equal(response.body.error.code, 'PAYLOAD_TOO_LARGE');
 });
 
-test('the login endpoint applies its own IP rate limit', async () => {
-  const app = buildApp();
+test('successful logins do not consume the login IP rate limit', async () => {
+  const app = buildApp({
+    securityConfig: {
+      globalRateLimitWindowMs: 900000,
+      globalRateLimitMax: 100,
+      authRateLimitWindowMs: 900000,
+      authRateLimitMax: 2
+    }
+  });
   let response;
 
   for (let index = 0; index < 31; index += 1) {
@@ -2292,15 +2364,21 @@ test('the login endpoint applies its own IP rate limit', async () => {
       .send({ email: 'tester@example.com', password: 'password123' });
   }
 
-  assert.equal(response.status, 429);
-  assert.equal(response.body.error.code, 'AUTH_RATE_LIMITED');
+  assert.equal(response.status, 200);
 });
 
-test('the login IP rate limit also counts malformed JSON requests', async () => {
-  const app = buildApp();
+test('the login IP rate limit counts failed malformed JSON requests', async () => {
+  const app = buildApp({
+    securityConfig: {
+      globalRateLimitWindowMs: 900000,
+      globalRateLimitMax: 100,
+      authRateLimitWindowMs: 900000,
+      authRateLimitMax: 2
+    }
+  });
   let response;
 
-  for (let index = 0; index < 31; index += 1) {
+  for (let index = 0; index < 3; index += 1) {
     response = await request(app)
       .post('/api/auth/login')
       .set('Content-Type', 'application/json')

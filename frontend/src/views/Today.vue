@@ -69,6 +69,15 @@
         <MetricCard label="平均心率" :value="`${overview.monthlySummary?.avgHeartRateBpm || '--'} bpm`" />
       </div>
 
+      <StateBlock
+        v-if="healthError"
+        title="今日健康数据暂时不可用"
+        :message="healthError"
+        action-label="重试"
+        tone="danger"
+        @action="loadTodayHealth"
+      />
+
       <section class="dark-panel" v-if="healthData">
         <div class="section-heading">
           <div>
@@ -124,9 +133,8 @@ import MetricCard from '@/components/MetricCard.vue'
 import StateBlock from '@/components/StateBlock.vue'
 import { useAsyncData } from '@/composables/useAsyncData'
 import { getDailyBrief } from '@/services/ai'
-import { getDashboardOverview } from '@/services/dashboard'
+import { getDashboardOverview, getTodayHealth } from '@/services/dashboard'
 import { formatDistance } from '@/utils/formatters'
-import { getTodayHealth } from '@/services/dashboard'
 
 const router = useRouter()
 const defaultOverview = {
@@ -206,12 +214,24 @@ async function loadAiBrief() {
 }
 
 async function reloadToday() {
-  await Promise.all([load(), loadAiBrief()])
+  await Promise.all([load(), loadAiBrief(), loadTodayHealth()])
 }
 
 const { data: overviewData, error, load } = useAsyncData(getDashboardOverview, defaultOverview)
 const healthData = ref(null)
-getTodayHealth().then(d => { healthData.value = d })
+const healthError = ref('')
+
+async function loadTodayHealth() {
+  healthError.value = ''
+  try {
+    healthData.value = await getTodayHealth()
+  } catch (err) {
+    healthData.value = null
+    healthError.value = err instanceof Error ? err.message : '今日健康数据加载失败'
+  }
+}
+
+void loadTodayHealth()
 const aiBrief = ref(normalizeBrief(defaultBrief))
 const aiMeta = ref({ ai: { fallback: true, provider: 'loading' } })
 const aiLoading = ref(true)

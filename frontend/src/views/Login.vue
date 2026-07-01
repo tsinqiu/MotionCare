@@ -3,9 +3,9 @@
     <section class="auth-card">
       <div class="auth-topline">
         <RouterLink class="auth-brand" to="/login">
-          <span class="brand-mark">GS</span>
+          <span class="brand-mark">MC</span>
           <span>
-            <strong>GarSync Motion</strong>
+            <strong>MotionCare</strong>
           </span>
         </RouterLink>
         <button class="theme-toggle auth-theme-toggle" type="button" @click="toggleTheme">
@@ -16,7 +16,7 @@
 
       <div class="auth-heading">
         <p class="overline">安全访问</p>
-        <h1>登录数据库管理系统</h1>
+        <h1>登录 MotionCare</h1>
         <p>登录后可查看 Garmin 运动数据、管理手动活动并访问统计分析。</p>
       </div>
 

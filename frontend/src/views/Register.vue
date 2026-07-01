@@ -3,9 +3,9 @@
     <section class="auth-card">
       <div class="auth-topline">
         <RouterLink class="auth-brand" to="/login">
-          <span class="brand-mark">GS</span>
+          <span class="brand-mark">MC</span>
           <span>
-            <strong>GarSync Motion</strong>
+            <strong>MotionCare</strong>
           </span>
         </RouterLink>
         <button class="theme-toggle auth-theme-toggle" type="button" @click="toggleTheme">
@@ -17,7 +17,7 @@
       <div class="auth-heading">
         <p class="overline">创建账号</p>
         <h1>注册访问账号</h1>
-        <p>新账号注册后会自动登录，可立即进入 Garmin 运动数据分析数据库系统。</p>
+        <p>新账号注册后会自动登录，可立即查看个人运动、健康与训练建议。</p>
       </div>
 
       <form class="auth-form" @submit.prevent="submit">

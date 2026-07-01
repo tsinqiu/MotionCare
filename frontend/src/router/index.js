@@ -6,7 +6,6 @@ import ActivityDetail from '@/views/ActivityDetail.vue'
 import Assistant from '@/views/Assistant.vue'
 import Calendar from '@/views/Calendar.vue'
 import Community from '@/views/Community.vue'
-import DatabaseSchema from '@/views/DatabaseSchema.vue'
 import Explore from '@/views/Explore.vue'
 import HealthDetail from '@/views/HealthDetail.vue'
 import Login from '@/views/Login.vue'
@@ -151,9 +150,7 @@ const routes = [
   },
   {
     path: '/schema',
-    name: 'schema',
-    component: DatabaseSchema,
-    meta: { title: '数据库结构', requiresAuth: true },
+    redirect: '/today',
   },
 ]
 
@@ -205,7 +202,7 @@ router.beforeEach(async (to) => {
 })
 
 router.afterEach((to) => {
-  document.title = `${to.meta.title || '系统'} - Motion Analysis`
+  document.title = `${to.meta.title || '系统'} - MotionCare`
 })
 
 export default router

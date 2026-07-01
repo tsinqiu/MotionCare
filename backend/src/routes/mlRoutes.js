@@ -2,8 +2,10 @@ const fs = require('node:fs');
 const { spawn } = require('node:child_process');
 const express = require('express');
 const config = require('../config');
+const defaultAuthService = require('../services/authService');
 const { ApiError } = require('../errors');
 const { asyncHandler } = require('../http');
+const { authenticate } = require('../middleware/authMiddleware');
 const { sendData } = require('../response');
 
 const MODEL_VERSION = 'running-v1';
@@ -179,8 +181,9 @@ const defaultMlService = {
   runPrediction
 };
 
-function createMlRouter(mlService = defaultMlService) {
+function createMlRouter(mlService = defaultMlService, authService = defaultAuthService) {
   const router = express.Router();
+  const requireAuth = authenticate(authService);
 
   router.get(
     '/ml/health',
@@ -192,6 +195,7 @@ function createMlRouter(mlService = defaultMlService) {
 
   router.post(
     '/ml/running-prediction',
+    requireAuth,
     asyncHandler(async (req, res) => {
       const features = parseRunningFeatures(req.body, mlService.FEATURE_NAMES);
       const prediction = await mlService.runPrediction(features);

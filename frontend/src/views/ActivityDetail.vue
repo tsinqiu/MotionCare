@@ -104,6 +104,7 @@
           </select>
           <span v-if="activity.shoeName" class="shoe-bind-info">当前：{{ activity.shoeName }}</span>
         </div>
+        <p v-if="shoeError" class="form-error">{{ shoeError }}</p>
       </section>
 
       <div class="detail-grid">
@@ -207,6 +208,7 @@ const heartRateSeries = ref([])
 const speedSeries = ref([])
 const laps = ref([])
 const shoes = ref([])
+const shoeError = ref('')
 const selectedShoeId = ref(null)
 const editForm = ref({ activityName: '', effort: null })
 const isSavingMeta = ref(false)
@@ -218,7 +220,11 @@ const sportColor = computed(() => {
   if (activity.value?.activity_type === '力量训练') return '#8b5cf6'
   return '#21d47b'
 })
-const canManageManual = computed(() => authSession.user?.role === 'admin' && activity.value?.is_manual)
+const canManageManual = computed(() => {
+  if (!authSession.user || !activity.value?.is_manual) return false
+  return authSession.user.role === 'admin'
+    || Number(authSession.user.id) === Number(activity.value.ownerUserId)
+})
 const isRunningActivity = computed(() => {
   const rawType = activity.value?.raw_activity_type
   return ['running', 'street_running', 'track_running', 'treadmill_running'].includes(rawType)
@@ -445,7 +451,14 @@ async function loadActivity(id) {
     editForm.value.effort = nextActivity.perceived_effort || null
 
     selectedShoeId.value = nextActivity.shoeId || null
-    try { const { data } = await apiClient.get('/shoes'); shoes.value = data || [] } catch (_) {}
+    shoeError.value = ''
+    try {
+      const { data } = await apiClient.get('/shoes')
+      shoes.value = data?.data || data || []
+    } catch (err) {
+      shoes.value = []
+      shoeError.value = err instanceof Error ? err.message : '跑鞋列表暂时无法加载'
+    }
 
     const [points, heartRate, speed, lapRows] = await Promise.all([
       getTrackPoints(id),
@@ -520,7 +533,7 @@ async function uploadPhoto(e) {
 
 async function removeActivity() {
   if (!canManageManual.value) {
-    error.value = '只有管理员可以删除手动运动记录'
+    error.value = '无法删除不属于你的手动运动记录'
     return
   }
   if (!window.confirm('确定删除这条手动运动记录吗？')) return

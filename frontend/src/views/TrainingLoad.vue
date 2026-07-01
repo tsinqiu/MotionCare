@@ -18,102 +18,14 @@
       <MetricCard v-for="item in healthExtras" :key="item.label" :label="item.label" :value="item.value" />
     </div>
 
-    <section v-if="importSummary || importError" class="dark-panel">
-      <div class="section-heading">
-        <div>
-          <p class="overline">Garmin 导入数据</p>
-          <h2>数据库原始字段</h2>
-        </div>
-      </div>
-      <StateBlock v-if="importError" title="导入数据加载失败" :message="importError" action-label="重试" tone="danger" @action="loadGarminImportSummary" />
-      <template v-else>
-        <div class="training-targets">
-          <span><small>功率 avg/max/normalized</small><b>{{ formatCount(activityImport.powerRows) }} 条</b></span>
-          <span><small>有氧训练效果</small><b>{{ formatCount(activityImport.aerobicTrainingEffectRows) }} 条</b></span>
-          <span><small>无氧训练效果</small><b>{{ formatCount(activityImport.anaerobicTrainingEffectRows) }} 条</b></span>
-          <span><small>训练效果 message</small><b>{{ formatCount(activityImport.trainingEffectMessageRows) }} 条</b></span>
-          <span><small>单次训练负荷</small><b>{{ formatCount(activityImport.trainingLoadRows) }} 条</b></span>
-        </div>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>日期</th>
-                <th>活动</th>
-                <th>平均/最大/标准化功率</th>
-                <th>有氧/无氧效果</th>
-                <th>效果标签</th>
-                <th>训练负荷</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="row in recentActivityRows" :key="`${row.date}-${row.activityName}`">
-                <td>{{ row.date }}</td>
-                <td>{{ row.activityName || '--' }}</td>
-                <td>{{ formatPower(row) }}</td>
-                <td>{{ formatValue(row.aerobicTrainingEffect) }} / {{ formatValue(row.anaerobicTrainingEffect) }}</td>
-                <td>{{ row.trainingEffectLabel || '--' }}</td>
-                <td>{{ formatValue(row.activityTrainingLoad) }}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </template>
-    </section>
-
-    <section v-if="importSummary" class="dark-panel">
-      <div class="section-heading">
-        <div>
-          <p class="overline">TrainingStatusSnapshots</p>
-          <h2>{{ trainingImport.startDate || '--' }} 到 {{ trainingImport.endDate || '--' }}，共 {{ formatCount(trainingImport.totalDays) }} 天</h2>
-        </div>
-      </div>
-      <div class="training-targets">
-        <span><small>短期负荷</small><b>{{ formatCount(trainingImport.acuteLoadRows) }}</b></span>
-        <span><small>长期负荷</small><b>{{ formatCount(trainingImport.chronicLoadRows) }}</b></span>
-        <span><small>最佳负荷范围</small><b>{{ formatCount(trainingImport.optimalRangeRows) }}</b></span>
-        <span><small>低/高有氧/无氧分类负荷</small><b>{{ formatCount(trainingImport.categoryLoadRows) }}</b></span>
-      </div>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>日期</th>
-              <th>状态</th>
-              <th>短期负荷</th>
-              <th>长期负荷</th>
-              <th>最佳范围</th>
-              <th>低有氧/高有氧/无氧</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="row in trainingStatusRows" :key="row.snapshotDate">
-              <td>{{ row.snapshotDate }}</td>
-              <td>{{ row.trainingStatus || '--' }}</td>
-              <td>{{ formatValue(row.acuteTrainingLoad) }}</td>
-              <td>{{ formatValue(row.chronicTrainingLoad) }}</td>
-              <td>{{ formatValue(row.optimalLoadMin) }} - {{ formatValue(row.optimalLoadMax) }}</td>
-              <td>{{ formatValue(row.lowAerobicLoad) }} / {{ formatValue(row.highAerobicLoad) }} / {{ formatValue(row.anaerobicLoad) }}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
-
-    <section v-if="lactateLatest" class="dark-panel">
-      <div class="section-heading">
-        <div>
-          <p class="overline">LactateThresholds</p>
-          <h2>乳酸阈值 {{ lactateLatest.thresholdDate || '' }}</h2>
-        </div>
-      </div>
-      <div class="training-targets">
-        <span><small>乳酸阈值心率</small><b>{{ formatValue(lactateLatest.heartRateBpm, 0) }} bpm</b></span>
-        <span><small>骑行阈值心率</small><b>{{ formatValue(lactateLatest.cyclingHeartRateBpm, 0) }} bpm</b></span>
-        <span><small>阈值功率</small><b>{{ formatValue(lactateLatest.powerW, 0) }} W</b></span>
-        <span><small>功体比</small><b>{{ formatValue(lactateLatest.powerToWeight, 2) }}</b></span>
-      </div>
-    </section>
+    <StateBlock
+      v-if="healthError"
+      title="部分健康指标暂时不可用"
+      :message="healthError"
+      action-label="重试"
+      tone="danger"
+      @action="loadHealthExtras"
+    />
 
     <StateBlock v-if="loading" title="正在加载训练负荷" message="正在读取体能、疲劳和状态曲线。" />
     <StateBlock v-else-if="error" title="训练负荷加载失败" :message="error" action-label="重试" tone="danger" @action="load" />
@@ -158,7 +70,7 @@ import {
   getLatestLactateThreshold,
   getLatestTrainingStatus,
 } from '@/services/health'
-import { getGarminImportSummary, getLoadBalance } from '@/services/training'
+import { getLoadBalance } from '@/services/training'
 
 const ranges = [
   { label: '42天', value: '42d' },
@@ -176,8 +88,7 @@ const trainingStatus = ref(null)
 const racePredictions = ref(null)
 const lactateThreshold = ref(null)
 const cyclingFtp = ref(null)
-const importSummary = ref(null)
-const importError = ref('')
+const healthError = ref('')
 
 const current = computed(() => loadRows.value.at(-1) || { ctl: '--', atl: '--', tsb: '--', dailyTrainingLoad: 0 })
 const currentLoad = computed(() => Math.round(current.value.dailyTrainingLoad || current.value.ctl || 0))
@@ -208,12 +119,6 @@ const healthExtras = computed(() => {
   if (racePredictions.value?.time10kS != null) items.push({ label: '10K 预测', value: formatRaceTime(racePredictions.value.time10kS) })
   return items
 })
-const activityImport = computed(() => importSummary.value?.activitySummary || {})
-const trainingImport = computed(() => importSummary.value?.trainingStatus || {})
-const lactateLatest = computed(() => importSummary.value?.lactateThreshold?.latest || null)
-const recentActivityRows = computed(() => activityImport.value.rows || [])
-const trainingStatusRows = computed(() => trainingImport.value.rows || [])
-
 const loadOption = computed(() => ({
   color: ['#33b5ff', '#8b5cf6', '#ef4444'],
   tooltip: { trigger: 'axis' },
@@ -258,46 +163,30 @@ function formatRaceTime(seconds) {
   return h ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}` : `${m}:${String(s).padStart(2, '0')}`
 }
 
-function formatCount(value) {
-  return Number(value || 0)
-}
-
-function formatValue(value, digits = 1) {
-  if (value === null || value === undefined || value === '') return '--'
-  const number = Number(value)
-  if (!Number.isFinite(number)) return value
-  return number.toFixed(digits).replace(/\.0+$/, '').replace(/(\.\d*[1-9])0+$/, '$1')
-}
-
-function formatPower(row) {
-  return `${formatValue(row.avgPowerW, 0)} / ${formatValue(row.maxPowerW, 0)} / ${formatValue(row.normalizedPowerW, 0)} W`
-}
-
 async function loadHealthExtras() {
-  const [training, race, threshold, ftp] = await Promise.all([
+  healthError.value = ''
+  const results = await Promise.allSettled([
     getLatestTrainingStatus(),
     getLatestRacePredictions(),
     getLatestLactateThreshold(),
     getLatestCyclingFtp(),
   ])
-  trainingStatus.value = training
-  racePredictions.value = race
-  lactateThreshold.value = threshold
-  cyclingFtp.value = ftp
-}
 
-async function loadGarminImportSummary() {
-  importError.value = ''
-  try {
-    importSummary.value = await getGarminImportSummary()
-  } catch (err) {
-    importError.value = err instanceof Error ? err.message : '导入数据加载失败'
+  const targets = [trainingStatus, racePredictions, lactateThreshold, cyclingFtp]
+  results.forEach((result, index) => {
+    targets[index].value = result.status === 'fulfilled' ? result.value : null
+  })
+
+  const failed = results.filter((result) => result.status === 'rejected')
+  if (failed.length) {
+    healthError.value = failed.length === results.length
+      ? '健康指标加载失败，请稍后重试。'
+      : '部分健康指标加载失败，其余训练数据仍可正常查看。'
   }
 }
 
 watch(() => ({ ...filters }), () => {
-  load()
-  loadHealthExtras()
-  loadGarminImportSummary()
+  void load()
+  void loadHealthExtras()
 }, { immediate: true })
 </script>

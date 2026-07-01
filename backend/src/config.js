@@ -11,6 +11,13 @@ function parseInteger(value, fallback) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function getRateLimitDefaults(nodeEnv) {
+  if (nodeEnv === 'production') {
+    return { globalMax: 1200, authMax: 60 };
+  }
+  return { globalMax: 3000, authMax: 120 };
+}
+
 function parseProviderOrder(value) {
   const supported = new Set(['deepseek', 'ollama']);
   const providers = String(value || 'deepseek,ollama')
@@ -58,6 +65,7 @@ function resolveProjectPath(value, fallback) {
 }
 
 const serverPort = parseInteger(process.env.PORT, 8089);
+const rateLimitDefaults = getRateLimitDefaults(process.env.NODE_ENV);
 
 const config = {
   server: {
@@ -92,9 +100,9 @@ const config = {
     trustProxy: process.env.TRUST_PROXY === 'true',
     jsonLimit: process.env.JSON_BODY_LIMIT || '1mb',
     globalRateLimitWindowMs: parseInteger(process.env.GLOBAL_RATE_LIMIT_WINDOW_MS, 15 * 60 * 1000),
-    globalRateLimitMax: parseInteger(process.env.GLOBAL_RATE_LIMIT_MAX, 600),
+    globalRateLimitMax: parseInteger(process.env.GLOBAL_RATE_LIMIT_MAX, rateLimitDefaults.globalMax),
     authRateLimitWindowMs: parseInteger(process.env.AUTH_RATE_LIMIT_WINDOW_MS, 15 * 60 * 1000),
-    authRateLimitMax: parseInteger(process.env.AUTH_RATE_LIMIT_MAX, 30),
+    authRateLimitMax: parseInteger(process.env.AUTH_RATE_LIMIT_MAX, rateLimitDefaults.authMax),
     loginFailureWindowMs: parseInteger(process.env.LOGIN_FAILURE_WINDOW_MS, 10 * 60 * 1000),
     loginFailureMax: parseInteger(process.env.LOGIN_FAILURE_MAX, 5),
     loginBlockMinutes: parseInteger(process.env.LOGIN_BLOCK_MINUTES, 10)
@@ -165,3 +173,4 @@ const config = {
 };
 
 module.exports = config;
+module.exports.getRateLimitDefaults = getRateLimitDefaults;

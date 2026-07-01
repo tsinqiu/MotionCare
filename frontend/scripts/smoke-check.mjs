@@ -19,7 +19,6 @@ const paths = [
   '/explore',
   '/settings',
   '/start',
-  '/schema',
 ]
 
 function checkPath(path) {

@@ -82,7 +82,7 @@ import {
 
 import ChartPanel from '@/components/ChartPanel.vue'
 import StateBlock from '@/components/StateBlock.vue'
-import { sportFilters } from '@/mock/garsync'
+import { sportFilters } from '@/constants/sports'
 import { getMetricTrend } from '@/services/stats'
 import { formatDistance, formatPaceSeconds } from '@/utils/formatters'
 

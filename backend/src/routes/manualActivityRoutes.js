@@ -151,12 +151,6 @@ function parseManualActivity(body) {
   return payload;
 }
 
-function requireAdmin(user) {
-  if (user?.role !== 'admin') {
-    throw new ApiError(403, 'only administrators can manage manual activities', 'FORBIDDEN');
-  }
-}
-
 function canManage(user, activity) {
   return user.role === 'admin' || activity.ownerUserId === user.id;
 }
@@ -224,10 +218,10 @@ async function getManualActivity(activityId, user) {
 
   const activity = rows[0];
   if (!activity) {
-    throw new ApiError(404, 'manual activity not found', 'MANUAL_ACTIVITY_NOT_FOUND');
+    throw new ApiError(404, 'activity not found', 'ACTIVITY_NOT_FOUND');
   }
   if (!canManage(user, activity)) {
-    throw new ApiError(403, 'you cannot access this manual activity', 'FORBIDDEN');
+    throw new ApiError(404, 'activity not found', 'ACTIVITY_NOT_FOUND');
   }
 
   return activity;
@@ -329,7 +323,6 @@ function createManualActivityRouter({
     '/manual-activities',
     requireAuth,
     asyncHandler(async (req, res) => {
-      requireAdmin(req.user);
       const activity = await manualActivityService.createManualActivity(parseManualActivity(req.body), req.user);
       statsCache.clear();
       sendCreated(res, activity);
@@ -349,7 +342,6 @@ function createManualActivityRouter({
     '/manual-activities/:id',
     requireAuth,
     asyncHandler(async (req, res) => {
-      requireAdmin(req.user);
       const activity = await manualActivityService.updateManualActivity(
         parsePositiveId(req.params.id),
         parseManualActivity(req.body),
@@ -364,7 +356,6 @@ function createManualActivityRouter({
     '/manual-activities/:id',
     requireAuth,
     asyncHandler(async (req, res) => {
-      requireAdmin(req.user);
       const result = await manualActivityService.deleteManualActivity(parsePositiveId(req.params.id), req.user);
       statsCache.clear();
       sendData(res, result);

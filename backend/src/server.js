@@ -1,21 +1,13 @@
 const createApp = require('./app');
 const config = require('./config');
 const db = require('./db');
+const { startServer } = require('./serverStartup');
 
 const app = createApp();
-const server = app.listen(config.server.port, config.server.host, () => {
-  console.log(`Motion Analysis API listening on http://${config.server.host}:${config.server.port}`);
-});
-
-server.on('error', (error) => {
-  if (error.code === 'EADDRINUSE') {
-    console.error(`Failed to start Motion Analysis API: ${config.server.host}:${config.server.port} is already in use`);
-  } else if (error.code === 'EACCES') {
-    console.error(`Failed to start Motion Analysis API: permission denied for ${config.server.host}:${config.server.port}`);
-  } else {
-    console.error(`Failed to start Motion Analysis API: ${error.message}`);
-  }
-  process.exit(1);
+const server = startServer({
+  app,
+  host: config.server.host,
+  port: config.server.port
 });
 
 const SHUTDOWN_TIMEOUT_MS = 30000;

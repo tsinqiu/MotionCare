@@ -3,7 +3,7 @@
 ## 安全边界
 
 本次加固覆盖 Express API、个人健康数据、运动活动数据、登录防暴力破解和认证审计。
-它不修改前端 UI、业务算法、JWT 的 localStorage 存储方式、密码哈希格式或登录产品流程。
+它不修改业务算法、JWT 的 localStorage 存储方式、密码哈希格式或登录产品流程。
 
 主要威胁包括：匿名读取个人健康数据、通过 activity ID 读取他人轨迹和心率、普通用户请求全局统计、登录撞库、高频 API 请求、过大 JSON 请求体，以及默认响应头暴露服务端实现。
 
@@ -11,10 +11,12 @@
 
 - `/api/health` 保持公开，只报告数据库为 `connected` 或 `unavailable`，不返回连接异常详情。
 - `/api/health/*` 的个人数据接口、活动列表与详情、活动轨迹/心率/速度/圈段/区域、统计、训练和仪表盘数据均要求 Bearer token。
-- 普通用户的活动 owner 始终归一化为 `mine`；管理员可使用 `all`、`mine` 或 `admin`。
+- 所有用户（包括管理员）的个人页面默认使用 `mine`；管理员仅在明确管理场景中可显式使用 `all` 或 `admin`。
 - 活动不存在或不属于当前普通用户时统一返回 `404 ACTIVITY_NOT_FOUND`，避免泄露资源是否存在。
+- 登录用户可以管理自己的手工活动，管理员可以管理全部手工活动；不存在和越权均返回统一 404。
+- `/api/ml/running-prediction` 要求 Bearer token，`/api/ml/health` 保持公开。
 - Helmet 启用常规安全响应头，CSP 暂时关闭，`Cross-Origin-Resource-Policy` 为 `cross-origin`，以兼容现有地图、图表和 `/uploads` 图片。
-- `/api` 使用全局 IP 限流；`/api/auth/login` 另有更严格的 IP 限流。
+- `/api` 使用全局 IP 限流；`/api/auth/login` 另有更严格的 IP 限流，成功登录不计入登录限流额度。
 - JSON 请求体默认最多 1 MB，超限返回 `413 PAYLOAD_TOO_LARGE`。
 
 ## 上传文件防护
@@ -42,9 +44,9 @@
 | `TRUST_PROXY` | `false` | 仅在应用确实位于可信反向代理之后时设为 `true`；启用后只信任一层代理。 |
 | `JSON_BODY_LIMIT` | `1mb` | JSON 请求体上限。 |
 | `GLOBAL_RATE_LIMIT_WINDOW_MS` | `900000` | 全局 API 限流窗口。 |
-| `GLOBAL_RATE_LIMIT_MAX` | `600` | 每个 IP 在全局窗口内的最大请求数。 |
+| `GLOBAL_RATE_LIMIT_MAX` | 开发 `3000`；生产 `1200` | 每个 IP 在全局窗口内的最大请求数。 |
 | `AUTH_RATE_LIMIT_WINDOW_MS` | `900000` | 登录 IP 限流窗口。 |
-| `AUTH_RATE_LIMIT_MAX` | `30` | 每个 IP 在认证窗口内的最大登录请求数。 |
+| `AUTH_RATE_LIMIT_MAX` | 开发 `120`；生产 `60` | 每个 IP 在认证窗口内的最大失败登录请求数；成功响应跳过计数。 |
 | `LOGIN_FAILURE_WINDOW_MS` | `600000` | email + IP 凭据失败统计窗口。 |
 | `LOGIN_FAILURE_MAX` | `5` | 写入临时封禁标记前允许的失败次数。 |
 | `LOGIN_BLOCK_MINUTES` | `10` | 持久化封禁标记有效时间。 |
@@ -74,20 +76,22 @@ npm audit --omit=dev
 
 先评估修复是否包含破坏性主版本升级，不要无审查运行 `npm audit fix --force`。
 
-## 部署顺序
+## 数据库结构检查与部署顺序
 
 1. 备份数据库。
-2. 从 `backend` 目录执行：
+2. 如果使用 `database/scripts/import_shared_seed.ps1` 重建数据库，脚本会自动重放 17 号迁移，无需手工执行。
+3. 只有绕过该脚本手工重建或手工导入数据库时，才从 `backend` 目录执行：
 
    ```powershell
    node scripts/applyMigration.js ..\database\sql\17_security_hardening.sql
    ```
 
-3. 使用非 root 数据库账号并配置 `JWT_SECRET` 等生产安全变量；仅在可信单层 Nginx 后启用 `TRUST_PROXY=true`。
-4. 发布并启动后端，检查 `/api/health`、安全响应头和认证限流。
-5. 查询 `LoginAttempts` 与 `SecurityEvents`，确认成功、失败和封禁事件正常落库。
+4. 执行 `npm run db:verify`，确认连接、核心字段、安全审计表、索引和外键完整。
+5. 使用非 root 数据库账号并配置 `JWT_SECRET` 等生产安全变量；仅在可信单层 Nginx 后启用 `TRUST_PROXY=true`。
+6. 通过 `npm start` 启动后端。该命令会先运行只读 `db:verify`，失败时不会启动 HTTP 服务。
+7. 检查 `/api/health`、安全响应头和认证限流，并确认登录审计事件正常落库。
 
-`import_shared_seed.ps1` 每次重建数据库后都会自动执行 17 号迁移；其他导入或手工重建方式仍必须在启动后端前手动执行该迁移，否则安全表缺失会使登录失败。
+`npm test` 不调用 `db:verify`，测试继续使用依赖注入和 mock；本机 MySQL 未启动时也不应因此失败。
 
 ## 状态码与兼容性
 
@@ -100,6 +104,4 @@ npm audit --omit=dev
 | 全局 API 限流 | `429 RATE_LIMITED` |
 | JSON 请求体超限 | `413 PAYLOAD_TOO_LARGE` |
 
-成功响应结构保持不变。现有 `frontend/src/services/dashboard.js` 和 `frontend/src/views/HealthDetail.vue` 使用裸 `fetch('/api/dashboard/health...')`，不会附加 Bearer token；本安全分支不修改前端，后续必须改用现有 `apiClient`，否则这些请求会收到 401。
-
-PR 描述必须保留上述兼容性说明，避免后续前端联调把 401 误判为健康接口故障。
+成功响应结构保持不变。健康仪表盘请求统一通过现有 `apiClient` 携带 Bearer token，不再使用裸 `fetch`。

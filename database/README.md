@@ -63,12 +63,21 @@ database/sql/16_drop_redundant_columns.sql 清理冗余列
 database/sql/17_security_hardening.sql  登录尝试与安全审计表
 ```
 
-`import_shared_seed.ps1` 会在共享 seed 导入完成后自动执行
-`database/sql/17_security_hardening.sql`，确保登录审计表不会因数据库重建而缺失。
+`import_shared_seed.ps1` 会在共享 seed 导入完成后自动重放
+`database/sql/17_security_hardening.sql`，使用该脚本时无需再手工执行 17 号迁移。
 
-对于没有重新导入共享 seed 的现有数据库，在启动新版后端前手动执行：
+只有绕过该脚本手工重建或手工导入数据库时，才必须在启动后端前执行：
 
 ```powershell
 cd backend
 node scripts/applyMigration.js ..\database\sql\17_security_hardening.sql
 ```
+
+启动前可单独执行只读结构检查：
+
+```powershell
+cd backend
+npm run db:verify
+```
+
+`npm start` 会先执行该检查；`npm test` 使用依赖注入和 mock，不连接本机 MySQL。

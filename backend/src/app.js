@@ -36,7 +36,8 @@ function createApp({
   exploreService,
   settingsService,
   shoeService,
-  securityService
+  securityService,
+  securityConfig = config.security
 } = {}) {
   if (!shoeService) shoeService = defaultShoeService;
   const app = express();
@@ -64,8 +65,8 @@ function createApp({
     })
   );
   app.use('/api', rateLimit({
-    windowMs: config.security.globalRateLimitWindowMs,
-    limit: config.security.globalRateLimitMax,
+    windowMs: securityConfig.globalRateLimitWindowMs,
+    limit: securityConfig.globalRateLimitMax,
     standardHeaders: 'draft-8',
     legacyHeaders: false,
     handler(req, res) {
@@ -75,10 +76,11 @@ function createApp({
     }
   }));
   app.use('/api/auth/login', rateLimit({
-    windowMs: config.security.authRateLimitWindowMs,
-    limit: config.security.authRateLimitMax,
+    windowMs: securityConfig.authRateLimitWindowMs,
+    limit: securityConfig.authRateLimitMax,
     standardHeaders: 'draft-8',
     legacyHeaders: false,
+    skipSuccessfulRequests: true,
     handler(req, res) {
       res.status(429).json({
         error: { code: 'AUTH_RATE_LIMITED', message: 'too many authentication requests' }
@@ -97,7 +99,7 @@ function createApp({
   app.use('/api', createDashboardRouter(activityService, authService));
   app.use('/api', createManualActivityRouter({ manualActivityService, authService }));
   app.use('/api', createWorkoutRouter({ workoutService, authService }));
-  app.use('/api', createMlRouter(mlService));
+  app.use('/api', createMlRouter(mlService, authService));
   app.use('/api', createAiRouter({ aiService, authService }));
   app.use('/api', createSyncRouter({ syncService, authService }));
   app.use('/api', createCommunityRouter({ communityService, authService }));

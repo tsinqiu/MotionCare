@@ -96,7 +96,7 @@ import ChartPanel from '@/components/ChartPanel.vue'
 import MetricCard from '@/components/MetricCard.vue'
 import SportTabs from '@/components/SportTabs.vue'
 import StateBlock from '@/components/StateBlock.vue'
-import { sportFilters } from '@/mock/garsync'
+import { sportFilters } from '@/constants/sports'
 import { getActivityTypeStats, getPersonalBests, getSummaryStats, getTimelineStats } from '@/services/stats'
 import { formatCalories, formatClockDuration, formatDistance, formatFatKg, formatPaceSeconds } from '@/utils/formatters'
 

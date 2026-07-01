@@ -9,7 +9,8 @@
   },
   "scripts": {
     "dev": "nodemon src/server.js",
-    "start": "node src/server.js",
+    "start": "npm run db:verify && node src/server.js",
+    "db:verify": "node scripts/verifyDatabase.js",
     "seed:admin": "node scripts/seedAdmin.js",
     "test": "node --test"
   },

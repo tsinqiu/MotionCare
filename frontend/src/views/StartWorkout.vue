@@ -53,7 +53,7 @@
 <script setup>
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 
-import { startSportTypes } from '@/mock/garsync'
+import { startSportTypes } from '@/constants/sports'
 import {
   appendWorkoutTrackPoints,
   cancelWorkout,

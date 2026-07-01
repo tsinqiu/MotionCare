@@ -8,7 +8,7 @@
         <span class="status-chip good">动态</span>
       </div>
       <form class="community-form" @submit.prevent="publish">
-        <textarea v-model.trim="draft.content" maxlength="2000" placeholder="分享一次训练、恢复感受或数据库记录观察" />
+        <textarea v-model.trim="draft.content" maxlength="2000" placeholder="分享一次训练、恢复感受或运动心得" />
         <div class="community-options">
           <label>
             <span>可见范围</span>

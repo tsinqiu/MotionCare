@@ -7,6 +7,18 @@ const db = require('../src/db');
 const config = require('../src/config');
 const securityService = require('../src/services/securityService');
 
+test('rate-limit defaults are relaxed by environment', () => {
+  assert.equal(typeof config.getRateLimitDefaults, 'function');
+  assert.deepEqual(config.getRateLimitDefaults('development'), {
+    globalMax: 3000,
+    authMax: 120
+  });
+  assert.deepEqual(config.getRateLimitDefaults('production'), {
+    globalMax: 1200,
+    authMax: 60
+  });
+});
+
 function requestStub({ ip = '::ffff:127.0.0.1', userAgent = 'test-agent' } = {}) {
   return {
     ip,
