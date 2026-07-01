@@ -31,19 +31,33 @@ const TREND_METRICS = [
   'body_battery_delta'
 ];
 
-function parseActivityFilters(query, user, { sourceFilters = SOURCE_FILTERS, withDates = true } = {}) {
-  const owner = parseEnum(query.owner, OWNER_FILTERS, 'owner', 'all');
-  if (owner === 'mine' && !user) {
-    throw new ApiError(401, 'login is required to filter your activities', 'AUTH_REQUIRED');
+function parseOwnerFilter(value, user) {
+  if (!user) {
+    throw new ApiError(401, 'login is required to access activity data', 'AUTH_REQUIRED');
   }
+
+  const requestedOwner = parseEnum(
+    value,
+    OWNER_FILTERS,
+    'owner',
+    user.role === 'admin' ? 'all' : 'mine'
+  );
+
+  return {
+    owner: user.role === 'admin' ? requestedOwner : 'mine',
+    ownerUserId: user.id
+  };
+}
+
+function parseActivityFilters(query, user, { sourceFilters = SOURCE_FILTERS, withDates = true } = {}) {
+  const ownerFilter = parseOwnerFilter(query.owner, user);
 
   return {
     activityType: parseActivityType(query.activity_type),
     ...(withDates ? parseDateRange(query, { maxDays: 1095 }) : {}),
     keyword: parseKeyword(query.keyword),
     source: parseEnum(query.source, sourceFilters, 'source', undefined),
-    owner,
-    ownerUserId: user?.id
+    ...ownerFilter
   };
 }
 
@@ -110,6 +124,7 @@ async function sendCachedStats(req, res, loader) {
 
 module.exports = {
   TIMELINE_GROUPS,
+  parseOwnerFilter,
   parseActivityFilters,
   parseSummaryFilters,
   parseTrendFilters,

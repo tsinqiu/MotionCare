@@ -3,7 +3,7 @@ const defaultActivityService = require('../services/activityService');
 const defaultAuthService = require('../services/authService');
 const { ApiError } = require('../errors');
 const { asyncHandler } = require('../http');
-const { optionalAuthenticate } = require('../middleware/authMiddleware');
+const { authenticate } = require('../middleware/authMiddleware');
 const {
   TIMELINE_GROUPS,
   parseActivityFilters,
@@ -16,21 +16,21 @@ const {
 
 function createStatsRouter(activityService = defaultActivityService, authService = defaultAuthService) {
   const router = express.Router();
-  const maybeAuth = optionalAuthenticate(authService);
+  const requireAuth = authenticate(authService);
 
-  router.get('/stats/activity-types', maybeAuth, asyncHandler((req, res) =>
+  router.get('/stats/activity-types', requireAuth, asyncHandler((req, res) =>
     sendCachedStats(req, res, () => activityService.getActivityTypeStats(parseActivityFilters(req.query, req.user)))
   ));
 
-  router.get('/stats/summary', maybeAuth, asyncHandler((req, res) =>
+  router.get('/stats/summary', requireAuth, asyncHandler((req, res) =>
     sendCachedStats(req, res, () => activityService.getSummaryStats(parseSummaryFilters(req.query, req.user)))
   ));
 
-  router.get('/stats/metric-trend', maybeAuth, asyncHandler((req, res) =>
+  router.get('/stats/metric-trend', requireAuth, asyncHandler((req, res) =>
     sendCachedStats(req, res, () => activityService.getMetricTrend(parseTrendFilters(req.query, req.user)))
   ));
 
-  router.get('/stats/calendar', maybeAuth, asyncHandler((req, res) => {
+  router.get('/stats/calendar', requireAuth, asyncHandler((req, res) => {
     const month = parseYearMonth(req.query.month, 'month');
     if (!month) {
       throw new ApiError(400, 'month is required', 'INVALID_QUERY');
@@ -44,7 +44,7 @@ function createStatsRouter(activityService = defaultActivityService, authService
     );
   }));
 
-  router.get('/stats/timeline', maybeAuth, asyncHandler((req, res) =>
+  router.get('/stats/timeline', requireAuth, asyncHandler((req, res) =>
     sendCachedStats(req, res, () =>
       activityService.getTimelineStats({
         ...parseSummaryFilters(req.query, req.user),
@@ -53,11 +53,11 @@ function createStatsRouter(activityService = defaultActivityService, authService
     )
   ));
 
-  router.get('/stats/heart-rate-zones', maybeAuth, asyncHandler((req, res) =>
+  router.get('/stats/heart-rate-zones', requireAuth, asyncHandler((req, res) =>
     sendCachedStats(req, res, () => activityService.getHeartRateZones(parseActivityFilters(req.query, req.user)))
   ));
 
-  router.get('/stats/personal-bests', maybeAuth, asyncHandler((req, res) =>
+  router.get('/stats/personal-bests', requireAuth, asyncHandler((req, res) =>
     sendCachedStats(req, res, () => activityService.getPersonalBests(parseActivityFilters(req.query, req.user)))
   ));
 

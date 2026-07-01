@@ -10,6 +10,7 @@ const { ApiError } = require('../errors');
 const { asyncHandler, parseEnum, parseKeyword, parsePage, parsePageSize, parsePositiveId } = require('../http');
 const { authenticate, optionalAuthenticate } = require('../middleware/authMiddleware');
 const { sendCreated, sendData } = require('../response');
+const { removeUploadedFiles, validateUploadedFile } = require('../services/uploadSecurity');
 
 const ARTICLE_TYPES = ['course', 'article', 'training_advice'];
 
@@ -47,12 +48,6 @@ const uploadMedia = multer({
     callback(null, true);
   }
 });
-
-function removeUploadedFile(file) {
-  if (file?.path) {
-    fs.unlink(file.path, () => {});
-  }
-}
 
 function parsePaging(query, fallback = 20, max = 100) {
   const page = parsePage(query.page);
@@ -281,47 +276,54 @@ function createExploreRouter(exploreService = defaultExploreService, authService
       { name: 'image', maxCount: 1 }
     ]),
     asyncHandler(async (req, res) => {
-      const type = parseEnum(req.body.type, ARTICLE_TYPES, 'type', 'article');
       const videoFile = req.files?.video?.[0] || null;
       const imageFile = req.files?.image?.[0] || null;
+      try {
+        const type = parseEnum(req.body.type, ARTICLE_TYPES, 'type', 'article');
+        if (videoFile) {
+          await validateUploadedFile(videoFile, { kind: 'video' });
+        }
+        if (imageFile) {
+          await validateUploadedFile(imageFile, { kind: 'image' });
+        }
+        if (type === 'course' && imageFile) {
+          throw new ApiError(400, 'course only accepts video upload', 'INVALID_UPLOAD');
+        }
+        if (type !== 'course' && videoFile) {
+          throw new ApiError(400, 'article and training advice only accept image upload', 'INVALID_UPLOAD');
+        }
+        if (imageFile && imageFile.size > config.uploads.maxImageBytes) {
+          throw new ApiError(400, 'image file is too large', 'INVALID_UPLOAD');
+        }
 
-      if (type === 'course' && imageFile) {
-        removeUploadedFile(imageFile);
-        throw new ApiError(400, 'course only accepts video upload', 'INVALID_UPLOAD');
-      }
-      if (type !== 'course' && videoFile) {
-        removeUploadedFile(videoFile);
-        throw new ApiError(400, 'article and training advice only accept image upload', 'INVALID_UPLOAD');
-      }
-      if (imageFile && imageFile.size > config.uploads.maxImageBytes) {
-        removeUploadedFile(imageFile);
-        throw new ApiError(400, 'image file is too large', 'INVALID_UPLOAD');
-      }
+        const videoPath = videoFile
+          ? `/uploads/explore-videos/${videoFile.filename}`
+          : '';
+        const imagePath = imageFile
+          ? `/uploads/explore-images/${imageFile.filename}`
+          : '';
 
-      const videoPath = videoFile
-        ? `/uploads/explore-videos/${videoFile.filename}`
-        : '';
-      const imagePath = imageFile
-        ? `/uploads/explore-images/${imageFile.filename}`
-        : '';
-
-      sendCreated(
-        res,
-        await exploreService.createArticle(
-          {
-            type,
-            title: requireText(req.body.title, 'title', 200),
-            summary: optionalText(req.body.summary, 500),
-            content: optionalText(req.body.content, 10000),
-            coverUrl: imagePath,
-            videoPath,
-            videoOriginalName: videoFile?.originalname || '',
-            videoMimeType: videoFile?.mimetype || '',
-            videoSizeBytes: videoFile?.size || null
-          },
-          req.user
-        )
-      );
+        sendCreated(
+          res,
+          await exploreService.createArticle(
+            {
+              type,
+              title: requireText(req.body.title, 'title', 200),
+              summary: optionalText(req.body.summary, 500),
+              content: optionalText(req.body.content, 10000),
+              coverUrl: imagePath,
+              videoPath,
+              videoOriginalName: videoFile?.originalname || '',
+              videoMimeType: videoFile?.mimetype || '',
+              videoSizeBytes: videoFile?.size || null
+            },
+            req.user
+          )
+        );
+      } catch (error) {
+        await removeUploadedFiles([videoFile, imageFile]);
+        throw error;
+      }
     })
   );
 

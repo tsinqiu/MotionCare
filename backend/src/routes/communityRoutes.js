@@ -10,6 +10,7 @@ const { ApiError } = require('../errors');
 const { asyncHandler, parseEnum, parseKeyword, parsePage, parsePageSize, parsePositiveId } = require('../http');
 const { authenticate, optionalAuthenticate } = require('../middleware/authMiddleware');
 const { sendCreated, sendData } = require('../response');
+const { removeUploadedFile, validateUploadedFile } = require('../services/uploadSecurity');
 
 const VISIBILITY = ['private', 'followers', 'public'];
 const SHARE_CHANNELS = ['copy_link', 'wechat', 'qq', 'weibo', 'system'];
@@ -87,21 +88,29 @@ function createCommunityRouter({ communityService = defaultCommunityService, aut
     uploadImage.single('image'),
     asyncHandler(async (req, res) => {
       const file = req.file;
-      sendCreated(
-        res,
-        await communityService.createPost(
-          {
-            content: requireText(req.body.content, 'content', 2000),
-            activityId: parseOptionalPositiveId(req.body.activityId || req.body.activity_id, 'activityId'),
-            visibility: parseEnum(req.body.visibility, VISIBILITY, 'visibility', 'public'),
-            imagePath: file ? `/uploads/community-images/${file.filename}` : '',
-            imageOriginalName: file?.originalname || '',
-            imageMimeType: file?.mimetype || '',
-            imageSizeBytes: file?.size || null
-          },
-          req.user
-        )
-      );
+      try {
+        if (file) {
+          await validateUploadedFile(file, { kind: 'image' });
+        }
+        sendCreated(
+          res,
+          await communityService.createPost(
+            {
+              content: requireText(req.body.content, 'content', 2000),
+              activityId: parseOptionalPositiveId(req.body.activityId || req.body.activity_id, 'activityId'),
+              visibility: parseEnum(req.body.visibility, VISIBILITY, 'visibility', 'public'),
+              imagePath: file ? `/uploads/community-images/${file.filename}` : '',
+              imageOriginalName: file?.originalname || '',
+              imageMimeType: file?.mimetype || '',
+              imageSizeBytes: file?.size || null
+            },
+            req.user
+          )
+        );
+      } catch (error) {
+        await removeUploadedFile(file);
+        throw error;
+      }
     })
   );
 

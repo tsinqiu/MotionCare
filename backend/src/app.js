@@ -1,5 +1,7 @@
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
+const { rateLimit } = require('express-rate-limit');
 const config = require('./config');
 const { ApiError } = require('./errors');
 const createAuthRouter = require('./routes/authRoutes');
@@ -33,10 +35,21 @@ function createApp({
   communityService,
   exploreService,
   settingsService,
-  shoeService
+  shoeService,
+  securityService
 } = {}) {
   if (!shoeService) shoeService = defaultShoeService;
   const app = express();
+  app.disable('x-powered-by');
+
+  if (config.security.trustProxy) {
+    app.set('trust proxy', 1);
+  }
+
+  app.use(helmet({
+    contentSecurityPolicy: false,
+    crossOriginResourcePolicy: { policy: 'cross-origin' }
+  }));
 
   app.use(
     cors({
@@ -50,12 +63,34 @@ function createApp({
       }
     })
   );
-  app.use(express.json());
+  app.use('/api', rateLimit({
+    windowMs: config.security.globalRateLimitWindowMs,
+    limit: config.security.globalRateLimitMax,
+    standardHeaders: 'draft-8',
+    legacyHeaders: false,
+    handler(req, res) {
+      res.status(429).json({
+        error: { code: 'RATE_LIMITED', message: 'too many requests' }
+      });
+    }
+  }));
+  app.use('/api/auth/login', rateLimit({
+    windowMs: config.security.authRateLimitWindowMs,
+    limit: config.security.authRateLimitMax,
+    standardHeaders: 'draft-8',
+    legacyHeaders: false,
+    handler(req, res) {
+      res.status(429).json({
+        error: { code: 'AUTH_RATE_LIMITED', message: 'too many authentication requests' }
+      });
+    }
+  }));
+  app.use(express.json({ limit: config.security.jsonLimit }));
   app.use('/uploads', express.static(config.uploads.root));
 
-  app.use('/api', createAuthRouter(authService));
+  app.use('/api', createAuthRouter(authService, securityService));
   app.use('/api', createAdminUserRouter(authService));
-  app.use('/api', createHealthRouter(healthService));
+  app.use('/api', createHealthRouter(healthService, authService));
   app.use('/api', createActivityRouter(activityService, authService));
   app.use('/api', createStatsRouter(activityService, authService));
   app.use('/api', createTrainingRouter(activityService, authService));
@@ -81,14 +116,19 @@ function createApp({
     }
 
     const uploadLimitExceeded = error.code === 'LIMIT_FILE_SIZE';
-    const statusCode = uploadLimitExceeded ? 400 : error.statusCode || 500;
+    const payloadLimitExceeded = error.type === 'entity.too.large';
+    const statusCode = uploadLimitExceeded ? 400 : payloadLimitExceeded ? 413 : error.statusCode || error.status || 500;
     res.status(statusCode).json({
       error: {
         code: uploadLimitExceeded
           ? 'INVALID_UPLOAD'
+          : payloadLimitExceeded
+            ? 'PAYLOAD_TOO_LARGE'
           : statusCode === 500 ? 'INTERNAL_SERVER_ERROR' : error.code || 'API_ERROR',
         message: uploadLimitExceeded
           ? 'uploaded file is too large'
+          : payloadLimitExceeded
+            ? 'request body is too large'
           : statusCode === 500 ? 'internal server error' : error.message
       }
     });

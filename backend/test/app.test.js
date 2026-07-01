@@ -10,13 +10,28 @@ const workoutServiceModule = require('../src/services/workoutService');
 
 function buildApp(overrides = {}) {
   const healthService = overrides.healthService || {
-    checkDatabase: async () => ({ ok: true, message: 'connected' })
+    checkDatabase: async () => ({ ok: true, message: 'connected' }),
+    getHealthTrends: async () => [],
+    getSamples: async () => [],
+    getLatestTrainingStatus: async () => null,
+    getLatestRacePredictions: async () => null,
+    getLatestLactateThreshold: async () => null,
+    getLatestCyclingFtp: async () => null
   };
 
   const activityService = overrides.activityService || {
     listActivities: async () => ({ items: [{ id: 1, activityType: 'running' }], page: 1, pageSize: 50, total: 1, totalPages: 1 }),
     getActivityById: async (id) => (id === 1 ? { id: 1, activityType: 'running' } : null),
     activityExists: async (id) => id === 1,
+    assertActivityReadable: async (user, id) => {
+      if (id !== 1) {
+        const error = new Error('activity not found');
+        error.statusCode = 404;
+        error.code = 'ACTIVITY_NOT_FOUND';
+        throw error;
+      }
+      return { id: 1, ownerUserId: user.id };
+    },
     getTrackPoints: async () => [{ sampleIndex: 0, heartRateBpm: 150 }],
     getHeartRateSeries: async () => [{ sampleTimeUtc: '2026-06-01T00:00:00.000Z', heartRateBpm: 150 }],
     getSpeedSeries: async () => [{ sampleTimeUtc: '2026-06-01T00:00:00.000Z', speedMps: 3.2 }],
@@ -35,7 +50,8 @@ function buildApp(overrides = {}) {
       lactateThreshold: { latest: { heartRateBpm: 184, cyclingHeartRateBpm: 174, powerW: 353, powerToWeight: 6.418181818181818 } }
     }),
     getPersonalBests: async () => ({ steps: [], running: [], cycling: [], swimming: [], overall: [] }),
-    getDashboardOverview: async () => ({ recentActivities: [], monthlySummary: {}, yearlySummary: {}, trainingLoad: [], personalBests: {} })
+    getDashboardOverview: async () => ({ recentActivities: [], monthlySummary: {}, yearlySummary: {}, trainingLoad: [], personalBests: {} }),
+    getTodayHealth: async () => ({ steps: 1000 })
   };
 
   const mlService = overrides.mlService || {
@@ -131,6 +147,12 @@ function buildApp(overrides = {}) {
       error.code = 'INVALID_TOKEN';
       throw error;
     }
+  };
+
+  const securityService = overrides.securityService || {
+    assertLoginAllowed: async () => undefined,
+    recordLoginAttempt: async () => undefined,
+    recordSecurityEvent: async () => undefined
   };
 
   const manualActivityService = overrides.manualActivityService || {
@@ -249,6 +271,7 @@ function buildApp(overrides = {}) {
     mlService,
     aiService,
     authService,
+    securityService,
     manualActivityService,
     syncService,
     communityService,
@@ -364,7 +387,9 @@ test('GET /api/health reports degraded database state', async () => {
 });
 
 test('GET /api/training/garmin-import-summary returns imported Garmin fields', async () => {
-  const response = await request(buildApp()).get('/api/training/garmin-import-summary');
+  const response = await request(buildApp())
+    .get('/api/training/garmin-import-summary')
+    .set('Authorization', 'Bearer valid-user-token');
 
   assert.equal(response.status, 200);
   assert.equal(response.body.data.activitySummary.powerRows, 121);
@@ -373,7 +398,9 @@ test('GET /api/training/garmin-import-summary returns imported Garmin fields', a
 });
 
 test('GET /api/activities validates limit', async () => {
-  const response = await request(buildApp()).get('/api/activities?limit=999');
+  const response = await request(buildApp())
+    .get('/api/activities?limit=999')
+    .set('Authorization', 'Bearer valid-user-token');
 
   assert.equal(response.status, 400);
   assert.equal(response.body.error.code, 'INVALID_QUERY');
@@ -401,9 +428,9 @@ test('GET /api/activities passes filters and sort options', async () => {
     }
   });
 
-  const response = await request(app).get(
-    '/api/activities?activity_type=running&start_date=2026-06-01&end_date=2026-06-09&sort_by=distance_m&sort_order=asc&limit=20&offset=5'
-  );
+  const response = await request(app)
+    .get('/api/activities?activity_type=running&start_date=2026-06-01&end_date=2026-06-09&sort_by=distance_m&sort_order=asc&limit=20&offset=5')
+    .set('Authorization', 'Bearer valid-admin-token');
 
   assert.equal(response.status, 200);
   assert.deepEqual(response.body.data, []);
@@ -415,7 +442,7 @@ test('GET /api/activities passes filters and sort options', async () => {
     keyword: undefined,
     source: undefined,
     owner: 'all',
-    ownerUserId: undefined,
+    ownerUserId: 1,
     limit: 20,
     offset: 5,
     page: 1,
@@ -443,9 +470,9 @@ test('GET /api/activities treats activity_type=all as no activity filter', async
     }
   });
 
-  const response = await request(app).get(
-    '/api/activities?page=2&page_size=12&activity_type=all&keyword=park&sort_by=local_start_time&sort_order=desc'
-  );
+  const response = await request(app)
+    .get('/api/activities?page=2&page_size=12&activity_type=all&keyword=park&sort_by=local_start_time&sort_order=desc')
+    .set('Authorization', 'Bearer valid-admin-token');
 
   assert.equal(response.status, 200);
   assert.equal(captured.activityType, undefined);
@@ -456,7 +483,9 @@ test('GET /api/activities treats activity_type=all as no activity filter', async
 });
 
 test('GET /api/activities/:id returns 404 for missing activity', async () => {
-  const response = await request(buildApp()).get('/api/activities/999');
+  const response = await request(buildApp())
+    .get('/api/activities/999')
+    .set('Authorization', 'Bearer valid-user-token');
 
   assert.equal(response.status, 404);
   assert.equal(response.body.error.message, 'activity not found');
@@ -469,6 +498,7 @@ test('GET /api/activities/:id/track-points uses default paging', async () => {
       listActivities: async () => [],
       getActivityById: async () => null,
       activityExists: async () => true,
+      assertActivityReadable: async () => ({ id: 1, ownerUserId: 2 }),
       getTrackPoints: async (activityId, paging) => {
         captured = { activityId, paging };
         return [];
@@ -483,7 +513,9 @@ test('GET /api/activities/:id/track-points uses default paging', async () => {
     }
   });
 
-  const response = await request(app).get('/api/activities/1/track-points');
+  const response = await request(app)
+    .get('/api/activities/1/track-points')
+    .set('Authorization', 'Bearer valid-user-token');
 
   assert.equal(response.status, 200);
   assert.deepEqual(response.body.data, []);
@@ -494,7 +526,9 @@ test('GET /api/activities/:id/track-points uses default paging', async () => {
 });
 
 test('GET /api/activities/:id/track-points returns 404 for missing activity', async () => {
-  const response = await request(buildApp()).get('/api/activities/999/track-points');
+  const response = await request(buildApp())
+    .get('/api/activities/999/track-points')
+    .set('Authorization', 'Bearer valid-user-token');
 
   assert.equal(response.status, 404);
   assert.equal(response.body.error.message, 'activity not found');
@@ -525,7 +559,9 @@ test('GET /api/stats/summary passes date filters', async () => {
     }
   });
 
-  const response = await request(app).get('/api/stats/summary?start_date=2026-06-01&end_date=2026-06-09');
+  const response = await request(app)
+    .get('/api/stats/summary?start_date=2026-06-01&end_date=2026-06-09')
+    .set('Authorization', 'Bearer valid-admin-token');
 
   assert.equal(response.status, 200);
   assert.deepEqual(response.body.data, { activityCount: 2 });
@@ -536,7 +572,7 @@ test('GET /api/stats/summary passes date filters', async () => {
     keyword: undefined,
     source: undefined,
     owner: 'all',
-    ownerUserId: undefined
+    ownerUserId: 1
   });
 });
 
@@ -568,7 +604,9 @@ test('GET /api/stats/summary passes range filters', async () => {
     }
   });
 
-  const response = await request(app).get('/api/stats/summary?range=month&date=2026-06');
+  const response = await request(app)
+    .get('/api/stats/summary?range=month&date=2026-06')
+    .set('Authorization', 'Bearer valid-admin-token');
 
   assert.equal(response.status, 200);
   assert.deepEqual(response.body.data, { activityCount: 3 });
@@ -578,7 +616,9 @@ test('GET /api/stats/summary passes range filters', async () => {
 });
 
 test('GET /api/stats/timeline validates group_by', async () => {
-  const response = await request(buildApp()).get('/api/stats/timeline?group_by=year');
+  const response = await request(buildApp())
+    .get('/api/stats/timeline?group_by=year')
+    .set('Authorization', 'Bearer valid-user-token');
 
   assert.equal(response.status, 400);
   assert.equal(response.body.error.code, 'INVALID_QUERY');
@@ -612,7 +652,9 @@ test('GET /api/stats/timeline passes range filters', async () => {
     }
   });
 
-  const response = await request(app).get('/api/stats/timeline?range=month&date=2026-06&group_by=day');
+  const response = await request(app)
+    .get('/api/stats/timeline?range=month&date=2026-06&group_by=day')
+    .set('Authorization', 'Bearer valid-user-token');
 
   assert.equal(response.status, 200);
   assert.equal(captured.range, 'month');
@@ -650,9 +692,9 @@ test('GET /api/stats/metric-trend returns trend points', async () => {
     }
   });
 
-  const response = await request(app).get(
-    '/api/stats/metric-trend?metric=avg_heart_rate_bpm&range=6m&end_date=2026-06-10'
-  );
+  const response = await request(app)
+    .get('/api/stats/metric-trend?metric=avg_heart_rate_bpm&range=6m&end_date=2026-06-10')
+    .set('Authorization', 'Bearer valid-user-token');
 
   assert.equal(response.status, 200);
   assert.equal(response.body.data[0].value, 150);
@@ -690,8 +732,8 @@ test('GET /api/stats/metric-trend accepts frontend range options', async () => {
     }
   });
 
-  const range42 = await request(app).get('/api/stats/metric-trend?metric=distance_m&range=42d');
-  const range2y = await request(app).get('/api/stats/metric-trend?metric=distance_m&range=2y');
+  const range42 = await request(app).get('/api/stats/metric-trend?metric=distance_m&range=42d').set('Authorization', 'Bearer valid-user-token');
+  const range2y = await request(app).get('/api/stats/metric-trend?metric=distance_m&range=2y').set('Authorization', 'Bearer valid-user-token');
 
   assert.equal(range42.status, 200);
   assert.equal(range2y.status, 200);
@@ -700,7 +742,9 @@ test('GET /api/stats/metric-trend accepts frontend range options', async () => {
 });
 
 test('GET /api/stats/metric-trend rejects unsupported metric', async () => {
-  const response = await request(buildApp()).get('/api/stats/metric-trend?metric=left_right_balance');
+  const response = await request(buildApp())
+    .get('/api/stats/metric-trend?metric=left_right_balance')
+    .set('Authorization', 'Bearer valid-user-token');
 
   assert.equal(response.status, 400);
   assert.equal(response.body.error.code, 'UNSUPPORTED_METRIC');
@@ -708,7 +752,9 @@ test('GET /api/stats/metric-trend rejects unsupported metric', async () => {
 
 test('GET /api/stats/calendar returns month calendar data', async () => {
   statsCache.clear();
-  const response = await request(buildApp()).get('/api/stats/calendar?month=2026-06');
+  const response = await request(buildApp())
+    .get('/api/stats/calendar?month=2026-06')
+    .set('Authorization', 'Bearer valid-user-token');
 
   assert.equal(response.status, 200);
   assert.equal(response.body.data.month, '2026-06');
@@ -717,7 +763,9 @@ test('GET /api/stats/calendar returns month calendar data', async () => {
 });
 
 test('GET /api/stats/calendar requires valid month', async () => {
-  const response = await request(buildApp()).get('/api/stats/calendar?month=2026');
+  const response = await request(buildApp())
+    .get('/api/stats/calendar?month=2026')
+    .set('Authorization', 'Bearer valid-user-token');
 
   assert.equal(response.status, 400);
   assert.equal(response.body.error.code, 'INVALID_QUERY');
@@ -751,7 +799,9 @@ test('GET /api/training/load-balance returns training series', async () => {
     }
   });
 
-  const response = await request(app).get('/api/training/load-balance?range=1y&end_date=2026-06-10');
+  const response = await request(app)
+    .get('/api/training/load-balance?range=1y&end_date=2026-06-10')
+    .set('Authorization', 'Bearer valid-user-token');
 
   assert.equal(response.status, 200);
   assert.equal(response.body.data[0].tsb, -30);
@@ -788,8 +838,8 @@ test('GET /api/training/load-balance accepts frontend range options', async () =
     }
   });
 
-  const range42 = await request(app).get('/api/training/load-balance?range=42d');
-  const range2y = await request(app).get('/api/training/load-balance?range=2y');
+  const range42 = await request(app).get('/api/training/load-balance?range=42d').set('Authorization', 'Bearer valid-user-token');
+  const range2y = await request(app).get('/api/training/load-balance?range=2y').set('Authorization', 'Bearer valid-user-token');
 
   assert.equal(range42.status, 200);
   assert.equal(range2y.status, 200);
@@ -798,7 +848,9 @@ test('GET /api/training/load-balance accepts frontend range options', async () =
 });
 
 test('GET /api/training/load-balance validates range', async () => {
-  const response = await request(buildApp()).get('/api/training/load-balance?range=5y');
+  const response = await request(buildApp())
+    .get('/api/training/load-balance?range=5y')
+    .set('Authorization', 'Bearer valid-user-token');
 
   assert.equal(response.status, 400);
   assert.equal(response.body.error.code, 'INVALID_QUERY');
@@ -806,7 +858,9 @@ test('GET /api/training/load-balance validates range', async () => {
 
 test('GET /api/dashboard/overview returns aggregated dashboard data', async () => {
   statsCache.clear();
-  const response = await request(buildApp()).get('/api/dashboard/overview');
+  const response = await request(buildApp())
+    .get('/api/dashboard/overview')
+    .set('Authorization', 'Bearer valid-user-token');
 
   assert.equal(response.status, 200);
   assert.deepEqual(response.body.data.recentActivities, []);
@@ -1122,7 +1176,9 @@ test('POST /api/manual-activities rejects zero distance for running activity', a
 });
 
 test('GET /api/activities returns unified paged response', async () => {
-  const response = await request(buildApp()).get('/api/activities?page=1&page_size=5');
+  const response = await request(buildApp())
+    .get('/api/activities?page=1&page_size=5')
+    .set('Authorization', 'Bearer valid-user-token');
 
   assert.equal(response.status, 200);
   assert.deepEqual(response.body.data, [{ id: 1, activityType: 'running' }]);
@@ -1158,8 +1214,8 @@ test('GET /api/stats/summary uses stats cache for repeated query', async () => {
     }
   });
 
-  const first = await request(app).get('/api/stats/summary?activity_type=running');
-  const second = await request(app).get('/api/stats/summary?activity_type=running');
+  const first = await request(app).get('/api/stats/summary?activity_type=running').set('Authorization', 'Bearer valid-user-token');
+  const second = await request(app).get('/api/stats/summary?activity_type=running').set('Authorization', 'Bearer valid-user-token');
 
   assert.equal(first.body.data.activityCount, 1);
   assert.equal(second.body.data.activityCount, 1);
@@ -1193,12 +1249,12 @@ test('POST /api/manual-activities clears stats cache', async () => {
     }
   });
 
-  await request(app).get('/api/stats/summary?activity_type=running');
+  await request(app).get('/api/stats/summary?activity_type=running').set('Authorization', 'Bearer valid-user-token');
   await request(app)
     .post('/api/manual-activities')
     .set('Authorization', 'Bearer valid-admin-token')
     .send(manualPayload);
-  const afterWrite = await request(app).get('/api/stats/summary?activity_type=running');
+  const afterWrite = await request(app).get('/api/stats/summary?activity_type=running').set('Authorization', 'Bearer valid-user-token');
 
   assert.equal(afterWrite.body.data.activityCount, 2);
   assert.equal(calls, 2);
@@ -1570,12 +1626,12 @@ test('POST /api/workouts/:id/finish clears stats cache and returns activity id',
     }
   });
 
-  await request(app).get('/api/stats/summary?activity_type=running');
+  await request(app).get('/api/stats/summary?activity_type=running').set('Authorization', 'Bearer valid-user-token');
   const finished = await request(app)
     .post('/api/workouts/8/finish')
     .set('Authorization', 'Bearer valid-user-token')
     .send({ activityName: 'Live Run', calories: 300 });
-  const afterWrite = await request(app).get('/api/stats/summary?activity_type=running');
+  const afterWrite = await request(app).get('/api/stats/summary?activity_type=running').set('Authorization', 'Bearer valid-user-token');
 
   assert.equal(finished.status, 200);
   assert.equal(finished.body.data.activityId, 99);
@@ -2042,4 +2098,335 @@ test('syncService Garmin sync skips remote scan when no local Garmin history exi
   } finally {
     db.query = originalQuery;
   }
+});
+
+test('activityService returns compact activity access metadata', async () => {
+  const originalQuery = db.query;
+  let captured;
+  db.query = async (sql, params) => {
+    captured = { sql, params };
+    return [{ id: 7, ownerUserId: 2 }];
+  };
+
+  try {
+    const access = await activityServiceModule.getActivityAccess(7);
+
+    assert.deepEqual(access, { id: 7, ownerUserId: 2 });
+    assert.match(captured.sql, /owner_user_id AS ownerUserId/);
+    assert.deepEqual(captured.params, [7]);
+  } finally {
+    db.query = originalQuery;
+  }
+});
+
+test('activityService hides activities owned by another normal user', async () => {
+  const originalQuery = db.query;
+  db.query = async () => [{ id: 7, ownerUserId: 3 }];
+
+  try {
+    await assert.rejects(
+      activityServiceModule.assertActivityReadable({ id: 2, role: 'user' }, 7),
+      (error) => error.statusCode === 404 && error.code === 'ACTIVITY_NOT_FOUND'
+    );
+  } finally {
+    db.query = originalQuery;
+  }
+});
+
+test('activityService allows owners and administrators to read an activity', async () => {
+  const originalQuery = db.query;
+  db.query = async () => [{ id: 7, ownerUserId: 2 }];
+
+  try {
+    const ownerAccess = await activityServiceModule.assertActivityReadable({ id: 2, role: 'user' }, 7);
+    const adminAccess = await activityServiceModule.assertActivityReadable({ id: 1, role: 'admin' }, 7);
+
+    assert.equal(ownerAccess.id, 7);
+    assert.equal(adminAccess.id, 7);
+  } finally {
+    db.query = originalQuery;
+  }
+});
+
+test('API responses use security headers without exposing Express', async () => {
+  const response = await request(buildApp()).get('/api/health');
+
+  assert.equal(response.status, 200);
+  assert.equal(response.headers['x-powered-by'], undefined);
+  assert.equal(response.headers['x-content-type-options'], 'nosniff');
+  assert.equal(response.headers['cross-origin-resource-policy'], 'cross-origin');
+});
+
+test('GET /api/health hides database error details', async () => {
+  const response = await request(buildApp({
+    healthService: {
+      checkDatabase: async () => ({ ok: false, message: 'connect ECONNREFUSED root:secret@127.0.0.1' })
+    }
+  })).get('/api/health');
+
+  assert.equal(response.status, 200);
+  assert.equal(response.body.data.status, 'degraded');
+  assert.deepEqual(response.body.data.database, { ok: false, message: 'unavailable' });
+});
+
+test('personal health, activity analytics, training, and dashboard routes require login', async () => {
+  const paths = [
+    '/api/health/trends',
+    '/api/health/samples/heart-rate',
+    '/api/health/training-status/latest',
+    '/api/health/race-predictions/latest',
+    '/api/health/lactate-threshold/latest',
+    '/api/health/cycling-ftp/latest',
+    '/api/activities',
+    '/api/activities/1',
+    '/api/activities/1/track-points',
+    '/api/activities/1/heart-rate',
+    '/api/activities/1/speed',
+    '/api/activities/1/laps',
+    '/api/activities/1/zones',
+    '/api/stats/summary',
+    '/api/training/load-balance',
+    '/api/training/garmin-import-summary',
+    '/api/dashboard/overview',
+    '/api/dashboard/health'
+  ];
+
+  for (const path of paths) {
+    const response = await request(buildApp()).get(path);
+    assert.equal(response.status, 401, path);
+    assert.equal(response.body.error.code, 'AUTH_REQUIRED', path);
+  }
+});
+
+test('GET /api/activities forces owner=mine for normal users', async () => {
+  let captured;
+  const response = await request(buildApp({
+    activityService: {
+      listActivities: async (filters) => {
+        captured = filters;
+        return { items: [], page: 1, pageSize: 50, total: 0, totalPages: 0 };
+      }
+    }
+  }))
+    .get('/api/activities?owner=all')
+    .set('Authorization', 'Bearer valid-user-token');
+
+  assert.equal(response.status, 200);
+  assert.equal(captured.owner, 'mine');
+  assert.equal(captured.ownerUserId, 2);
+});
+
+test('GET /api/activities preserves administrator owner filters', async () => {
+  const captured = [];
+  const app = buildApp({
+    activityService: {
+      listActivities: async (filters) => {
+        captured.push(filters);
+        return { items: [], page: 1, pageSize: 50, total: 0, totalPages: 0 };
+      }
+    }
+  });
+
+  for (const owner of ['all', 'mine', 'admin']) {
+    const response = await request(app)
+      .get(`/api/activities?owner=${owner}`)
+      .set('Authorization', 'Bearer valid-admin-token');
+    assert.equal(response.status, 200);
+  }
+
+  assert.deepEqual(captured.map((filters) => filters.owner), ['all', 'mine', 'admin']);
+  assert.equal(captured[1].ownerUserId, 1);
+});
+
+test('activity detail checks object-level read access for the authenticated user', async () => {
+  let checked;
+  const response = await request(buildApp({
+    activityService: {
+      assertActivityReadable: async (user, activityId) => {
+        checked = { user, activityId };
+      },
+      getActivityById: async (activityId) => ({ id: activityId, activityType: 'running' })
+    }
+  }))
+    .get('/api/activities/1')
+    .set('Authorization', 'Bearer valid-user-token');
+
+  assert.equal(response.status, 200);
+  assert.equal(checked.user.id, 2);
+  assert.equal(checked.activityId, 1);
+});
+
+test('activity detail hides activities denied by object-level access control', async () => {
+  const denied = new Error('activity not found');
+  denied.statusCode = 404;
+  denied.code = 'ACTIVITY_NOT_FOUND';
+  const response = await request(buildApp({
+    activityService: {
+      assertActivityReadable: async () => { throw denied; },
+      getActivityById: async (activityId) => ({ id: activityId, activityType: 'running' })
+    }
+  }))
+    .get('/api/activities/2')
+    .set('Authorization', 'Bearer valid-user-token');
+
+  assert.equal(response.status, 404);
+  assert.equal(response.body.error.code, 'ACTIVITY_NOT_FOUND');
+});
+
+test('oversized JSON requests return the stable payload-too-large error', async () => {
+  const response = await request(buildApp())
+    .post('/api/auth/register')
+    .send({ username: 'tester', email: 'tester@example.com', password: `x${'a'.repeat(1024 * 1024)}` });
+
+  assert.equal(response.status, 413);
+  assert.equal(response.body.error.code, 'PAYLOAD_TOO_LARGE');
+});
+
+test('the login endpoint applies its own IP rate limit', async () => {
+  const app = buildApp();
+  let response;
+
+  for (let index = 0; index < 31; index += 1) {
+    response = await request(app)
+      .post('/api/auth/login')
+      .send({ email: 'tester@example.com', password: 'password123' });
+  }
+
+  assert.equal(response.status, 429);
+  assert.equal(response.body.error.code, 'AUTH_RATE_LIMITED');
+});
+
+test('the login IP rate limit also counts malformed JSON requests', async () => {
+  const app = buildApp();
+  let response;
+
+  for (let index = 0; index < 31; index += 1) {
+    response = await request(app)
+      .post('/api/auth/login')
+      .set('Content-Type', 'application/json')
+      .send('{invalid-json');
+  }
+
+  assert.equal(response.status, 429);
+  assert.equal(response.body.error.code, 'AUTH_RATE_LIMITED');
+});
+
+test('activity image upload rejects non-image files', async () => {
+  const response = await request(buildApp())
+    .post('/api/activities/1/photo')
+    .set('Authorization', 'Bearer valid-user-token')
+    .attach('photo', Buffer.from('plain text'), { filename: 'notes.txt', contentType: 'text/plain' });
+
+  assert.equal(response.status, 400);
+  assert.equal(response.body.error.code, 'INVALID_UPLOAD');
+});
+
+test('all media upload routes reject spoofed file contents', async () => {
+  const app = buildApp();
+  const authorization = ['Authorization', 'Bearer valid-user-token'];
+  const spoofed = Buffer.from('plain text disguised as media');
+  const requests = [
+    ['activity', request(app)
+      .post('/api/activities/1/photo')
+      .set(...authorization)
+      .attach('photo', spoofed, { filename: 'activity.png', contentType: 'image/png' })],
+    ['shoe', request(app)
+      .post('/api/shoes/1/photo')
+      .set(...authorization)
+      .attach('photo', spoofed, { filename: 'shoe.png', contentType: 'image/png' })],
+    ['community', request(app)
+      .post('/api/community/posts')
+      .set(...authorization)
+      .field('content', 'spoofed upload')
+      .attach('image', spoofed, { filename: 'community.png', contentType: 'image/png' })],
+    ['explore image', request(app)
+      .post('/api/explore/articles')
+      .set(...authorization)
+      .field('type', 'article')
+      .field('title', 'spoofed image')
+      .attach('image', spoofed, { filename: 'explore.png', contentType: 'image/png' })],
+    ['explore video', request(app)
+      .post('/api/explore/articles')
+      .set(...authorization)
+      .field('type', 'course')
+      .field('title', 'spoofed video')
+      .attach('video', spoofed, { filename: 'explore.mp4', contentType: 'video/mp4' })]
+  ];
+
+  for (const [label, pendingRequest] of requests) {
+    const response = await pendingRequest;
+    assert.equal(response.status, 400, `${label}: ${JSON.stringify(response.body)}`);
+    assert.equal(response.body.error.code, 'INVALID_UPLOAD', label);
+  }
+});
+
+test('successful login records the attempt and LOGIN_SUCCESS event before responding', async () => {
+  const calls = [];
+  const response = await request(buildApp({
+    securityService: {
+      assertLoginAllowed: async () => calls.push('allowed'),
+      recordLoginAttempt: async (entry) => calls.push({ attempt: entry }),
+      recordSecurityEvent: async (entry) => calls.push({ event: entry })
+    }
+  }))
+    .post('/api/auth/login')
+    .send({ email: 'tester@example.com', password: 'password123' });
+
+  assert.equal(response.status, 200);
+  assert.equal(calls[0], 'allowed');
+  assert.equal(calls[1].attempt.success, true);
+  assert.equal(calls[1].attempt.userId, 2);
+  assert.equal(calls[2].event.eventType, 'LOGIN_SUCCESS');
+});
+
+test('failed login records the attempt and LOGIN_FAILED event', async () => {
+  const calls = [];
+  const invalidCredentials = new Error('invalid email or password');
+  invalidCredentials.statusCode = 401;
+  invalidCredentials.code = 'INVALID_CREDENTIALS';
+  const response = await request(buildApp({
+    authService: {
+      login: async () => { throw invalidCredentials; },
+      verifyToken: async () => ({ id: 2, role: 'user' })
+    },
+    securityService: {
+      assertLoginAllowed: async () => undefined,
+      recordLoginAttempt: async (entry) => calls.push({ attempt: entry }),
+      recordSecurityEvent: async (entry) => calls.push({ event: entry })
+    }
+  }))
+    .post('/api/auth/login')
+    .send({ email: 'tester@example.com', password: 'wrong-password' });
+
+  assert.equal(response.status, 401);
+  assert.equal(calls[0].attempt.success, false);
+  assert.equal(calls[0].attempt.failureReason, 'INVALID_CREDENTIALS');
+  assert.equal(calls[1].event.eventType, 'LOGIN_FAILED');
+});
+
+test('persisted login block returns 429 without calling authService.login', async () => {
+  let loginCalled = false;
+  const blocked = new Error('login temporarily blocked');
+  blocked.statusCode = 429;
+  blocked.code = 'LOGIN_BLOCKED';
+  const response = await request(buildApp({
+    authService: {
+      login: async () => {
+        loginCalled = true;
+        return {};
+      },
+      verifyToken: async () => ({ id: 2, role: 'user' })
+    },
+    securityService: {
+      assertLoginAllowed: async () => { throw blocked; },
+      recordLoginAttempt: async () => undefined,
+      recordSecurityEvent: async () => undefined
+    }
+  }))
+    .post('/api/auth/login')
+    .send({ email: 'tester@example.com', password: 'password123' });
+
+  assert.equal(response.status, 429);
+  assert.equal(response.body.error.code, 'LOGIN_BLOCKED');
+  assert.equal(loginCalled, false);
 });

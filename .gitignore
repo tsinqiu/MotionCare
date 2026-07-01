@@ -17,6 +17,27 @@ dist/
 .DS_Store
 Thumbs.db
 
+# Local agent, cache, coverage, and temporary artifacts
+.agents/
+.codex/
+.cache/
+coverage/
+.nyc_output/
+.tmp/
+tmp/
+temp/
+.tmp-*
+*.tmp.*
+*.temp
+*.swp
+*.swo
+*~
+*.pid
+*.pid.lock
+*.orig
+*.rej
+*.err
+
 # Local secrets and runtime files
 .env
 .env.*

@@ -88,6 +88,17 @@ const config = {
       password: process.env.ADMIN_PASSWORD || ''
     }
   },
+  security: {
+    trustProxy: process.env.TRUST_PROXY === 'true',
+    jsonLimit: process.env.JSON_BODY_LIMIT || '1mb',
+    globalRateLimitWindowMs: parseInteger(process.env.GLOBAL_RATE_LIMIT_WINDOW_MS, 15 * 60 * 1000),
+    globalRateLimitMax: parseInteger(process.env.GLOBAL_RATE_LIMIT_MAX, 600),
+    authRateLimitWindowMs: parseInteger(process.env.AUTH_RATE_LIMIT_WINDOW_MS, 15 * 60 * 1000),
+    authRateLimitMax: parseInteger(process.env.AUTH_RATE_LIMIT_MAX, 30),
+    loginFailureWindowMs: parseInteger(process.env.LOGIN_FAILURE_WINDOW_MS, 10 * 60 * 1000),
+    loginFailureMax: parseInteger(process.env.LOGIN_FAILURE_MAX, 5),
+    loginBlockMinutes: parseInteger(process.env.LOGIN_BLOCK_MINUTES, 10)
+  },
   cache: {
     statsTtlSeconds: parseInteger(process.env.STATS_CACHE_TTL_SECONDS, 60)
   },
