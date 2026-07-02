@@ -13,10 +13,12 @@ import {
 } from 'vant'
 
 import App from './App.vue'
+import { initTheme } from '@/composables/useThemeMode'
 import router from './router'
 import './assets/styles.css'
 import './assets/app.css'
 
+initTheme()
 const app = createApp(App)
 
 // Register the Vant components we actually use so <van-*> tags resolve in

@@ -7,7 +7,7 @@
      3. Phone-frame shell (viewport / frame / top bar / scroll / tab bar)
      4. Surface softening (cards / metrics / chips / state block / links)
      5. Motion (page / card / message / press) + reduced-motion guard
-     6. Narrow-frame responsive fixes
+     6. Phone-container responsive layout
    The look stays MotionCare's own: calm light ground, one green accent,
    generous whitespace — Vant supplies behaviour, not the brand.
    ============================================================================= */
@@ -40,7 +40,7 @@
   --fs-display: 30px;
 
   /* layout */
-  --phone-max: 480px;
+  --phone-max: 430px;
   --navbar-h: 52px;
   --tabbar-h: 60px;
   --safe-top: env(safe-area-inset-top, 0px);
@@ -143,6 +143,8 @@ html[data-theme="night"] {
 
 .phone-frame {
   position: relative;
+  container-name: phone-frame;
+  container-type: inline-size;
   /* establish a containing block so in-frame fixed overlays (filter sheet,
      activity modal) stay inside the phone, not the whole desktop viewport */
   transform: translateZ(0);
@@ -189,6 +191,8 @@ html[data-theme="night"] {
 /* the real scroll container (reuses legacy .page-frame class) */
 .phone-frame .page-frame {
   flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
   min-height: 0;
   max-width: none;
   margin: 0;
@@ -237,7 +241,10 @@ html[data-theme="night"] {
   padding: var(--space-4);
   gap: 4px;
 }
-.metric-card strong { font-size: var(--fs-h2); }
+.metric-card strong {
+  font-size: clamp(16px, 5cqi, var(--fs-h2));
+  line-height: 1.2;
+}
 
 .status-chip {
   border-radius: var(--radius-pill);
@@ -321,34 +328,342 @@ html[data-theme="night"] {
   }
 }
 
-/* 6. Narrow-frame responsive fixes ------------------------------------------ */
-/* Legacy grids keyed on viewport width won't fire inside a ~480px desktop
-   frame, so make the heavy grids fluid regardless of viewport. */
+/* 6. Phone-container responsive layout -------------------------------------- */
+/* The desktop viewport can be wide while the product remains a 430px phone.
+   Keep all product layout decisions tied to this container, not the viewport. */
+.phone-frame .page-stack {
+  width: 100%;
+  min-width: 0;
+}
+
+.phone-frame .page-stack > *,
+.phone-frame :is(.dark-panel, .panel, .metric-card, .state-block, .chart-panel),
+.phone-frame :is(.section-heading, .panel-heading, .list-meta, .date-stepper) > *,
+.phone-frame :is(.sync-brand, .sync-account-card, .sync-status-line) > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.phone-frame :is(input, textarea, select) {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.phone-frame :is(p, strong, b, small, span, code) {
+  overflow-wrap: anywhere;
+}
+
+.phone-frame :is(
+  .primary-link,
+  .secondary-link,
+  .danger-link,
+  .filter-btn,
+  .quick-prompts button,
+  .pagination-row button,
+  .date-stepper button,
+  .btn-icon,
+  .shoe-actions button
+) {
+  min-height: 44px;
+}
+
+.phone-frame :is(.app-hero, .hero-panel, .sync-hero) {
+  min-height: 0;
+  align-items: flex-start;
+  flex-direction: column;
+  padding: var(--space-5);
+}
+
+.phone-frame :is(.section-heading, .panel-heading, .list-meta, .modal-header) {
+  flex-direction: row;
+  flex-wrap: wrap;
+}
+
+.phone-frame :is(.api-banner, .account-summary, .settings-actions) {
+  flex-direction: row;
+  flex-wrap: wrap;
+}
+
+.phone-frame .account-summary > :nth-child(2) {
+  flex: 1 1 180px;
+  min-width: 0;
+}
+
+.phone-frame .account-summary .secondary-link {
+  margin-left: auto;
+}
+
+.phone-frame :is(.section-heading, .panel-heading) > :first-child {
+  flex: 1 1 180px;
+}
+
 .metric-grid,
 .health-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
+
 .activity-card-grid,
 .detail-grid,
 .status-summary-grid,
 .secondary-link-grid,
-.me-link-grid {
+.me-link-grid,
+.security-grid,
+.achievement-grid,
+.settings-grid,
+.session-detail-grid,
+.quality-grid {
   grid-template-columns: 1fr;
 }
 
-/* Legacy secondary-page grids keyed on viewport width won't collapse inside a
-   ~480px desktop frame, so pin them to sensible narrow layouts here. */
 .sync-layout,
 .sync-list-grid,
 .load-dashboard,
-.manual-form {
+.manual-form,
+.admin-user-form,
+.filter-grid,
+.explore-upload-form {
   grid-template-columns: 1fr;
 }
+
+.phone-frame :is(.manual-form, .admin-user-form, .filter-grid) > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.admin-user-form {
+  align-items: stretch;
+  grid-auto-rows: max-content;
+}
+
 .prediction-grid,
 .ai-analysis-grid,
-.provider-meta {
+.provider-meta,
+.training-targets {
   grid-template-columns: 1fr 1fr;
 }
+
 .state-metrics {
   grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.state-metrics span,
+.provider-meta span,
+.training-targets span,
+.prediction-grid span {
+  min-width: 0;
+  padding: 10px;
+}
+
+.state-metrics b,
+.provider-meta b,
+.training-targets b,
+.prediction-grid b {
+  font-size: clamp(13px, 3.8cqi, 16px);
+  line-height: 1.25;
+}
+
+.sync-brand,
+.sync-account-card,
+.sync-status-line,
+.sync-actions {
+  width: 100%;
+}
+
+.sync-brand {
+  align-items: flex-start;
+}
+
+.sync-brand h2 {
+  font-size: clamp(24px, 7cqi, 30px);
+}
+
+.sync-account-card {
+  min-width: 0;
+}
+
+.sync-account-card .status-chip {
+  flex: 0 0 auto;
+}
+
+.chart-panel,
+.chart-canvas {
+  width: 100%;
+  min-width: 0;
+}
+
+.chart-panel {
+  min-height: 360px;
+  overflow: clip;
+}
+
+.chart-canvas {
+  height: 300px;
+}
+
+.calendar-grid-panel {
+  padding: 12px;
+}
+
+.calendar-week,
+.calendar-grid {
+  gap: 4px;
+}
+
+.calendar-day,
+.calendar-blank {
+  min-width: 0;
+  min-height: clamp(52px, 15cqi, 64px);
+}
+
+.calendar-day {
+  padding: 6px;
+}
+
+.achievement-list button {
+  min-height: 64px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: 10px 12px;
+}
+
+.achievement-list button small {
+  grid-column: 1 / -1;
+}
+
+.record-list button {
+  grid-template-columns: minmax(72px, 1fr) minmax(0, 1fr) 18px;
+}
+
+.records-grid {
+  grid-template-columns: 1fr;
+}
+
+.record-list button strong {
+  min-width: 0;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.zone-row {
+  grid-template-columns: 12px minmax(0, 1fr) auto auto;
+  gap: 8px;
+}
+
+.zone-dot { grid-column: 1; grid-row: 1; }
+.zone-label { grid-column: 2; grid-row: 1; }
+.zone-time { grid-column: 3; grid-row: 1; }
+.zone-percent { grid-column: 4; grid-row: 1; }
+.zone-bar { grid-column: 2 / -1; grid-row: 2; }
+.zone-label,
+.zone-time,
+.zone-percent { font-size: 13px; }
+
+.modal-backdrop,
+.modal-overlay {
+  padding: var(--space-3);
+  padding-bottom: calc(var(--space-3) + var(--safe-bottom));
+}
+
+.modal-panel,
+.modal-content {
+  width: 100%;
+  max-width: 100%;
+  max-height: calc(100% - var(--space-3));
+}
+
+.phone-frame .van-popup--bottom {
+  max-height: calc(100% - var(--safe-top));
+  overflow-y: auto;
+}
+
+/* Authentication is outside AppShell, but keeps the same maximum phone width. */
+.auth-card {
+  width: min(100%, var(--phone-max));
+}
+
+.phone-frame :is(.modal-actions, .shoe-form-actions, .edit-form-actions, .filter-sheet__actions) {
+  flex-wrap: wrap;
+}
+
+.phone-frame :is(.modal-actions, .shoe-form-actions, .filter-sheet__actions) > * {
+  flex: 1 1 120px;
+}
+
+/* Compact phones: 360px is the minimum supported width. */
+@container phone-frame (max-width: 374px) {
+  .phone-frame .page-frame {
+    padding: var(--space-3);
+    padding-bottom: calc(var(--space-5) + var(--safe-bottom));
+  }
+
+  .dark-panel,
+  .panel {
+    padding: var(--space-4);
+  }
+
+  .page-stack { gap: var(--space-3); }
+
+  .state-block {
+    padding: var(--space-5) var(--space-3);
+  }
+
+  .provider-meta,
+  .training-targets,
+  .prediction-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .sync-account-card {
+    display: grid;
+    grid-template-columns: 48px minmax(0, 1fr);
+    align-items: flex-start;
+  }
+
+  .sync-account-card .status-chip {
+    grid-column: 2;
+    justify-self: start;
+    margin-left: 0;
+  }
+
+  .app-navbar .app-navbar-action {
+    font-size: 13px;
+  }
+
+  .account-summary {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .phone-frame .account-summary .secondary-link {
+    width: 100%;
+    margin-left: 0;
+    justify-content: center;
+  }
+}
+
+/* Large phones get slightly more breathing room without becoming a desktop UI. */
+@container phone-frame (min-width: 410px) {
+  .phone-frame .page-frame {
+    padding: 18px;
+    padding-bottom: calc(var(--space-6) + var(--safe-bottom));
+  }
+
+  .dark-panel,
+  .panel {
+    padding: var(--space-5);
+  }
+
+  .chart-canvas {
+    height: 320px;
+  }
+}
+
+@media (max-width: 374px) {
+  .auth-page {
+    padding: var(--space-3);
+  }
+
+  .auth-card {
+    gap: var(--space-5);
+    padding: var(--space-5) var(--space-4);
+  }
 }
