@@ -564,22 +564,27 @@ watch(() => route.params.id, loadActivity, { immediate: true })
 </script>
 
 <style scoped>
-.shoe-bind { display: flex; align-items: center; gap: 12px; padding: 8px 0; }
-.shoe-bind select { padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--panel-soft); color: var(--text); }
+.shoe-bind { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 8px 0; }
+.shoe-bind select { flex: 1 1 180px; min-width: 0; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--panel-soft); color: var(--text); }
 .shoe-bind-info { font-size: 13px; color: var(--muted); }
 .edit-form { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; padding: 8px 0; }
-.edit-form label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); }
+.edit-form label { display: flex; flex: 1 1 140px; min-width: 0; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); }
 .edit-form input { padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--panel-soft); color: var(--text); }
 .edit-form-actions { display: flex; align-items: flex-end; }
 .photo-section { padding: 8px 0; display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
 .photo-upload-label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); }
 .upload-status { font-size: 12px; color: var(--muted); }
-.activity-photo { max-width: 240px; max-height: 180px; border-radius: 8px; object-fit: cover; margin-top: 8px; }
+.activity-photo { width: auto; max-width: 100%; max-height: 180px; border-radius: 8px; object-fit: cover; margin-top: 8px; }
 .weather-grid { display: flex; flex-wrap: wrap; gap: 16px; padding: 8px 0; }
 .weather-grid span { display: flex; flex-direction: column; gap: 2px; }
 .weather-grid small { font-size: 12px; color: var(--muted); }
 .weather-form { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; padding: 8px 0; }
-.weather-form label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); }
-.weather-form input { width: 100px; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--border); background: var(--panel-soft); color: var(--text); }
+.weather-form label { display: flex; flex: 1 1 120px; min-width: 0; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); }
+.weather-form input { width: 100%; min-width: 0; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--border); background: var(--panel-soft); color: var(--text); }
 .weather-source { font-size: 11px; color: var(--muted); margin: 4px 0 0; }
+
+@container phone-frame (max-width: 374px) {
+  .edit-form-actions { width: 100%; }
+  .edit-form-actions .primary-link { width: 100%; justify-content: center; }
+}
 </style>

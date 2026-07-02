@@ -55,36 +55,40 @@
         </div>
         <span class="status-chip good">{{ users.length }} 个账号</span>
       </div>
-      <div class="table-wrap admin-users-table">
-        <table>
-          <thead>
-            <tr>
-              <th>用户名</th>
-              <th>邮箱</th>
-              <th>角色</th>
-              <th>状态</th>
-              <th>操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="user in users" :key="user.id">
-              <td>{{ user.username }}</td>
-              <td>{{ user.email }}</td>
-              <td>{{ user.role === 'admin' ? '管理员' : '普通用户' }}</td>
-              <td>{{ user.status === 'active' ? '正常' : '已停用' }}</td>
-              <td>
-                <button
-                  class="danger-link compact-link"
-                  type="button"
-                  :disabled="usersBusy || user.id === authSession.user?.id || user.status !== 'active'"
-                  @click="disableUser(user)"
-                >
-                  删除
-                </button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+      <div class="admin-user-list">
+        <article v-for="user in users" :key="user.id" class="admin-user-card">
+          <div class="admin-user-card__head">
+            <div class="admin-user-card__identity">
+              <strong>{{ user.username }}</strong>
+              <span>{{ user.email }}</span>
+            </div>
+            <span class="status-chip" :class="{ good: user.status === 'active' }">
+              {{ user.status === 'active' ? '正常' : '已停用' }}
+            </span>
+          </div>
+          <dl class="admin-user-card__meta">
+            <div>
+              <dt>角色</dt>
+              <dd>{{ user.role === 'admin' ? '管理员' : '普通用户' }}</dd>
+            </div>
+            <div>
+              <dt>账号 ID</dt>
+              <dd>{{ user.id }}</dd>
+            </div>
+          </dl>
+          <div class="admin-user-card__actions">
+            <span v-if="user.id === authSession.user?.id" class="muted-copy">当前登录账号</span>
+            <button
+              v-else
+              class="danger-link"
+              type="button"
+              :disabled="usersBusy || user.status !== 'active'"
+              @click="disableUser(user)"
+            >
+              {{ user.status === 'active' ? '停用账号' : '账号已停用' }}
+            </button>
+          </div>
+        </article>
       </div>
     </section>
   </div>
@@ -92,6 +96,7 @@
 
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
+import { showConfirmDialog } from 'vant'
 
 import StateBlock from '@/components/StateBlock.vue'
 import { createAdminUser, disableAdminUser, getAdminUsers } from '@/services/auth'
@@ -135,7 +140,19 @@ async function createUser() {
 }
 
 async function disableUser(user) {
-  if (!window.confirm(`确定删除用户 ${user.username} 吗？该账号将无法继续登录。`)) return
+  try {
+    await showConfirmDialog({
+      title: '停用账号',
+      message: `确定停用用户 ${user.username} 吗？该账号将无法继续登录。`,
+      confirmButtonText: '停用',
+      confirmButtonColor: 'var(--red)',
+      cancelButtonText: '取消',
+      teleport: '.phone-frame',
+    })
+  } catch {
+    return
+  }
+
   usersBusy.value = true
   usersError.value = ''
   try {
@@ -150,3 +167,103 @@ async function disableUser(user) {
 
 onMounted(loadUsers)
 </script>
+
+<style scoped>
+.admin-user-form label,
+.admin-user-form input,
+.admin-user-form select {
+  min-width: 0;
+}
+
+.admin-user-form .primary-link {
+  width: 100%;
+  justify-content: center;
+}
+
+.admin-user-list {
+  display: grid;
+  gap: 12px;
+}
+
+.admin-user-card {
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--panel-soft);
+}
+
+.admin-user-card__head,
+.admin-user-card__actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.admin-user-card__identity {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.admin-user-card__identity strong,
+.admin-user-card__identity span {
+  overflow-wrap: anywhere;
+}
+
+.admin-user-card__identity span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.admin-user-card__head .status-chip {
+  flex: 0 0 auto;
+}
+
+.admin-user-card__meta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 14px 0;
+}
+
+.admin-user-card__meta div {
+  min-width: 0;
+  padding: 10px;
+  border-radius: var(--radius);
+  background: var(--panel);
+}
+
+.admin-user-card__meta dt {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.admin-user-card__meta dd {
+  margin: 4px 0 0;
+  color: var(--text);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.admin-user-card__actions {
+  min-height: 44px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.admin-user-card__actions .danger-link {
+  margin-left: auto;
+}
+
+@container phone-frame (max-width: 374px) {
+  .admin-user-card__head {
+    align-items: flex-start;
+  }
+
+  .admin-user-card__meta {
+    grid-template-columns: 1fr;
+  }
+}
+</style>

@@ -76,7 +76,7 @@
       </div>
     </section>
 
-    <Teleport to="body">
+    <Teleport to=".phone-frame">
       <div v-if="editTarget" class="modal-overlay" @click.self="closeEdit">
         <div class="modal-content">
           <h3>编辑跑鞋</h3>
@@ -316,7 +316,7 @@ onMounted(load)
 
 <style scoped>
 .shoe-form { display: flex; flex-wrap: wrap; gap: 8px; padding: 16px 0; }
-.shoe-form input { flex: 1; min-width: 120px; padding: 8px 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--panel-soft); color: var(--text); }
+.shoe-form input { flex: 1 1 140px; min-width: 0; padding: 8px 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--panel-soft); color: var(--text); }
 .shoe-form-actions { display: flex; gap: 8px; width: 100%; }
 .photo-upload-label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); }
 .shoe-list { display: flex; flex-direction: column; gap: 8px; }
@@ -325,7 +325,7 @@ onMounted(load)
 .shoe-card.selected { border: 1px solid var(--green); }
 .shoe-card:hover { background: var(--panel); }
 .shoe-photo { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; flex-shrink: 0; }
-.shoe-info { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 140px; }
+.shoe-info { display: flex; flex-direction: column; gap: 2px; flex: 1 1 180px; min-width: 0; }
 .shoe-detail { font-size: 12px; color: var(--muted); }
 .shoe-stats { display: flex; flex-wrap: wrap; gap: 8px; font-size: 12px; color: var(--muted); margin-top: 4px; }
 .shoe-actions { display: flex; gap: 8px; }
@@ -334,10 +334,17 @@ onMounted(load)
 .shoe-activities-list { display: flex; flex-direction: column; gap: 8px; }
 
 .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.45); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 16px; }
-.modal-content { background: var(--panel); border-radius: var(--radius-lg); padding: 24px; width: 100%; max-width: 420px; max-height: 90vh; overflow-y: auto; box-shadow: var(--shadow-lg); }
+.modal-content { background: var(--panel); border-radius: var(--radius-lg); padding: 24px; width: 100%; max-width: 100%; max-height: calc(100% - 24px); overflow-y: auto; box-shadow: var(--shadow-lg); }
 .modal-content h3 { margin: 0 0 16px; }
 .modal-content label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); margin-bottom: 12px; }
 .modal-content input { padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--panel-soft); color: var(--text); }
 .edit-photo-preview { max-width: 120px; max-height: 120px; border-radius: 8px; object-fit: cover; margin-top: 4px; }
 .modal-actions { display: flex; gap: 8px; margin-top: 16px; }
+
+@container phone-frame (max-width: 374px) {
+  .shoe-card { align-items: flex-start; }
+  .shoe-actions { width: 100%; }
+  .shoe-actions button { flex: 1 1 0; }
+  .modal-content { padding: 16px; }
+}
 </style>

@@ -199,10 +199,17 @@ onMounted(loadCoach)
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 12px;
 }
+.coach-head > div { min-width: 0; }
 .coach-head h2 { margin: 2px 0 0; }
 .coach-head .overline { margin: 0; }
+
+.ai-mode-pill {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
 
 .ai-mode-pill .dot {
   display: inline-block;
@@ -218,6 +225,9 @@ onMounted(loadCoach)
 .chat-surface {
   display: flex;
   flex-direction: column;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
   gap: 14px;
   padding: var(--space-4);
   border-radius: var(--radius-lg);
@@ -229,6 +239,8 @@ onMounted(loadCoach)
 .chat-messages {
   display: flex;
   flex-direction: column;
+  width: 100%;
+  min-width: 0;
   gap: 12px;
   max-height: 48vh;
   overflow-y: auto;
@@ -238,6 +250,7 @@ onMounted(loadCoach)
 
 .chat-message {
   display: flex;
+  min-width: 0;
   gap: 10px;
   align-items: flex-end;
   max-width: 88%;
@@ -257,10 +270,12 @@ onMounted(loadCoach)
 }
 .chat-message.user .chat-avatar { background: var(--green); color: #04240f; }
 .chat-bubble {
+  min-width: 0;
   padding: 10px 14px;
   border-radius: 16px;
   background: var(--panel-soft);
   line-height: 1.5;
+  overflow-wrap: anywhere;
 }
 .chat-bubble p { margin: 0; }
 .chat-message.user .chat-bubble {
@@ -287,6 +302,9 @@ onMounted(loadCoach)
 
 .quick-prompts {
   display: flex;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
   gap: 8px;
   overflow-x: auto;
   scrollbar-width: none;
@@ -306,6 +324,8 @@ onMounted(loadCoach)
 
 .chat-composer {
   display: flex;
+  width: 100%;
+  min-width: 0;
   align-items: flex-end;
   gap: 10px;
   padding: 8px;
@@ -315,6 +335,7 @@ onMounted(loadCoach)
 }
 .chat-composer textarea {
   flex: 1;
+  min-width: 0;
   border: none;
   background: transparent;
   color: var(--text);
@@ -326,8 +347,8 @@ onMounted(loadCoach)
 .chat-composer textarea:focus { outline: none; }
 .send-btn {
   flex: 0 0 auto;
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   display: grid;
   place-items: center;
   border-radius: 50%;
@@ -336,8 +357,9 @@ onMounted(loadCoach)
   color: #04240f;
 }
 
-.recommendation-list { display: grid; gap: 12px; }
+.recommendation-list { display: grid; min-width: 0; gap: 12px; }
 .recommendation-card {
+  min-width: 0;
   padding: 14px;
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
@@ -345,5 +367,5 @@ onMounted(loadCoach)
 }
 .recommendation-card small { color: var(--green-strong); font-weight: 600; }
 .recommendation-card h3 { margin: 6px 0; font-size: var(--fs-title); }
-.recommendation-card p { margin: 0; color: var(--muted); line-height: 1.5; }
+.recommendation-card p { margin: 0; color: var(--muted); line-height: 1.5; overflow-wrap: anywhere; }
 </style>

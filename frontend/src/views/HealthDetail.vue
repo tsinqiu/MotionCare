@@ -247,11 +247,18 @@ watch(selectedDate, loadAll, { immediate: true })
 <style scoped>
 .date-nav {
   display: flex;
+  flex: 1 1 190px;
   align-items: center;
+  justify-content: flex-end;
   gap: 8px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .date-input {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
   background: var(--panel-strong);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -265,13 +272,21 @@ watch(selectedDate, loadAll, { immediate: true })
   border: 1px solid var(--border);
   border-radius: var(--radius);
   color: var(--text);
-  width: 32px;
-  height: 32px;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
   cursor: pointer;
   font-size: 18px;
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+@container phone-frame (max-width: 374px) {
+  .date-nav {
+    flex-basis: 100%;
+    justify-content: stretch;
+  }
 }
 
 .btn-icon:hover {
