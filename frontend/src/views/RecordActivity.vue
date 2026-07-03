@@ -12,7 +12,7 @@
     <StateBlock v-else-if="!authSession.user" title="请先登录" message="登录后可以实时或手工记录运动。" action-label="去登录" @action="router.push('/login')" />
 
     <template v-else>
-      <section class="record-rq-panel">
+      <section class="record-rq-panel" v-if="!liveRecording">
         <div class="section-heading">
           <div>
             <p class="overline">训练入口</p>
@@ -36,7 +36,7 @@
         </div>
       </section>
 
-      <div class="record-choice-grid">
+      <div class="record-choice-grid" v-if="!liveRecording">
         <section class="dark-panel record-choice record-choice--live">
           <span class="record-choice__icon"><MapPin :size="20" aria-hidden="true" /></span>
           <div>
@@ -58,7 +58,7 @@
       </div>
 
       <div ref="liveRecorderRef" class="live-recorder-anchor">
-        <StartWorkout />
+        <StartWorkout @recording-state-change="liveRecording = $event" />
       </div>
     </template>
 
@@ -84,6 +84,7 @@ import StartWorkout from '@/views/StartWorkout.vue'
 
 const router = useRouter()
 const showManualModal = ref(false)
+const liveRecording = ref(false)
 const liveRecorderRef = ref(null)
 
 function scrollToLiveRecorder() {

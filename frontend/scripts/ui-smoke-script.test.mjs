@@ -57,6 +57,11 @@ test('ui smoke checks production mobile layout invariants on every route', () =>
 
 test('ui smoke exercises core server-backed app functions', () => {
   assert.match(source, /UI_SMOKE_EXERCISE_GPS/)
+  assert.match(source, /newContext\(\{[\s\S]*permissions:\s*shouldExerciseGps\s*\?\s*\['geolocation'\]\s*:\s*\[\]/)
+  assert.match(source, /geolocation:\s*shouldExerciseGps\s*\?/)
+  assert.match(source, /args:\s*shouldExerciseGps\s*\?\s*\[/)
+  assert.match(source, /--unsafely-treat-insecure-origin-as-secure=\$\{appUrl\}/)
+  assert.doesNotMatch(source, /grantPermissions/)
   assert.match(source, /async function exerciseLiveWorkout/)
   assert.match(source, /async function exerciseManualActivity/)
   assert.match(source, /async function exerciseShoeFlow/)

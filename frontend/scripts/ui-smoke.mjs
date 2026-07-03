@@ -58,8 +58,8 @@ function routePath(route, state) {
 }
 
 async function collectBrowserEvents(page) {
-    const events = []
-    page.on('console', (message) => {
+  const events = []
+  page.on('console', (message) => {
     if (message.type() === 'error') events.push(`console:${redact(message.text())}`)
   })
   page.on('requestfailed', (request) => {
@@ -141,7 +141,6 @@ async function exerciseManualActivity(page, state) {
 
 async function exerciseLiveWorkout(page) {
   const context = page.context()
-  await context.grantPermissions(['geolocation'], { origin: appUrl })
   await context.setGeolocation({ latitude: 31.2304, longitude: 121.4737, accuracy: 12 })
 
   await page.goto(`${appUrl}/record`, { waitUntil: 'networkidle', timeout: 20000 })
@@ -276,8 +275,18 @@ async function run() {
   const browser = await chromium.launch({
     headless: true,
     executablePath: browserExecutable,
+    args: shouldExerciseGps ? [
+      `--unsafely-treat-insecure-origin-as-secure=${appUrl}`,
+    ] : [],
   })
-  const page = await browser.newPage({ viewport: { width: 430, height: 932 } })
+  const context = await browser.newContext({
+    viewport: { width: 430, height: 932 },
+    permissions: shouldExerciseGps ? ['geolocation'] : [],
+    geolocation: shouldExerciseGps
+      ? { latitude: 31.2304, longitude: 121.4737, accuracy: 12 }
+      : undefined,
+  })
+  const page = await context.newPage()
   const events = await collectBrowserEvents(page)
   const state = { manualActivityPath: '' }
   let badgeText = ''

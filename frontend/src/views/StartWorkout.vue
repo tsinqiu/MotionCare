@@ -1,6 +1,6 @@
 <template>
   <div class="page-stack">
-    <section class="workout-rq-panel">
+    <section class="workout-rq-panel" v-if="!workout">
       <div>
         <p class="overline">实时训练</p>
         <h2>{{ selectedSport.label }}</h2>
@@ -13,7 +13,7 @@
       </div>
     </section>
 
-    <section class="sport-start-grid">
+    <section class="sport-start-grid" v-if="!workout">
       <button
         v-for="sport in startSportTypes"
         :key="sport.label"
@@ -28,7 +28,7 @@
       </button>
     </section>
 
-    <section class="recording-panel dark-panel">
+    <section ref="recordingPanelRef" class="recording-panel dark-panel">
       <span class="status-chip" :class="workout ? 'good' : 'neutral'">{{ workout ? '记录中' : '未开始' }}</span>
       <div class="recording-time">{{ formatClockDuration(elapsed) }}</div>
       <div class="recording-metrics">
@@ -56,7 +56,7 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 
 import { startSportTypes } from '@/constants/sports'
 import {
@@ -69,6 +69,8 @@ import {
 } from '@/services/workouts'
 import { formatClockDuration, formatDistance, formatPaceSeconds, formatSpeed } from '@/utils/formatters'
 
+const emit = defineEmits(['recording-state-change'])
+
 const selectedSport = ref(startSportTypes[0])
 const elapsed = ref(0)
 const running = ref(false)
@@ -76,6 +78,7 @@ const saved = ref(false)
 const busy = ref(false)
 const error = ref('')
 const workout = ref(null)
+const recordingPanelRef = ref(null)
 const startedAt = ref('')
 const distanceM = ref(0)
 const trackPoints = ref([])
@@ -167,6 +170,7 @@ function handleLocation(position) {
   trackPoints.value.push(point)
   pendingTrackPoints.push(point)
   locationStatus.value = accuracyM.value != null && accuracyM.value > 80 ? '精度偏低' : '定位正常'
+  error.value = ''
 
   if (pendingTrackPoints.length >= 5) {
     void flushTrackPoints().catch((err) => {
@@ -177,8 +181,18 @@ function handleLocation(position) {
 
 function handleLocationError(err) {
   const denied = err?.code === 1
+  if (!denied && trackPoints.value.length > 0) {
+    locationStatus.value = '定位不稳定'
+    return
+  }
   locationStatus.value = denied ? '定位被拒绝' : '定位不可用'
   error.value = denied ? '请允许定位权限后再开始实时记录。' : '暂时无法获取定位，请保持网络和定位服务可用。'
+}
+
+function scrollActiveRecorderIntoView() {
+  void nextTick(() => {
+    recordingPanelRef.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  })
 }
 
 function startLocationWatch() {
@@ -240,6 +254,7 @@ async function toggleRecording() {
       if (elapsed.value > 0) await resumeWorkout(current.id)
       running.value = true
       startLocationWatch()
+      scrollActiveRecorderIntoView()
     }
   } catch (err) {
     running.value = false
@@ -308,6 +323,10 @@ watch(running, (active) => {
       elapsed.value += 1
     }, 1000)
   }
+})
+
+watch(workout, (current) => {
+  emit('recording-state-change', Boolean(current))
 })
 
 onBeforeUnmount(() => {
