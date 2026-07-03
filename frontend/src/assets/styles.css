@@ -2203,9 +2203,8 @@ html[data-theme="night"] .route-map .leaflet-control-attribution {
   place-items: center;
   padding: 24px;
   background:
-    radial-gradient(circle at 18% 18%, rgb(33 212 123 / 0.18), transparent 30%),
-    radial-gradient(circle at 82% 8%, rgb(51 181 255 / 0.14), transparent 26%),
-    linear-gradient(135deg, #f8fafc 0%, #effcf5 52%, #f2f7ff 100%);
+    linear-gradient(180deg, var(--app-top-green) 0 24%, transparent 24%),
+    linear-gradient(180deg, #f7fbf8 0%, var(--app-mint-bg) 100%);
 }
 
 .auth-card {
@@ -2221,9 +2220,8 @@ html[data-theme="night"] .route-map .leaflet-control-attribution {
 
 html[data-theme="night"] .auth-page {
   background:
-    radial-gradient(circle at 18% 18%, rgb(33 212 123 / 0.18), transparent 28%),
-    radial-gradient(circle at 84% 12%, rgb(51 181 255 / 0.12), transparent 24%),
-    linear-gradient(135deg, #050a12 0%, #0b111d 52%, #07130e 100%);
+    linear-gradient(180deg, #123f21 0 24%, transparent 24%),
+    linear-gradient(180deg, #08110c 0%, #0a1510 100%);
 }
 
 html[data-theme="night"] .auth-card {
@@ -2362,10 +2360,6 @@ html[data-theme="night"] .input-with-icon {
 .auth-switch a {
   color: var(--green);
   font-weight: 800;
-}
-
-.auth-theme-toggle {
-  flex: 0 0 auto;
 }
 
 .user-chip {

@@ -1,26 +1,17 @@
 <template>
   <main class="auth-page auth-page--login">
     <section class="auth-card auth-card--quiet">
-      <div class="auth-topline">
-        <RouterLink class="auth-brand" to="/login">
-          <span class="brand-mark brand-mark--runner" aria-hidden="true">
-            <i />
-            <b />
-          </span>
+      <div class="auth-topline auth-topline--center">
+        <div class="auth-brand auth-brand--plain">
+          <img class="auth-brand__icon" src="/icons/motioncare-icon.svg" alt="" />
           <span>
             <strong>MotionCare</strong>
           </span>
-        </RouterLink>
-        <button class="theme-toggle auth-theme-toggle" type="button" @click="toggleTheme">
-          <component :is="isNightTheme ? Sun : Moon" :size="16" />
-          {{ isNightTheme ? '日间' : '夜晚' }}
-        </button>
+        </div>
       </div>
 
-      <div class="auth-login-mark" aria-hidden="true">
-        <span />
-        <i />
-        <b />
+      <div class="auth-login-mark">
+        <img src="/icons/motioncare-icon.svg" alt="" />
       </div>
 
       <div class="auth-heading auth-heading--center">
@@ -76,15 +67,13 @@
 <script setup>
 import { reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Eye, EyeOff, LockKeyhole, LogIn, Mail, Moon, Sun } from '@lucide/vue'
+import { Eye, EyeOff, LockKeyhole, LogIn, Mail } from '@lucide/vue'
 
 import ServerHealthBadge from '@/components/ServerHealthBadge.vue'
-import { useThemeMode } from '@/composables/useThemeMode'
 import { authSession, normalizeRedirect, signIn } from '@/stores/authStore'
 
 const route = useRoute()
 const router = useRouter()
-const { isNightTheme, toggleTheme } = useThemeMode()
 const showPassword = ref(false)
 const localError = ref('')
 const form = reactive({

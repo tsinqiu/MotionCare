@@ -2,10 +2,7 @@
   <main class="download-page">
     <section class="download-shell">
       <div class="download-brand">
-        <span class="download-brand__mark" aria-hidden="true">
-          <i />
-          <b />
-        </span>
+        <img class="download-brand__icon" src="/icons/motioncare-icon.svg" alt="" />
         <strong>MotionCare</strong>
       </div>
 

@@ -8,6 +8,7 @@ async function source(path) {
 
 const [
   appCss,
+  stylesCss,
   coachView,
   adminView,
   mainSource,
@@ -37,6 +38,7 @@ const [
   appShell,
 ] = await Promise.all([
   source('src/assets/app.css'),
+  source('src/assets/styles.css'),
   source('src/views/Coach.vue'),
   source('src/views/Admin.vue'),
   source('src/main.js'),
@@ -665,18 +667,32 @@ test('login page is quiet, elegant, and free of fake readiness metrics', () => {
   assert.match(loginView, /auth-login-mark/)
   assert.match(loginView, /欢迎回来/)
   assert.match(loginView, /训练记录与恢复状态/)
+  assert.match(loginView, /class="auth-brand auth-brand--plain"/)
+  assert.match(loginView, /\/icons\/motioncare-icon\.svg/)
+  assert.doesNotMatch(loginView, /brand-mark--runner/)
+  assert.doesNotMatch(loginView, /auth-theme-toggle/)
+  assert.doesNotMatch(loginView, /useThemeMode/)
   assert.doesNotMatch(loginView, /今日跑力/)
   assert.doesNotMatch(loginView, /auth-rq-panel/)
   assert.doesNotMatch(loginView, /auth-runner-grid/)
   assert.doesNotMatch(loginView, />68</)
+  assert.doesNotMatch(stylesCss, /\.auth-page\s*\{[\s\S]*?radial-gradient/)
   assert.match(appCss, /\.auth-card--quiet\s*\{[\s\S]*?border-top:\s*4px solid var\(--app-top-green\)/)
-  assert.match(appCss, /\.auth-login-mark\s*\{[\s\S]*?background:\s*linear-gradient\(135deg,\s*var\(--app-top-green\)/)
+  assert.match(appCss, /\.auth-login-mark\s+img\s*\{[\s\S]*?width:\s*100%/)
+  assert.match(appCss, /\.auth-brand--plain\s*\{[\s\S]*?justify-content:\s*center/)
 })
 
 test('register page frames onboarding as a runner profile setup', () => {
   assert.match(registerView, /建立跑者档案/)
   assert.match(registerView, /数据源/)
   assert.match(registerView, /训练目标/)
+  assert.match(registerView, /class="auth-brand auth-brand--plain"/)
+  assert.match(registerView, /\/icons\/motioncare-icon\.svg/)
+  assert.match(registerView, /耐力赛/)
+  assert.doesNotMatch(registerView, /5K 到全马/)
+  assert.doesNotMatch(registerView, /brand-mark--runner/)
+  assert.doesNotMatch(registerView, /auth-theme-toggle/)
+  assert.doesNotMatch(registerView, /useThemeMode/)
   assert.match(registerView, /auth-setup-panel/)
   assert.match(registerView, /auth-setup-grid/)
   assert.match(appCss, /\.auth-setup-panel\s*\{[\s\S]*?border-top:\s*4px solid var\(--app-green\)/)

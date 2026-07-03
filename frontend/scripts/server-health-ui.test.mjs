@@ -80,6 +80,8 @@ test('download page is the web-only home for the server-hosted Android package',
   assert.match(downloadView, /\/downloads\/motioncare-release\.apk/)
   assert.doesNotMatch(downloadView, /\/downloads\/motioncare-debug\.apk/)
   assert.match(downloadView, /下载安卓版 APK/)
+  assert.match(downloadView, /\/icons\/motioncare-icon\.svg/)
+  assert.doesNotMatch(downloadView, /download-brand__mark/)
   assert.match(downloadView, /download-page/)
   assert.match(downloadView, /download-primary/)
   assert.match(appCss, /\.download-page\s*\{[\s\S]*?--download-green:\s*#2e681d/)
