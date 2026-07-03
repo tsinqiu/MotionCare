@@ -51,9 +51,12 @@ test('manifest provides regular and maskable app icons', () => {
   assert.ok(manifest.icons.every((icon) => icon.type === 'image/svg+xml'))
 })
 
-test('app icons carry the MotionCare green runner mark', () => {
+test('app icons carry the refined deep-green runner mark', () => {
+  assert.match(iconSvg, /#2e681d/)
   assert.match(iconSvg, /#15b66a/)
   assert.match(iconSvg, /MotionCare/)
+  assert.match(maskableSvg, /#2e681d/)
   assert.match(maskableSvg, /#15b66a/)
   assert.match(maskableSvg, /viewBox="0 0 512 512"/)
+  assert.doesNotMatch(iconSvg, />MC</)
 })

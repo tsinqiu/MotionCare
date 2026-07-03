@@ -3,7 +3,10 @@
     <section class="auth-card">
       <div class="auth-topline">
         <RouterLink class="auth-brand" to="/login">
-          <span class="brand-mark">MC</span>
+          <span class="brand-mark brand-mark--runner" aria-hidden="true">
+            <i />
+            <b />
+          </span>
           <span>
             <strong>MotionCare</strong>
           </span>
@@ -21,14 +24,6 @@
       </div>
 
       <ServerHealthBadge />
-
-      <a class="android-download-link" href="/downloads/motioncare-release.apk" download>
-        <span>
-          <small>移动应用</small>
-          <strong>下载安卓应用</strong>
-        </span>
-        <Download :size="18" />
-      </a>
 
       <section class="auth-setup-panel">
         <div class="auth-setup-panel__title">
@@ -113,7 +108,7 @@
 <script setup>
 import { reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Download, Eye, EyeOff, LockKeyhole, Mail, Moon, Sun, UserRound } from '@lucide/vue'
+import { Eye, EyeOff, LockKeyhole, Mail, Moon, Sun, UserRound } from '@lucide/vue'
 
 import ServerHealthBadge from '@/components/ServerHealthBadge.vue'
 import { useThemeMode } from '@/composables/useThemeMode'

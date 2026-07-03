@@ -3,15 +3,17 @@
     android:height="108dp"
     android:viewportHeight="108"
     android:viewportWidth="108">
-    <!-- MotionCare runner launcher foreground -->
+    <!-- MotionCare refined runner launcher foreground -->
     <path
-        android:fillColor="#ffffff"
-        android:fillAlpha="0.18"
-        android:pathData="M18,78C30,67 45,62 61,63C75,64 85,69 93,78V90C83,82 72,78 60,78C44,78 30,84 18,94Z" />
+        android:fillColor="#00000000"
+        android:pathData="M24,74C35,61 49,54 66,52C77,51 87,53 96,58"
+        android:strokeColor="#15b66a"
+        android:strokeLineCap="round"
+        android:strokeWidth="7" />
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M54,20a9,9 0,1 1,0.1 0M47,39c6,-5 14,-6 21,-3l14,5c4,2 6,6 4,10c-2,4 -6,6 -10,4l-8,-3l-8,12l10,11c3,3 2,8 -1,11c-3,3 -8,2 -11,-1l-13,-16c-2,-3 -3,-7 -1,-10l6,-10l-9,4l-8,13c-2,4 -7,5 -11,3c-4,-2 -5,-7 -3,-11l10,-17c1,-2 3,-3 5,-4z" />
+        android:pathData="M66,23a8,8 0,1 1,0.1 0M59,39l-9,14l11,8l12,-17c2,-4 7,-5 11,-3l12,6c4,2 5,6 3,10c-2,3 -6,5 -10,3l-7,-3l-9,13l10,11c3,3 3,8 0,11c-3,3 -8,3 -11,0l-13,-15l-10,16c-2,4 -7,5 -11,3c-4,-2 -5,-7 -3,-11l10,-18l-8,3l-10,13c-2,3 -7,4 -10,1c-3,-2 -4,-7 -1,-10l12,-16c2,-2 4,-4 7,-5z" />
     <path
         android:fillColor="#f6d34d"
-        android:pathData="M34,82h33c4,0 7,3 7,7s-3,7 -7,7h-33c-4,0 -7,-3 -7,-7s3,-7 7,-7z" />
+        android:pathData="M33,85h38c4,0 7,3 7,7s-3,7 -7,7h-38c-4,0 -7,-3 -7,-7s3,-7 7,-7z" />
 </vector>

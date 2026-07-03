@@ -645,14 +645,17 @@ test('shoes empty state keeps an equipment readiness panel', () => {
   assert.match(shoesView, /\.shoe-empty-actions\s*\{[\s\S]*?grid-template-columns:\s*1fr/)
 })
 
-test('login page opens with an RQ-style runner readiness panel before credentials', () => {
-  assert.match(loginView, /今日跑力/)
-  assert.match(loginView, /恢复/)
-  assert.match(loginView, /训练负荷/)
-  assert.match(loginView, /auth-rq-panel/)
-  assert.match(loginView, /auth-runner-grid/)
-  assert.match(appCss, /\.auth-rq-panel\s*\{[\s\S]*?border-top:\s*4px solid var\(--app-green\)/)
-  assert.match(appCss, /\.auth-runner-grid\s*\{[\s\S]*?grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\)/)
+test('login page is quiet, elegant, and free of fake readiness metrics', () => {
+  assert.match(loginView, /auth-card--quiet/)
+  assert.match(loginView, /auth-login-mark/)
+  assert.match(loginView, /欢迎回来/)
+  assert.match(loginView, /训练记录与恢复状态/)
+  assert.doesNotMatch(loginView, /今日跑力/)
+  assert.doesNotMatch(loginView, /auth-rq-panel/)
+  assert.doesNotMatch(loginView, /auth-runner-grid/)
+  assert.doesNotMatch(loginView, />68</)
+  assert.match(appCss, /\.auth-card--quiet\s*\{[\s\S]*?border-top:\s*4px solid var\(--app-top-green\)/)
+  assert.match(appCss, /\.auth-login-mark\s*\{[\s\S]*?background:\s*linear-gradient\(135deg,\s*var\(--app-top-green\)/)
 })
 
 test('register page frames onboarding as a runner profile setup', () => {

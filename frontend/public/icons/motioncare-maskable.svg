@@ -1,11 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="MotionCare">
   <title>MotionCare</title>
-  <rect width="512" height="512" fill="#15b66a"/>
-  <circle cx="256" cy="256" r="214" fill="#15b66a"/>
-  <path fill="#eef8f2" d="M136 344c35-82 80-136 133-163 39-19 78-21 116-9l-22 60c-26-8-51-5-75 9-37 22-68 64-92 126h-60z"/>
-  <path fill="#10251a" d="M202 299h132c22 0 40 18 40 40v9H176v-23c0-14 12-26 26-26z"/>
-  <circle cx="351" cy="137" r="42" fill="#10251a"/>
-  <path fill="#eef8f2" d="M175 390h174c25 0 45 20 45 45v6H126v-3c0-27 22-48 49-48z"/>
-  <path fill="#10251a" d="M112 158h130v44H112z"/>
-  <path fill="#10251a" d="M112 224h82v44h-82z"/>
+  <rect width="512" height="512" fill="#2e681d"/>
+  <circle cx="256" cy="256" r="214" fill="#2e681d"/>
+  <path fill="none" stroke="#15b66a" stroke-width="34" stroke-linecap="round" d="M104 358c62-88 132-139 210-151 42-7 83-1 125 17"/>
+  <path fill="none" stroke="#effaf2" stroke-width="28" stroke-linecap="round" stroke-linejoin="round" d="M137 346c51-72 111-112 179-122 36-5 72-1 108 14"/>
+  <circle cx="324" cy="147" r="38" fill="#effaf2"/>
+  <path fill="none" stroke="#effaf2" stroke-width="36" stroke-linecap="round" stroke-linejoin="round" d="M294 201l-40 58 58 37"/>
+  <path fill="none" stroke="#effaf2" stroke-width="30" stroke-linecap="round" stroke-linejoin="round" d="M268 253l-72 31m101-69 86 22"/>
+  <path fill="none" stroke="#effaf2" stroke-width="30" stroke-linecap="round" stroke-linejoin="round" d="M312 296l-61 85m62-84 91 63"/>
+  <path fill="none" stroke="#f6d34d" stroke-width="26" stroke-linecap="round" d="M166 402h190"/>
 </svg>

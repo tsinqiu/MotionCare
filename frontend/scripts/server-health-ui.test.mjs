@@ -16,6 +16,8 @@ const [
   serverHealthBadge,
   loginView,
   registerView,
+  downloadView,
+  routerSource,
   appCss,
   packageJsonText,
   nginxConfig,
@@ -24,6 +26,8 @@ const [
   source('src/components/ServerHealthBadge.vue'),
   source('src/views/Login.vue'),
   source('src/views/Register.vue'),
+  source('src/views/Download.vue'),
+  source('src/router/index.js'),
   source('src/assets/app.css'),
   source('package.json'),
   source('../backend/docs/nginx-motion-analysis.conf'),
@@ -55,16 +59,31 @@ test('login and register screens surface the server status before account action
   assert.match(registerView, /<ServerHealthBadge\s*\/>/)
 })
 
-test('auth screens expose the server-hosted Android app package', () => {
+test('auth screens do not expose APK download actions inside the app flow', () => {
   for (const view of [loginView, registerView]) {
-    assert.match(view, /\/downloads\/motioncare-release\.apk/)
+    assert.doesNotMatch(view, /\/downloads\/motioncare-release\.apk/)
     assert.doesNotMatch(view, /\/downloads\/motioncare-debug\.apk/)
-    assert.match(view, /移动应用/)
-    assert.match(view, /下载安卓应用/)
+    assert.doesNotMatch(view, /下载安卓应用/)
     assert.doesNotMatch(view, /Android App/)
-    assert.match(view, /android-download-link/)
+    assert.doesNotMatch(view, /android-download-link/)
   }
-  assert.match(appCss, /\.android-download-link\s*\{[\s\S]*?var\(--app-green\)/)
+})
+
+test('download page is the web-only home for the server-hosted Android package', () => {
+  assert.match(routerSource, /import\s+\{\s*Capacitor\s*\}\s+from\s+['"]@capacitor\/core['"]/)
+  assert.match(routerSource, /function\s+isNativeRuntime\(\)/)
+  assert.match(routerSource, /path:\s*['"]\/download['"]/)
+  assert.match(routerSource, /name:\s*['"]download['"]/)
+  assert.match(routerSource, /redirect:\s*\(\)\s*=>\s*\(isNativeRuntime\(\)\s*\|\|\s*hasAuthToken\(\)\s*\?\s*['"]\/today['"]\s*:\s*['"]\/download['"]\)/)
+  assert.match(routerSource, /to\.name\s*===\s*['"]download['"][\s\S]*?isNativeRuntime\(\)[\s\S]*?name:\s*['"]login['"]/)
+  assert.match(downloadView, /<ServerHealthBadge\s*\/>/)
+  assert.match(downloadView, /\/downloads\/motioncare-release\.apk/)
+  assert.doesNotMatch(downloadView, /\/downloads\/motioncare-debug\.apk/)
+  assert.match(downloadView, /下载安卓版 APK/)
+  assert.match(downloadView, /download-page/)
+  assert.match(downloadView, /download-primary/)
+  assert.match(appCss, /\.download-page\s*\{[\s\S]*?--download-green:\s*#2e681d/)
+  assert.match(appCss, /\.download-primary\s*\{[\s\S]*?background:\s*var\(--download-green\)/)
 })
 
 test('server health badge follows the RQ-style green system status treatment', () => {

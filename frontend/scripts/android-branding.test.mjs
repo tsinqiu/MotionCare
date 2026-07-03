@@ -38,12 +38,14 @@ test('Android launcher icon uses MotionCare adaptive icon resources', () => {
   assert.match(adaptiveRoundIcon, /@drawable\/motioncare_launcher_foreground/)
 })
 
-test('MotionCare launcher art is green, runner-focused, and not the default Android mark', () => {
+test('MotionCare launcher art is deep green, refined, and not the default Android mark', () => {
+  assert.match(launcherBackground, /#2e681d/)
   assert.match(launcherBackground, /#15b66a/)
-  assert.match(launcherBackground, /MotionCare launcher background/)
-  assert.match(launcherForeground, /MotionCare runner launcher foreground/)
+  assert.match(launcherBackground, /MotionCare refined launcher background/)
+  assert.match(launcherForeground, /MotionCare refined runner launcher foreground/)
   assert.match(launcherForeground, /#ffffff/)
   assert.match(launcherForeground, /#f6d34d/)
+  assert.match(launcherForeground, /#15b66a/)
   assert.doesNotMatch(launcherForeground, /62\.94,56\.92/)
   assert.doesNotMatch(legacyForeground, /62\.94,56\.92/)
   assert.doesNotMatch(legacyBackground, /#26A69A/)

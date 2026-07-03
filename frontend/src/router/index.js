@@ -1,3 +1,4 @@
+import { Capacitor } from '@capacitor/core'
 import { createRouter, createWebHistory } from 'vue-router'
 
 import Admin from '@/views/Admin.vue'
@@ -5,6 +6,7 @@ import Activities from '@/views/Activities.vue'
 import ActivityDetail from '@/views/ActivityDetail.vue'
 import Calendar from '@/views/Calendar.vue'
 import Coach from '@/views/Coach.vue'
+import Download from '@/views/Download.vue'
 import HealthDetail from '@/views/HealthDetail.vue'
 import Login from '@/views/Login.vue'
 import Me from '@/views/Me.vue'
@@ -28,10 +30,20 @@ import {
   normalizeRedirect,
 } from '@/stores/authStore'
 
+function isNativeRuntime() {
+  return Capacitor.isNativePlatform()
+}
+
 const routes = [
   {
     path: '/',
-    redirect: '/today',
+    redirect: () => (isNativeRuntime() || hasAuthToken() ? '/today' : '/download'),
+  },
+  {
+    path: '/download',
+    name: 'download',
+    component: Download,
+    meta: { title: '下载', authLayout: true },
   },
   {
     path: '/login',
@@ -179,6 +191,13 @@ const router = createRouter({
 installAuthFailureHandler(router)
 
 router.beforeEach(async (to) => {
+  if (to.name === 'download') {
+    if (isNativeRuntime()) {
+      return hasAuthToken() ? { name: 'today' } : { name: 'login' }
+    }
+    return true
+  }
+
   if (to.meta.publicOnly) {
     if (hasAuthToken()) {
       const ready = isAuthenticated.value || await initAuthSession()

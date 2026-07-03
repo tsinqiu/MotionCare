@@ -328,6 +328,212 @@ html[data-theme="night"] {
   box-shadow: 0 0 0 5px color-mix(in srgb, #ef4444 16%, transparent);
 }
 
+.auth-card--quiet {
+  gap: 20px;
+  border-top: 4px solid var(--app-top-green);
+  background: color-mix(in srgb, #ffffff 94%, var(--app-mint-bg));
+}
+
+.auth-heading--center {
+  justify-items: center;
+  text-align: center;
+}
+
+.auth-heading--center h1 {
+  font-size: clamp(32px, 10vw, 42px);
+  letter-spacing: 0;
+}
+
+.auth-brand .brand-mark--runner {
+  position: relative;
+  border-radius: 50%;
+  background: var(--app-top-green);
+  color: transparent;
+  overflow: hidden;
+}
+
+.brand-mark--runner i,
+.brand-mark--runner b {
+  position: absolute;
+  display: block;
+  border-radius: 999px;
+}
+
+.brand-mark--runner i {
+  width: 26px;
+  height: 13px;
+  border: 4px solid #fff;
+  border-color: transparent transparent #fff #fff;
+  transform: rotate(-18deg) translate(-1px, 5px);
+}
+
+.brand-mark--runner b {
+  width: 9px;
+  height: 9px;
+  background: #fff;
+  transform: translate(8px, -9px);
+}
+
+.auth-login-mark {
+  position: relative;
+  width: 82px;
+  height: 82px;
+  justify-self: center;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--app-top-green), var(--app-green-dark));
+  box-shadow: 0 18px 44px color-mix(in srgb, var(--app-top-green) 28%, transparent);
+}
+
+.auth-login-mark span,
+.auth-login-mark i,
+.auth-login-mark b {
+  position: absolute;
+  display: block;
+  border-radius: 999px;
+}
+
+.auth-login-mark span {
+  width: 48px;
+  height: 24px;
+  border: 7px solid #fff;
+  border-color: transparent transparent #fff #fff;
+  transform: rotate(-18deg) translate(1px, 6px);
+}
+
+.auth-login-mark i {
+  width: 16px;
+  height: 16px;
+  background: #fff;
+  transform: translate(13px, -20px);
+}
+
+.auth-login-mark b {
+  width: 28px;
+  height: 7px;
+  background: #f6d34d;
+  transform: translate(-1px, 25px);
+}
+
+.download-page {
+  --download-green: #2e681d;
+  min-height: 100vh;
+  display: grid;
+  align-items: start;
+  justify-items: center;
+  padding: clamp(18px, 7vh, 54px) 24px 24px;
+  background:
+    linear-gradient(180deg, var(--download-green) 0%, var(--download-green) 34%, var(--app-mint-bg) 34%, var(--app-mint-bg) 100%);
+}
+
+.download-shell {
+  width: min(100%, 430px);
+  display: grid;
+  gap: 18px;
+  padding: 24px;
+  border: 1px solid color-mix(in srgb, var(--download-green) 16%, var(--border));
+  border-radius: var(--radius);
+  background: var(--panel);
+  box-shadow: 0 22px 58px rgb(16 37 26 / 0.18);
+}
+
+.download-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text);
+  font-size: 17px;
+}
+
+.download-brand__mark {
+  position: relative;
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--download-green);
+}
+
+.download-brand__mark i,
+.download-brand__mark b {
+  position: absolute;
+  display: block;
+  border-radius: 999px;
+}
+
+.download-brand__mark i {
+  width: 24px;
+  height: 13px;
+  border: 4px solid #fff;
+  border-color: transparent transparent #fff #fff;
+  transform: rotate(-18deg) translate(0, 3px);
+}
+
+.download-brand__mark b {
+  width: 10px;
+  height: 10px;
+  background: #fff;
+  transform: translate(8px, -10px);
+}
+
+.download-hero {
+  display: grid;
+  gap: 8px;
+  padding-top: 6px;
+}
+
+.download-hero h1 {
+  margin: 0;
+  color: var(--text);
+  font-size: clamp(32px, 9vw, 42px);
+  line-height: 1.08;
+}
+
+.download-hero p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+.download-primary {
+  min-height: 54px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: var(--radius);
+  background: var(--download-green);
+  color: #fff;
+  text-decoration: none;
+  box-shadow: 0 14px 34px color-mix(in srgb, var(--download-green) 26%, transparent);
+}
+
+.download-primary span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.download-primary strong {
+  font-size: 15px;
+}
+
+.download-primary small {
+  color: rgb(255 255 255 / 0.72);
+  font-size: 12px;
+}
+
+.download-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+  text-align: center;
+}
+
 .android-download-link {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
