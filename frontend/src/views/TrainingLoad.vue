@@ -18,88 +18,6 @@
       <MetricCard v-for="item in healthExtras" :key="item.label" :label="item.label" :value="item.value" />
     </div>
 
-    <section v-if="importSummary || importError" class="dark-panel">
-      <div class="section-heading">
-        <div>
-          <p class="overline">Garmin 导入数据</p>
-          <h2>数据库原始字段</h2>
-        </div>
-      </div>
-      <StateBlock v-if="importError" title="导入数据加载失败" :message="importError" action-label="重试" tone="danger" @action="loadGarminImportSummary" />
-      <template v-else>
-        <div class="training-targets">
-          <span><small>功率 avg/max/normalized</small><b>{{ formatCount(activityImport.powerRows) }} 条</b></span>
-          <span><small>有氧训练效果</small><b>{{ formatCount(activityImport.aerobicTrainingEffectRows) }} 条</b></span>
-          <span><small>无氧训练效果</small><b>{{ formatCount(activityImport.anaerobicTrainingEffectRows) }} 条</b></span>
-          <span><small>训练效果 message</small><b>{{ formatCount(activityImport.trainingEffectMessageRows) }} 条</b></span>
-          <span><small>单次训练负荷</small><b>{{ formatCount(activityImport.trainingLoadRows) }} 条</b></span>
-        </div>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>日期</th>
-                <th>活动</th>
-                <th>平均/最大/标准化功率</th>
-                <th>有氧/无氧效果</th>
-                <th>效果标签</th>
-                <th>训练负荷</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="row in recentActivityRows" :key="`${row.date}-${row.activityName}`">
-                <td>{{ row.date }}</td>
-                <td>{{ row.activityName || '--' }}</td>
-                <td>{{ formatPower(row) }}</td>
-                <td>{{ formatValue(row.aerobicTrainingEffect) }} / {{ formatValue(row.anaerobicTrainingEffect) }}</td>
-                <td>{{ row.trainingEffectLabel || '--' }}</td>
-                <td>{{ formatValue(row.activityTrainingLoad) }}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </template>
-    </section>
-
-    <section v-if="importSummary" class="dark-panel">
-      <div class="section-heading">
-        <div>
-          <p class="overline">TrainingStatusSnapshots</p>
-          <h2>{{ trainingImport.startDate || '--' }} 到 {{ trainingImport.endDate || '--' }}，共 {{ formatCount(trainingImport.totalDays) }} 天</h2>
-        </div>
-      </div>
-      <div class="training-targets">
-        <span><small>短期负荷</small><b>{{ formatCount(trainingImport.acuteLoadRows) }}</b></span>
-        <span><small>长期负荷</small><b>{{ formatCount(trainingImport.chronicLoadRows) }}</b></span>
-        <span><small>最佳负荷范围</small><b>{{ formatCount(trainingImport.optimalRangeRows) }}</b></span>
-        <span><small>低/高有氧/无氧分类负荷</small><b>{{ formatCount(trainingImport.categoryLoadRows) }}</b></span>
-      </div>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>日期</th>
-              <th>状态</th>
-              <th>短期负荷</th>
-              <th>长期负荷</th>
-              <th>最佳范围</th>
-              <th>低有氧/高有氧/无氧</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="row in trainingStatusRows" :key="row.snapshotDate">
-              <td>{{ row.snapshotDate }}</td>
-              <td>{{ row.trainingStatus || '--' }}</td>
-              <td>{{ formatValue(row.acuteTrainingLoad) }}</td>
-              <td>{{ formatValue(row.chronicTrainingLoad) }}</td>
-              <td>{{ formatValue(row.optimalLoadMin) }} - {{ formatValue(row.optimalLoadMax) }}</td>
-              <td>{{ formatValue(row.lowAerobicLoad) }} / {{ formatValue(row.highAerobicLoad) }} / {{ formatValue(row.anaerobicLoad) }}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
-
     <section v-if="lactateLatest" class="dark-panel">
       <div class="section-heading">
         <div>
@@ -160,6 +78,88 @@
         </section>
       </div>
     </template>
+
+    <section v-if="importSummary || importError" class="dark-panel raw-data-panel">
+      <div class="section-heading">
+        <div>
+          <p class="overline">Garmin 导入数据</p>
+          <h2>数据库原始字段</h2>
+        </div>
+      </div>
+      <StateBlock v-if="importError" title="导入数据加载失败" :message="importError" action-label="重试" tone="danger" @action="loadGarminImportSummary" />
+      <template v-else>
+        <div class="training-targets">
+          <span><small>功率 avg/max/normalized</small><b>{{ formatCount(activityImport.powerRows) }} 条</b></span>
+          <span><small>有氧训练效果</small><b>{{ formatCount(activityImport.aerobicTrainingEffectRows) }} 条</b></span>
+          <span><small>无氧训练效果</small><b>{{ formatCount(activityImport.anaerobicTrainingEffectRows) }} 条</b></span>
+          <span><small>训练效果 message</small><b>{{ formatCount(activityImport.trainingEffectMessageRows) }} 条</b></span>
+          <span><small>单次训练负荷</small><b>{{ formatCount(activityImport.trainingLoadRows) }} 条</b></span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>日期</th>
+                <th>活动</th>
+                <th>平均/最大/标准化功率</th>
+                <th>有氧/无氧效果</th>
+                <th>效果标签</th>
+                <th>训练负荷</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="row in recentActivityRows" :key="`${row.date}-${row.activityName}`">
+                <td>{{ row.date }}</td>
+                <td>{{ row.activityName || '--' }}</td>
+                <td>{{ formatPower(row) }}</td>
+                <td>{{ formatValue(row.aerobicTrainingEffect) }} / {{ formatValue(row.anaerobicTrainingEffect) }}</td>
+                <td>{{ row.trainingEffectLabel || '--' }}</td>
+                <td>{{ formatValue(row.activityTrainingLoad) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </template>
+    </section>
+
+    <section v-if="importSummary" class="dark-panel raw-data-panel">
+      <div class="section-heading">
+        <div>
+          <p class="overline">TrainingStatusSnapshots</p>
+          <h2>{{ trainingImport.startDate || '--' }} 到 {{ trainingImport.endDate || '--' }}，共 {{ formatCount(trainingImport.totalDays) }} 天</h2>
+        </div>
+      </div>
+      <div class="training-targets">
+        <span><small>短期负荷</small><b>{{ formatCount(trainingImport.acuteLoadRows) }}</b></span>
+        <span><small>长期负荷</small><b>{{ formatCount(trainingImport.chronicLoadRows) }}</b></span>
+        <span><small>最佳负荷范围</small><b>{{ formatCount(trainingImport.optimalRangeRows) }}</b></span>
+        <span><small>低/高有氧/无氧分类负荷</small><b>{{ formatCount(trainingImport.categoryLoadRows) }}</b></span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>日期</th>
+              <th>状态</th>
+              <th>短期负荷</th>
+              <th>长期负荷</th>
+              <th>最佳范围</th>
+              <th>低有氧/高有氧/无氧</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="row in trainingStatusRows" :key="row.snapshotDate">
+              <td>{{ row.snapshotDate }}</td>
+              <td>{{ row.trainingStatus || '--' }}</td>
+              <td>{{ formatValue(row.acuteTrainingLoad) }}</td>
+              <td>{{ formatValue(row.chronicTrainingLoad) }}</td>
+              <td>{{ formatValue(row.optimalLoadMin) }} - {{ formatValue(row.optimalLoadMax) }}</td>
+              <td>{{ formatValue(row.lowAerobicLoad) }} / {{ formatValue(row.highAerobicLoad) }} / {{ formatValue(row.anaerobicLoad) }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
   </div>
 </template>
 
@@ -253,21 +253,23 @@ const lactateLatest = computed(() => importSummary.value?.lactateThreshold?.late
 const recentActivityRows = computed(() => activityImport.value.rows || [])
 const trainingStatusRows = computed(() => trainingImport.value.rows || [])
 
+const chartTextColor = 'var(--muted)'
+const chartLineColor = 'var(--border)'
 const loadOption = computed(() => ({
   color: ['#33b5ff', '#8b5cf6', '#ef4444'],
   tooltip: { trigger: 'axis' },
-  legend: { top: 0, right: 8, textStyle: { color: '#9ca3af' } },
+  legend: { top: 0, right: 8, textStyle: { color: chartTextColor } },
   grid: { left: 44, right: 22, top: 46, bottom: 36 },
   xAxis: {
     type: 'category',
     data: loadRows.value.map((row) => row.date),
-    axisLine: { lineStyle: { color: '#334155' } },
-    axisLabel: { color: '#9ca3af' },
+    axisLine: { lineStyle: { color: chartLineColor } },
+    axisLabel: { color: chartTextColor },
   },
   yAxis: {
     type: 'value',
-    axisLabel: { color: '#9ca3af' },
-    splitLine: { lineStyle: { color: '#1f2937' } },
+    axisLabel: { color: chartTextColor },
+    splitLine: { lineStyle: { color: chartLineColor } },
   },
   series: [
     { name: '体能 CTL', type: 'line', smooth: true, data: loadRows.value.map((row) => row.ctl) },

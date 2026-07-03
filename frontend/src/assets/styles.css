@@ -437,7 +437,6 @@ html[data-theme="night"] .hero-panel {
   white-space: nowrap;
 }
 
-.today-layout,
 .load-dashboard,
 .detail-grid,
 .analytics-grid,
@@ -447,7 +446,6 @@ html[data-theme="night"] .hero-panel {
   gap: 18px;
 }
 
-.today-layout > *,
 .load-dashboard > *,
 .detail-grid > *,
 .analytics-grid > *,
@@ -459,12 +457,19 @@ html[data-theme="night"] .hero-panel {
   grid-column: 1 / -1;
 }
 
-.today-layout.single {
-  grid-template-columns: 1fr;
+.today-layout {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.62fr) minmax(0, 1.38fr);
+  align-items: start;
+  gap: 18px;
 }
 
-.today-layout:has(.ai-brief-panel) {
-  grid-template-columns: minmax(240px, 0.72fr) minmax(0, 1.28fr);
+.today-layout > * {
+  min-width: 0;
+}
+
+.today-layout.single {
+  grid-template-columns: 1fr;
 }
 
 .weather-panel {
@@ -475,15 +480,16 @@ html[data-theme="night"] .hero-panel {
 }
 
 .start-workout-panel {
-  min-height: 220px;
+  min-height: 150px;
   display: flex;
-  flex-direction: column;
+  align-items: flex-start;
   justify-content: space-between;
-  gap: 18px;
+  gap: 14px;
 }
 
 .start-workout-panel.compact {
-  min-height: 190px;
+  min-height: 150px;
+  padding: 16px;
 }
 
 .start-workout-panel p {
@@ -492,9 +498,14 @@ html[data-theme="night"] .hero-panel {
   line-height: 1.7;
 }
 
-.ai-brief-panel {
+.ai-summary-panel,
+.ai-detail-panel {
   display: grid;
   gap: 14px;
+}
+
+.ai-detail-panel {
+  grid-column: 1 / -1;
 }
 
 .ai-mode-pill {
@@ -533,7 +544,7 @@ html[data-theme="night"] .hero-panel {
 
 .ai-brief-sections {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 10px;
 }
 

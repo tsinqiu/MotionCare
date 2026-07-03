@@ -380,11 +380,11 @@ function createLineOption(name, unit, color, source, field, options = {}) {
     type: 'value',
     name: unit,
     min: axisMin,
-    axisLabel: { color: '#9ca3af' },
-    splitLine: { lineStyle: { color: '#1f2937' } },
+    axisLabel: { color: 'var(--muted)' },
+    splitLine: { lineStyle: { color: 'var(--border)' } },
     ...options.yAxis,
     axisLabel: {
-      color: '#9ca3af',
+      color: 'var(--muted)',
       ...(options.yAxis?.axisLabel || {}),
     },
   }
@@ -407,8 +407,8 @@ function createLineOption(name, unit, color, source, field, options = {}) {
       type: 'category',
       name: '运动时间',
       data: elapsedLabels(source),
-      axisLine: { lineStyle: { color: '#334155' } },
-      axisLabel: { color: '#9ca3af' },
+      axisLine: { lineStyle: { color: 'var(--border)' } },
+      axisLabel: { color: 'var(--muted)' },
     },
     yAxis,
     series: [
@@ -553,11 +553,11 @@ watch(() => route.params.id, loadActivity, { immediate: true })
 
 <style scoped>
 .shoe-bind { display: flex; align-items: center; gap: 12px; padding: 8px 0; }
-.shoe-bind select { padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border, #333); background: var(--bg-elevated, #1a1a2e); color: inherit; }
+.shoe-bind select { padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--panel-soft); color: inherit; }
 .shoe-bind-info { font-size: 13px; color: var(--text-muted, #888); }
 .edit-form { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; padding: 8px 0; }
 .edit-form label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--text-muted, #888); }
-.edit-form input { padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border, #333); background: var(--bg-elevated, #1a1a2e); color: inherit; }
+.edit-form input { padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--panel-soft); color: inherit; }
 .edit-form-actions { display: flex; align-items: flex-end; }
 .photo-section { padding: 8px 0; display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
 .photo-upload-label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--text-muted, #888); }
@@ -568,6 +568,6 @@ watch(() => route.params.id, loadActivity, { immediate: true })
 .weather-grid small { font-size: 12px; color: var(--text-muted, #888); }
 .weather-form { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; padding: 8px 0; }
 .weather-form label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--text-muted, #888); }
-.weather-form input { width: 100px; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--border, #333); background: var(--bg-elevated, #1a1a2e); color: inherit; }
+.weather-form input { width: 100px; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--panel-soft); color: inherit; }
 .weather-source { font-size: 11px; color: var(--text-muted, #888); margin: 4px 0 0; }
 </style>

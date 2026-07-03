@@ -177,17 +177,17 @@ const barOption = computed(() => {
     xAxis: {
       type: 'category',
       data: timeline.value.map((row) => row.period),
-      axisLine: { lineStyle: { color: '#334155' } },
+      axisLine: { lineStyle: { color: 'var(--border)' } },
       axisLabel: {
-        color: '#9ca3af',
+        color: 'var(--muted)',
         hideOverlap: true,
       },
     },
     yAxis: {
       type: 'value',
       name: seriesName,
-      axisLabel: { color: '#9ca3af' },
-      splitLine: { lineStyle: { color: '#1f2937' } },
+      axisLabel: { color: 'var(--muted)' },
+      splitLine: { lineStyle: { color: 'var(--border)' } },
     },
     series: [
       {

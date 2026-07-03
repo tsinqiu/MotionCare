@@ -15,7 +15,7 @@
           <div>
             <p class="overline">浏览器模拟运动</p>
             <h2>开始运动</h2>
-            <p>快速记录一次浏览器运动，并写入运动记录。</p>
+            <p>记录一次浏览器运动。</p>
           </div>
           <RouterLink class="start-fab" to="/start">
             <Play :size="18" />
@@ -23,7 +23,7 @@
           </RouterLink>
         </section>
 
-        <section class="dark-panel training-panel ai-brief-panel">
+        <section class="dark-panel ai-summary-panel">
           <div class="section-heading">
             <div>
               <p class="overline">AI Brief</p>
@@ -63,6 +63,19 @@
             </button>
           </div>
           <p v-if="feedbackMessage" class="feedback-message">{{ feedbackMessage }}</p>
+          <p v-if="aiError" class="ai-brief-error">
+            {{ aiError }}
+            <button type="button" @click="loadAiBrief">重新生成</button>
+          </p>
+        </section>
+
+        <section class="dark-panel ai-detail-panel">
+          <div class="section-heading">
+            <div>
+              <p class="overline">Coach Notes</p>
+              <h2>今日建议拆解</h2>
+            </div>
+          </div>
           <div class="ai-brief-sections">
             <span
               v-for="section in aiSections"
@@ -73,28 +86,7 @@
               <b>{{ section.text }}</b>
             </span>
           </div>
-          <p v-if="aiError" class="ai-brief-error">
-            {{ aiError }}
-            <button type="button" @click="loadAiBrief">重新生成</button>
-          </p>
-          <div class="training-targets">
-            <span
-              v-for="metric in aiMetrics"
-              :key="metric.label"
-              :class="metric.tone"
-            >
-              <small>{{ metric.label }}</small>
-              <b>{{ metric.value }}</b>
-            </span>
-          </div>
         </section>
-      </div>
-
-      <div class="metric-grid">
-        <MetricCard label="本月活动" :value="`${overview.monthlySummary?.activityCount || 0}`" />
-        <MetricCard label="本月距离" :value="formatDistance((overview.monthlySummary?.totalDistanceKm || 0) * 1000)" />
-        <MetricCard label="训练负荷" :value="`${overview.yearlySummary?.totalTrainingLoad || 0}`" />
-        <MetricCard label="平均心率" :value="`${overview.monthlySummary?.avgHeartRateBpm || '--'} bpm`" />
       </div>
 
       <section class="dark-panel" v-if="healthData">
@@ -148,12 +140,10 @@ import { useRouter } from 'vue-router'
 import { Play } from '@lucide/vue'
 
 import ActivityCard from '@/components/ActivityCard.vue'
-import MetricCard from '@/components/MetricCard.vue'
 import StateBlock from '@/components/StateBlock.vue'
 import { useAsyncData } from '@/composables/useAsyncData'
 import { getDailyBrief, sendAiFeedback } from '@/services/ai'
 import { getDashboardOverview } from '@/services/dashboard'
-import { formatDistance } from '@/utils/formatters'
 import { getTodayHealth } from '@/services/dashboard'
 
 const router = useRouter()
@@ -272,7 +262,6 @@ const aiRiskLabel = computed(() => {
 const aiRiskTone = computed(() => (['orange', 'red'].includes(aiBrief.value.riskLevel) ? 'danger' : aiBrief.value.riskLevel === 'green' ? 'good' : 'neutral'))
 const aiRecommendation = computed(() => (aiLoading.value ? defaultBrief.recommendation : aiBrief.value.recommendation))
 const aiSections = computed(() => (aiLoading.value ? defaultBrief.sections : aiBrief.value.sections))
-const aiMetrics = computed(() => aiBrief.value.metrics)
 const mlSignals = computed(() => {
   const ml = aiBrief.value.ml
   if (!ml) return []
@@ -338,8 +327,9 @@ onMounted(loadAiBrief)
   gap: 12px;
 }
 .health-grid span {
-  background: var(--bg-elevated, #1a1a2e);
-  border-radius: 10px;
+  background: var(--panel-soft);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
   padding: 12px 16px;
   display: flex;
   flex-direction: column;

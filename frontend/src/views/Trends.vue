@@ -162,13 +162,13 @@ function formatTooltip(params = []) {
 const trendOption = computed(() => ({
   color: ['#21d47b', '#33b5ff', '#ff9d19', '#8b5cf6', '#ef4444', '#94a3b8'],
   tooltip: { trigger: 'axis', formatter: formatTooltip },
-  legend: { top: 0, textStyle: { color: '#64748b' } },
+  legend: { top: 0, textStyle: { color: 'var(--muted)' } },
   grid: { left: 24, right: 24, top: 34, bottom: 42, containLabel: true },
   xAxis: {
     type: 'category',
     data: xAxisDates.value,
-    axisLine: { lineStyle: { color: '#334155' } },
-    axisLabel: { color: '#9ca3af' },
+    axisLine: { lineStyle: { color: 'var(--border)' } },
+    axisLabel: { color: 'var(--muted)' },
   },
   dataZoom: [
     {
@@ -184,15 +184,15 @@ const trendOption = computed(() => ({
   yAxis: {
     type: 'value',
     name: activeMetric.value.unit,
-    nameTextStyle: { color: '#9ca3af', padding: [0, 0, 0, 4] },
+    nameTextStyle: { color: 'var(--muted)', padding: [0, 0, 0, 4] },
     nameGap: 18,
     axisLabel: {
-      color: '#9ca3af',
+      color: 'var(--muted)',
       formatter: (value) => formatMetricValue(value),
       hideOverlap: true,
       margin: 12,
     },
-    splitLine: { lineStyle: { color: '#1f2937' } },
+    splitLine: { lineStyle: { color: 'var(--border)' } },
   },
   series: trendSeries.value.map((series) => ({
     name: series.label,

@@ -287,11 +287,11 @@ onMounted(load)
 
 <style scoped>
 .shoe-form { display: flex; flex-wrap: wrap; gap: 8px; padding: 16px 0; }
-.shoe-form input { flex: 1; min-width: 120px; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border, #333); background: var(--bg-elevated, #1a1a2e); color: inherit; }
+.shoe-form input { flex: 1; min-width: 120px; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--panel-soft); color: inherit; }
 .shoe-form-actions { display: flex; gap: 8px; width: 100%; }
 .photo-upload-label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--text-muted, #888); }
 .shoe-list { display: flex; flex-direction: column; gap: 8px; }
-.shoe-card { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-radius: 10px; background: var(--bg-elevated, #1a1a2e); cursor: pointer; gap: 12px; }
+.shoe-card { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-radius: 10px; background: var(--panel-soft); cursor: pointer; gap: 12px; }
 .shoe-card.retired { opacity: 0.5; }
 .shoe-card.selected { border: 1px solid var(--primary, #21d47b); }
 .shoe-card:hover { background: var(--bg-hover, #222); }
@@ -305,7 +305,7 @@ onMounted(load)
 .shoe-activities-list { display: flex; flex-direction: column; gap: 8px; }
 
 .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 1000; }
-.modal-content { background: var(--bg-elevated, #1a1a2e); border-radius: 12px; padding: 24px; width: 90%; max-width: 480px; max-height: 90vh; overflow-y: auto; }
+.modal-content { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 24px; width: 90%; max-width: 480px; max-height: 90vh; overflow-y: auto; }
 .modal-content h3 { margin: 0 0 16px; }
 .modal-content label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--text-muted, #888); margin-bottom: 12px; }
 .modal-content input { padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border, #333); background: var(--bg-card, #16162a); color: inherit; }

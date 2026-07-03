@@ -105,7 +105,49 @@ function ragDbQuery(sql) {
       optimalLoadMax: 650
     }];
   }
+  if (sql.includes('FROM AiCoachFeedback')) {
+    return [];
+  }
   return [];
+}
+
+function feedbackMemoryDbQuery(sql, params) {
+  if (sql.includes('FROM AiCoachFeedback')) {
+    assert.deepEqual(params, [7, 5]);
+    return [
+      {
+        suggestionDate: '2026-06-29',
+        suggestionType: 'daily_brief',
+        feedback: 'too_conservative',
+        note: '我其实还能练',
+        modelVersion: 'coach-v1',
+        mlRiskLevel: 'yellow',
+        mlLoadAction: 'maintain',
+        mlWeatherRisk: 'low'
+      },
+      {
+        suggestionDate: '2026-06-28',
+        suggestionType: 'training_load',
+        feedback: 'too_conservative',
+        note: null,
+        modelVersion: 'coach-v1',
+        mlRiskLevel: 'green',
+        mlLoadAction: 'maintain',
+        mlWeatherRisk: 'low'
+      },
+      {
+        suggestionDate: '2026-06-27',
+        suggestionType: 'daily_brief',
+        feedback: 'helpful',
+        note: null,
+        modelVersion: 'coach-v1',
+        mlRiskLevel: 'yellow',
+        mlLoadAction: 'reduce',
+        mlWeatherRisk: 'medium'
+      }
+    ];
+  }
+  return ragDbQuery(sql, params);
 }
 
 test('aiService reports DeepSeek provider with rule fallback', async () => {
@@ -197,17 +239,62 @@ test('aiService daily brief uses DeepSeek JSON with RAG system context', async (
 
     assert.equal(result.meta.ai.provider, 'deepseek');
     assert.equal(result.meta.ai.fallback, false);
+    assert.equal(result.meta.ai.contextStrategy, 'today_readiness');
+    assert.equal(result.meta.ai.jsonMode, true);
     assert.equal(result.data.headline, 'DeepSeek 恢复建议');
     assert.equal(result.data.placements.trainingLoad.text, '降低强度。');
     assert.equal(result.data.ml.provider, 'rules');
     assert.equal(result.meta.ai.contextSignals.mlProvider, 'rules');
     assert.equal(result.data.metrics.length, 4);
+    assert.deepEqual(requestBody.response_format, { type: 'json_object' });
     assert.equal(requestBody.messages[0].role, 'system');
     assert.equal(requestBody.messages[1].role, 'user');
     assert.match(requestBody.messages[0].content, /近期运动明细/);
     assert.match(requestBody.messages[0].content, /本地模型输出/);
+    assert.match(requestBody.messages[0].content, /结构化决策上下文/);
+    assert.match(requestBody.messages[0].content, /用户近期反馈偏好/);
     assert.match(requestBody.messages[1].content, /只返回一个 JSON 对象/);
     assert.doesNotMatch(JSON.stringify(result), /近期运动明细|system prompt|28天运动汇总/);
+  });
+});
+
+test('aiService injects feedback preference into hidden prompt without leaking it', async () => {
+  let requestBody;
+  await withAiEnvironment({
+    dbQuery: feedbackMemoryDbQuery,
+    aiConfig: {
+      deepseekApiKey: 'test-key',
+      deepseekModel: 'deepseek-chat',
+      deepseekBaseUrl: 'https://api.deepseek.com',
+      fallbackRules: true
+    },
+    activityStubs: {
+      getDashboardOverview: async () => ({
+        recentActivities: [{ id: 1, activityType: 'running', distanceM: 5000 }],
+        monthlySummary: { activityCount: 1, totalDistanceKm: 5 },
+        trainingLoad: [{ dailyTrainingLoad: 80, ctl: 20, atl: 25, tsb: -5 }]
+      })
+    },
+    fetchImpl: async (_url, init) => {
+      requestBody = JSON.parse(init.body);
+      return {
+        ok: true,
+        json: async () => ({ choices: [{ message: { content: '可以安排轻松跑；如果体感很好，可在安全范围内小幅推进。' } }] })
+      };
+    }
+  }, async () => {
+    const result = await aiService.chat({ message: '今天适合跑吗？' }, { id: 7 });
+
+    assert.equal(result.meta.ai.provider, 'deepseek');
+    assert.equal(result.meta.ai.contextStrategy, 'today_readiness');
+    assert.equal(result.meta.ai.feedbackPreference.dominant, 'too_conservative');
+    assert.equal(result.meta.ai.feedbackPreference.total, 3);
+    assert.equal(result.meta.ai.contextSignals.feedbackCount, 3);
+    assert.match(requestBody.messages[0].content, /用户近期反馈偏好/);
+    assert.match(requestBody.messages[0].content, /偏保守/);
+    assert.match(requestBody.messages[0].content, /不得因为用户嫌保守而建议高强度训练/);
+    assert.equal(requestBody.messages[1].content, '今天适合跑吗？');
+    assert.doesNotMatch(JSON.stringify(result), /我其实还能练|结构化决策上下文|近期运动明细|system prompt/);
   });
 });
 
@@ -293,6 +380,8 @@ test('aiService sends RAG context as DeepSeek system message only', async () => 
 
     assert.equal(result.meta.ai.provider, 'deepseek');
     assert.equal(result.meta.ai.fallback, false);
+    assert.equal(result.meta.ai.contextStrategy, 'today_readiness');
+    assert.equal(result.meta.ai.jsonMode, false);
     assert.equal(result.data.content, '今天建议恢复跑，并避开高温时段。');
     assert.equal(requestBody.model, 'deepseek-chat');
     assert.equal(requestBody.messages[0].role, 'system');
@@ -303,6 +392,40 @@ test('aiService sends RAG context as DeepSeek system message only', async () => 
     assert.match(requestBody.messages[0].content, /本地模型输出/);
     assert.doesNotMatch(requestBody.messages[1].content, /近期运动明细|28天运动汇总|system prompt/);
     assert.doesNotMatch(JSON.stringify(result), /近期运动明细|system prompt|28天运动汇总/);
+  });
+});
+
+test('aiService selects long range RAG strategy for historical summary questions', async () => {
+  let requestBody;
+  await withAiEnvironment({
+    dbQuery: ragDbQuery,
+    aiConfig: {
+      deepseekApiKey: 'test-key',
+      deepseekModel: 'deepseek-chat',
+      deepseekBaseUrl: 'https://api.deepseek.com',
+      fallbackRules: true
+    },
+    activityStubs: {
+      getDashboardOverview: async () => ({
+        recentActivities: [],
+        monthlySummary: {},
+        yearlySummary: { activityCount: 55, totalDistanceKm: 450 },
+        trainingLoad: []
+      })
+    },
+    fetchImpl: async (_url, init) => {
+      requestBody = JSON.parse(init.body);
+      return {
+        ok: true,
+        json: async () => ({ choices: [{ message: { content: '今年骑行和跑步总体保持稳定。' } }] })
+      };
+    }
+  }, async () => {
+    const result = await aiService.chat({ message: '总结一下我今年的骑行表现' }, { id: 7 });
+
+    assert.equal(result.meta.ai.contextStrategy, 'long_range_summary');
+    assert.match(requestBody.messages[0].content, /长周期总结/);
+    assert.equal(requestBody.messages[1].content, '总结一下我今年的骑行表现');
   });
 });
 
