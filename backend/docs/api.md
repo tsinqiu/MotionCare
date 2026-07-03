@@ -1,15 +1,9 @@
 # Backend API
 
-Frontend integration notes:
-
-```text
-backend/docs/frontend-integration.md
-```
-
 Base URL for local frontend development:
 
 ```text
-http://localhost:8080/api
+http://localhost:8089/api
 ```
 
 ## Auth
@@ -77,7 +71,7 @@ Supported query parameters:
 - `start_date`, `end_date`: local date range in `YYYY-MM-DD`; if both are provided, the range must be 1095 days or less.
 - `keyword`: searches activity name, location, activity type, activity key, and Garmin activity id; maximum length is 100 characters.
 - `source`: `garmin_import`, `manual_upload`, or `live_workout`.
-- `owner`: `all`, `admin`, or `mine`; `mine` requires login.
+- `owner`: defaults to `mine` for every logged-in user. Normal users are always restricted to `mine`; administrators may explicitly request `all` or `admin` in management views.
 - `sort_by`: `local_start_time`, `distance_m`, `duration_s`, `avg_heart_rate_bpm`, `max_heart_rate_bpm`, `avg_pace`, `activity_training_load`.
 - `sort_order`: `asc` or `desc`.
 
@@ -165,6 +159,7 @@ DELETE /api/manual-activities/:id
 ```
 
 Manual upload only stores summary data. It does not automatically run ML prediction. `distanceM` may be `0` for non-distance activities such as strength training, but `durationS` must be greater than `0`.
+Logged-in users can create and manage their own manual activities. Administrators can manage all manual activities. Missing and unauthorized activity ids both return `404 ACTIVITY_NOT_FOUND`.
 
 Example body:
 
@@ -290,9 +285,9 @@ Returns recent activities, monthly summary, yearly summary, recent training load
 
 ## Extension Modules
 
-These modules persist real backend state. Garmin Connect sync is implemented;
-Strava, COROS, and Apple Health remain placeholder providers and return
-`adapterStatus="not_configured"`.
+These modules persist real backend state. Garmin Connect is the only sync
+provider currently exposed by the API; unimplemented providers are rejected
+instead of appearing as placeholder integrations.
 
 Sync APIs require login:
 
@@ -418,6 +413,7 @@ POST /api/ml/running-prediction
 ```
 
 Prediction is intentionally separate from upload. The frontend should show a separate button after upload if the user wants analysis.
+`GET /api/ml/health` is public. `POST /api/ml/running-prediction` requires `Authorization: Bearer <token>`.
 
 `POST /api/ml/running-prediction` accepts numeric running metrics:
 

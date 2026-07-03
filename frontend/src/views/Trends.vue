@@ -82,7 +82,7 @@ import {
 
 import ChartPanel from '@/components/ChartPanel.vue'
 import StateBlock from '@/components/StateBlock.vue'
-import { sportFilters } from '@/mock/garsync'
+import { sportFilters } from '@/constants/sports'
 import { getMetricTrend } from '@/services/stats'
 import { formatDistance, formatPaceSeconds } from '@/utils/formatters'
 
@@ -95,7 +95,7 @@ const ranges = [
 ]
 
 const metrics = [
-  { label: '平均心率', value: 'avg_heart_rate_bpm', unit: 'bpm', color: '#ef4444', icon: HeartPulse },
+  { label: '平均心率', value: 'avg_heart_rate_bpm', unit: '次/分', color: '#ef4444', icon: HeartPulse },
   { label: '平均配速', value: 'avg_pace_sec_per_km', unit: '分:秒/km', color: '#21d47b', icon: Gauge },
   { label: '平均步频', value: 'avg_cadence_spm', unit: '步/分钟', color: '#ff9d19', icon: Activity },
   { label: '距离', value: 'distance_m', unit: 'km', color: '#22c55e', icon: Mountain },
@@ -145,7 +145,7 @@ function formatMetricValue(value) {
   if (!Number.isFinite(Number(value))) return '--'
   if (filters.metric === 'avg_pace_sec_per_km') return formatPaceSeconds(value)
   if (filters.metric === 'distance_m') return formatDistance(value)
-  if (filters.metric === 'avg_heart_rate_bpm') return `${Number(value).toFixed(0)} bpm`
+  if (filters.metric === 'avg_heart_rate_bpm') return `${Number(value).toFixed(0)} 次/分`
   if (filters.metric === 'avg_cadence_spm') return `${Number(value).toFixed(0)} 步/分钟`
   return Number(value).toFixed(1)
 }

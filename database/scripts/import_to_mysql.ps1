@@ -60,14 +60,15 @@ default-character-set=utf8mb4
     Write-Host "Verifying row counts..."
     & $Mysql --defaults-extra-file="$defaultsFile" --database=MotionAnalysis --table --execute="
 SELECT 'Activities' AS table_name, COUNT(*) AS row_count FROM Activities
-UNION ALL SELECT 'SourceFiles', COUNT(*) FROM SourceFiles
-UNION ALL SELECT 'ActivitySourceFiles', COUNT(*) FROM ActivitySourceFiles
-UNION ALL SELECT 'Sessions', COUNT(*) FROM Sessions
 UNION ALL SELECT 'Laps', COUNT(*) FROM Laps
 UNION ALL SELECT 'TrackPoints', COUNT(*) FROM TrackPoints
-UNION ALL SELECT 'Events', COUNT(*) FROM Events
 UNION ALL SELECT 'ActivitySummaries', COUNT(*) FROM ActivitySummaries
-UNION ALL SELECT 'ActivityZones', COUNT(*) FROM ActivityZones;
+UNION ALL SELECT 'ActivityZones', COUNT(*) FROM ActivityZones
+UNION ALL SELECT 'DailyHealthSummaries', COUNT(*) FROM DailyHealthSummaries
+UNION ALL SELECT 'SleepSummaries', COUNT(*) FROM SleepSummaries
+UNION ALL SELECT 'RestingHeartRates', COUNT(*) FROM RestingHeartRates
+UNION ALL SELECT 'BodyWeights', COUNT(*) FROM BodyWeights
+UNION ALL SELECT 'DailyStressSummaries', COUNT(*) FROM DailyStressSummaries;
 "
     if ($LASTEXITCODE -ne 0) {
         throw "Verification query failed with exit code $LASTEXITCODE"

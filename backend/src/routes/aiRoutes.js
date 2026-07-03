@@ -37,6 +37,24 @@ function createAiRouter({ aiService = defaultAiService, authService = defaultAut
   );
 
   router.post(
+    '/ai/feedback',
+    requireAuth,
+    asyncHandler(async (req, res) => {
+      const result = await aiService.submitFeedback(req.body, req.user);
+      sendData(res, result.data, result.meta);
+    })
+  );
+
+  router.post(
+    '/ai/morning-readiness',
+    requireAuth,
+    asyncHandler(async (req, res) => {
+      const result = await aiService.submitMorningReadiness(req.body, req.user);
+      sendData(res, result.data, result.meta);
+    })
+  );
+
+  router.post(
     '/ai/activity-analysis',
     requireAuth,
     asyncHandler(async (req, res) => {

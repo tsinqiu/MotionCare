@@ -3,12 +3,9 @@
     <section class="dark-panel">
       <div class="section-heading">
         <div>
+          <p class="overline">训练日历</p>
           <h2>运动日历</h2>
         </div>
-        <button v-if="isAdmin" class="primary-link" type="button" @click="openCreate">
-          <Plus :size="17" />
-          添加
-        </button>
       </div>
       <div class="date-stepper">
         <button type="button" @click="stepMonth(-1)">‹</button>
@@ -21,6 +18,30 @@
     <StateBlock v-else-if="error" title="日历加载失败" :message="error" action-label="重试" tone="danger" @action="load" />
 
     <template v-else>
+      <section class="calendar-rq-panel">
+        <div class="section-heading">
+          <div>
+            <p class="overline">本月训练</p>
+            <h2>{{ monthLabel }}</h2>
+          </div>
+          <span class="status-chip">{{ monthlyActivityCount }} 次</span>
+        </div>
+        <div class="calendar-summary-grid">
+          <span>
+            <small>月跑量</small>
+            <b>{{ monthlyDistanceText }}</b>
+          </span>
+          <span>
+            <small>训练连续性</small>
+            <b>{{ trainingContinuityText }}</b>
+          </span>
+          <span>
+            <small>训练天数</small>
+            <b>{{ monthlyTrainingDays }} 天</b>
+          </span>
+        </div>
+      </section>
+
       <section class="calendar-grid-panel">
         <div class="calendar-week">
           <span v-for="day in weekDays" :key="day">{{ day }}</span>
@@ -52,7 +73,7 @@
         <StateBlock
           v-if="selectedActivities.length === 0"
           title="当天暂无运动"
-          message="可以点击右上角添加手动运动记录。"
+          message="这一天还没有运动记录。"
         />
         <div v-else class="activity-card-grid">
           <ActivityCard
@@ -65,42 +86,47 @@
       </section>
     </template>
 
-    <ManualActivityModal
-      v-if="modalOpen"
-      :save="createManualActivity"
-      @close="modalOpen = false"
-      @saved="handleSaved"
-    />
   </div>
 </template>
 
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { Plus } from '@lucide/vue'
 
 import ActivityCard from '@/components/ActivityCard.vue'
-import ManualActivityModal from '@/components/ManualActivityModal.vue'
 import StateBlock from '@/components/StateBlock.vue'
-import { createManualActivity } from '@/services/activities'
 import { getCalendarStats } from '@/services/stats'
-import { authSession } from '@/stores/authStore'
+import { formatDistance } from '@/utils/formatters'
 
 const router = useRouter()
 const weekDays = ['日', '一', '二', '三', '四', '五', '六']
-const month = ref('2026-06')
+const today = new Date()
+const month = ref(formatMonthKey(today))
 const calendar = ref({ days: [] })
-const selectedDate = ref('2026-06-10')
+const selectedDate = ref(`${formatMonthKey(today)}-${String(today.getDate()).padStart(2, '0')}`)
 const error = ref('')
 const loading = ref(false)
-const modalOpen = ref(false)
-const isAdmin = computed(() => authSession.user?.role === 'admin')
 
 const monthLabel = computed(() => `${month.value.slice(0, 4)}年${Number(month.value.slice(5, 7))}月`)
 const leadingBlanks = computed(() => new Date(`${month.value}-01T00:00:00`).getDay())
 const selectedActivities = computed(() =>
   (calendar.value.days || []).find((day) => day.date === selectedDate.value)?.activities || [],
 )
+const monthlyActivities = computed(() => (calendar.value.days || []).flatMap((day) => day.activities || []))
+const monthlyActivityCount = computed(() => monthlyActivities.value.length)
+const monthlyTrainingDays = computed(() => (calendar.value.days || [])
+  .filter((day) => (day.activities || []).length > 0).length)
+const monthlyDistanceText = computed(() => {
+  const distance = monthlyActivities.value.reduce((sum, activity) => sum + Number(activity.total_distance_m || 0), 0)
+  return distance > 0 ? formatDistance(distance) : '--'
+})
+const trainingContinuityText = computed(() => {
+  const days = monthlyTrainingDays.value
+  if (!days) return '--'
+  const calendarDays = Math.max((calendar.value.days || []).length, 1)
+  const ratio = Math.round((days / calendarDays) * 100)
+  return `${ratio}%`
+})
 
 function iconClass(type) {
   if (String(type).includes('cycling')) return 'ride'
@@ -116,37 +142,8 @@ function stepMonth(offset) {
   selectedDate.value = `${month.value}-01`
 }
 
-function openCreate() {
-  if (!isAdmin.value) return
-  modalOpen.value = true
-}
-
 function formatMonthKey(date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
-}
-
-async function handleSaved(activity) {
-  modalOpen.value = false
-  const normalizedDate = normalizeDateKey(activity.local_start_time)
-  month.value = normalizedDate.slice(0, 7)
-  selectedDate.value = normalizedDate
-  await load()
-}
-
-function normalizeDateKey(value) {
-  if (!value) return new Date().toISOString().slice(0, 10)
-  if (typeof value === 'string') {
-    const normalized = value.replace(' ', 'T')
-    const parsed = new Date(normalized)
-    if (!Number.isNaN(parsed.getTime())) return formatDateKey(parsed)
-    return value.slice(0, 10)
-  }
-  const parsed = new Date(value)
-  return Number.isNaN(parsed.getTime()) ? formatDateKey(new Date()) : formatDateKey(parsed)
-}
-
-function formatDateKey(date) {
-  return `${formatMonthKey(date)}-${String(date.getDate()).padStart(2, '0')}`
 }
 
 async function load() {

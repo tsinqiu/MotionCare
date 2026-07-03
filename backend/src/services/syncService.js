@@ -7,10 +7,7 @@ const { ApiError } = require('../errors');
 const statsCache = require('../cache/statsCache');
 
 const PROVIDERS = [
-  { provider: 'garmin', name: 'Garmin Connect' },
-  { provider: 'strava', name: 'Strava' },
-  { provider: 'coros', name: 'COROS' },
-  { provider: 'apple_health', name: 'Apple Health' }
+  { provider: 'garmin', name: 'Garmin Connect' }
 ];
 
 const DEFAULT_PROVIDER_STATE = {
@@ -31,13 +28,12 @@ function assertProvider(provider) {
 }
 
 function normalizeConnection(provider, row) {
-  const adapterStatus = provider === 'garmin' ? 'configured' : DEFAULT_PROVIDER_STATE.adapterStatus;
   return {
     status: row?.status || DEFAULT_PROVIDER_STATE.status,
     autoSync: Boolean(row?.autoSync),
     syncDirection: row?.syncDirection || DEFAULT_PROVIDER_STATE.syncDirection,
     lastSyncAt: row?.lastSyncAt || null,
-    adapterStatus,
+    adapterStatus: 'configured',
     authorizationUrl: null
   };
 }
@@ -287,47 +283,6 @@ async function getJobById(jobId) {
   return toJob(rows[0]);
 }
 
-async function createSkippedJob(payload, user, message) {
-  return db.transaction(async (connection) => {
-    const [jobResult] = await connection.query(
-      `
-        INSERT INTO SyncJobs (user_id, provider, job_type, status, requested_at, started_at, finished_at, activity_count, error_message)
-        VALUES (?, ?, ?, 'skipped', NOW(3), NOW(3), NOW(3), 0, ?)
-      `,
-      [user.id, payload.provider, payload.jobType || 'manual_sync', message]
-    );
-    const jobId = jobResult.insertId;
-
-    await connection.query(
-      `
-        INSERT INTO SyncLogs (job_id, user_id, provider, level, message)
-        VALUES (?, ?, ?, 'warn', ?)
-      `,
-      [jobId, user.id, payload.provider, message]
-    );
-
-    const [rows] = await connection.query(
-      `
-        SELECT
-          id,
-          provider,
-          job_type AS jobType,
-          status,
-          requested_at AS requestedAt,
-          started_at AS startedAt,
-          finished_at AS finishedAt,
-          activity_count AS activityCount,
-          error_message AS errorMessage
-        FROM SyncJobs
-        WHERE id = ?
-      `,
-      [jobId]
-    );
-
-    return toJob(rows[0]);
-  });
-}
-
 async function getExistingGarminIds(startDate) {
   const rows = await db.query(
     `
@@ -431,6 +386,7 @@ async function runGarminSync(jobId, user, payload) {
   const knownIdsPath = path.join(jobDir, 'known_ids.json');
   const summaryPath = path.join(jobDir, 'download_summary.json');
   const importSqlPath = path.join(jobDir, 'import.sql');
+  const healthSqlPath = path.join(jobDir, 'health_import.sql');
 
   await fs.mkdir(jobDir, { recursive: true });
   await fs.writeFile(knownIdsPath, JSON.stringify(await getExistingGarminIds(startDate)), 'utf8');
@@ -462,6 +418,7 @@ async function runGarminSync(jobId, user, payload) {
       String(config.garmin.retries),
       '--skip-activity-ids-file',
       knownIdsPath,
+      '--include-health',
       '--summary-out',
       summaryPath,
       ...(account.isCn ? ['--cn'] : [])
@@ -474,10 +431,28 @@ async function runGarminSync(jobId, user, payload) {
   );
 
   const summary = parseRawJson(await fs.readFile(summaryPath, 'utf8'));
+  const downloadedHealthDays = Array.isArray(summary.downloadedHealthDays) ? summary.downloadedHealthDays : [];
+  if (downloadedHealthDays.length) {
+    await runProcess(
+      config.garmin.pythonPath,
+      [
+        config.garmin.healthImportScriptPath,
+        '--health-dir',
+        path.join(jobDir, 'health'),
+        '--user-id',
+        String(user.id),
+        '--out',
+        healthSqlPath
+      ],
+      { cwd: PROJECT_ROOT, timeoutMs: config.garmin.timeoutMs }
+    );
+    await executeSqlFile(healthSqlPath);
+  }
+
   const downloadedIds = Array.isArray(summary.downloadedActivityIds) ? summary.downloadedActivityIds : [];
   if (!downloadedIds.length) {
     await addLog(jobId, user, 'garmin', 'info', 'no new Garmin activities found');
-    return { importedCount: 0, startDate, endDate, summary };
+    return { importedCount: 0, healthDaysImported: downloadedHealthDays.length, startDate, endDate, summary };
   }
 
   await runProcess(
@@ -506,8 +481,40 @@ async function runGarminSync(jobId, user, payload) {
   );
   statsCache.clear();
 
+  const weatherService = require('./weatherService');
+
+  if (downloadedIds.length) {
+    const placeholders = downloadedIds.map(() => '?').join(', ');
+    const weatherActivities = await db.query(
+      `SELECT id, start_latitude AS startLatitude, start_longitude AS startLongitude, local_start_time AS localStartTime
+       FROM Activities
+       WHERE garmin_activity_id IN (${placeholders})
+         AND start_latitude IS NOT NULL AND start_longitude IS NOT NULL
+         AND (weather_condition IS NULL AND temperature_c IS NULL)`,
+      [...downloadedIds.map(String)]
+    );
+
+    for (const act of weatherActivities) {
+      weatherService.fetchHistoricalWeatherForActivity(act)
+        .then((payload) => {
+          const wc = payload.weatherCondition;
+          const tc = payload.temperatureC;
+          const hp = payload.humidityPercent;
+          const fl = payload.feelsLikeC;
+          if (tc !== null || hp !== null || fl !== null) {
+            return db.query(
+              `UPDATE Activities SET weather_condition = ?, temperature_c = ?, humidity_percent = ?, feels_like_c = ?, weather_source = 'open_meteo', weather_updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+              [wc, tc, hp, fl, act.id]
+            );
+          }
+        })
+        .catch(() => {});
+    }
+  }
+
   return {
     importedCount: updateResult.affectedRows || downloadedIds.length,
+    healthDaysImported: downloadedHealthDays.length,
     startDate,
     endDate,
     summary
@@ -653,9 +660,6 @@ async function disconnectProvider(provider, user) {
 
 async function createJob(payload, user) {
   assertProvider(payload.provider);
-  if (payload.provider !== 'garmin') {
-    return createSkippedJob(payload, user, 'sync adapter is not configured; no activity was imported');
-  }
 
   const result = await db.query(
     `

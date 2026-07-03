@@ -1,10 +1,4 @@
-import { apiClient, unwrapApiResponse, useMockData } from '@/services/http'
-
-export { useMockData }
-
-export function cloneValue(value) {
-  return value === undefined ? undefined : structuredClone(value)
-}
+import { apiClient, unwrapApiResponse } from '@/services/http'
 
 export function cleanParams(params = {}) {
   const next = {}
@@ -23,14 +17,7 @@ export function normalizeCollection(value, normalizer) {
   return value
 }
 
-export async function getEnvelope(path, { params, mockValue, normalizer, mockMeta } = {}) {
-  if (useMockData()) {
-    return {
-      data: normalizeCollection(cloneValue(mockValue), normalizer),
-      meta: mockMeta || {},
-    }
-  }
-
+export async function getEnvelope(path, { params, normalizer } = {}) {
   const response = await apiClient.get(path, { params: cleanParams(params) })
   const envelope = unwrapApiResponse(response.data)
   return {
@@ -39,14 +26,7 @@ export async function getEnvelope(path, { params, mockValue, normalizer, mockMet
   }
 }
 
-export async function mutateEnvelope(method, path, body, { mockValue, normalizer } = {}) {
-  if (useMockData()) {
-    return {
-      data: normalizeCollection(cloneValue(mockValue), normalizer),
-      meta: {},
-    }
-  }
-
+export async function mutateEnvelope(method, path, body, { normalizer } = {}) {
   const response = await apiClient[method](path, body)
   const envelope = unwrapApiResponse(response.data)
   return {

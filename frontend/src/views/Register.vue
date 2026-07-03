@@ -1,24 +1,43 @@
 <template>
   <main class="auth-page">
     <section class="auth-card">
-      <div class="auth-topline">
-        <RouterLink class="auth-brand" to="/login">
-          <span class="brand-mark">GS</span>
+      <div class="auth-topline auth-topline--center">
+        <div class="auth-brand auth-brand--plain">
+          <img class="auth-brand__icon" src="/icons/motioncare-icon.svg" alt="" />
           <span>
-            <strong>GarSync Motion</strong>
+            <strong>MotionCare</strong>
           </span>
-        </RouterLink>
-        <button class="theme-toggle auth-theme-toggle" type="button" @click="toggleTheme">
-          <component :is="isNightTheme ? Sun : Moon" :size="16" />
-          {{ isNightTheme ? '日间' : '夜晚' }}
-        </button>
+        </div>
       </div>
 
       <div class="auth-heading">
-        <p class="overline">创建账号</p>
-        <h1>注册访问账号</h1>
-        <p>新账号注册后会自动登录，可立即进入 Garmin 运动数据分析数据库系统。</p>
+        <p class="overline">建立跑者档案</p>
+        <h1>注册 MotionCare</h1>
+        <p>从第一天开始记录跑力、恢复和训练目标。</p>
       </div>
+
+      <ServerHealthBadge />
+
+      <section class="auth-setup-panel">
+        <div class="auth-setup-panel__title">
+          <span>建立跑者档案</span>
+          <strong>3 步</strong>
+        </div>
+        <div class="auth-setup-grid">
+          <span>
+            <small>数据源</small>
+            <b>Garmin / 手动</b>
+          </span>
+          <span>
+            <small>训练目标</small>
+            <b>耐力赛</b>
+          </span>
+          <span>
+            <small>恢复追踪</small>
+            <b>睡眠 / 压力</b>
+          </span>
+        </div>
+      </section>
 
       <form class="auth-form" @submit.prevent="submit">
         <label>
@@ -82,14 +101,13 @@
 <script setup>
 import { reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Eye, EyeOff, LockKeyhole, Mail, Moon, Sun, UserRound } from '@lucide/vue'
+import { Eye, EyeOff, LockKeyhole, Mail, UserRound } from '@lucide/vue'
 
-import { useThemeMode } from '@/composables/useThemeMode'
+import ServerHealthBadge from '@/components/ServerHealthBadge.vue'
 import { authSession, normalizeRedirect, signUp } from '@/stores/authStore'
 
 const route = useRoute()
 const router = useRouter()
-const { isNightTheme, toggleTheme } = useThemeMode()
 const showPassword = ref(false)
 const localError = ref('')
 const form = reactive({

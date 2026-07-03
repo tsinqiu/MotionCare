@@ -1,28 +1,81 @@
 <template>
   <div class="page-stack">
-    <section class="dark-panel">
+    <section class="statistics-control-panel">
       <div class="section-heading">
         <div>
+          <p class="overline">统计控制</p>
           <h2>运动统计</h2>
         </div>
       </div>
-      <div class="range-row">
-        <button v-for="tab in tabs" :key="tab.value" type="button" :class="{ active: mode === tab.value }" @click="mode = tab.value">
+      <div class="statistics-period-toggle" aria-label="统计周期">
+        <button
+          v-for="tab in tabs"
+          :key="tab.value"
+          type="button"
+          :class="{ active: mode === tab.value }"
+          :aria-pressed="mode === tab.value"
+          @click="mode = tab.value"
+        >
           {{ tab.label }}
         </button>
       </div>
-      <SportTabs v-model="activityType" :items="sportFilters" aria-label="统计运动类型筛选" />
-      <div v-if="mode !== 'all'" class="date-stepper">
-        <button type="button" @click="stepDate(-1)">‹</button>
-        <strong>{{ selectedLabel }}</strong>
-        <button type="button" @click="stepDate(1)">›</button>
+      <div class="statistics-sport-strip" aria-label="统计运动类型筛选">
+        <button
+          v-for="item in sportFilters"
+          :key="item.value"
+          type="button"
+          :class="{ active: activityType === item.value }"
+          :style="{ '--sport-color': item.color }"
+          :aria-pressed="activityType === item.value"
+          @click="activityType = item.value"
+        >
+          {{ item.label }}
+        </button>
+      </div>
+      <div class="statistics-month-switch" aria-label="统计时间范围">
+        <button class="statistics-step" type="button" :disabled="mode === 'all'" @click="stepDate(-1)">
+          <ChevronLeft :size="18" aria-hidden="true" />
+        </button>
+        <strong>{{ currentPeriodLabel }}</strong>
+        <button class="statistics-step" type="button" :disabled="mode === 'all'" @click="stepDate(1)">
+          <ChevronRight :size="18" aria-hidden="true" />
+        </button>
       </div>
     </section>
 
     <StateBlock v-if="loading" title="正在加载统计" message="正在读取运动统计。" />
     <StateBlock v-else-if="error" title="统计加载失败" :message="error" action-label="重试" tone="danger" @action="load" />
+    <StateBlock
+      v-else-if="!hasStats"
+      title="还没有趋势数据"
+      message="有运动数据后，这里会展示距离、时长和运动类型趋势。"
+    />
 
     <template v-else>
+      <section class="statistics-rq-panel">
+        <div class="section-heading">
+          <div>
+            <p class="overline">训练趋势</p>
+            <h2>{{ currentPeriodLabel }}</h2>
+          </div>
+          <span class="status-chip">{{ summaryActivityCountText }}</span>
+        </div>
+        <div class="stat-focus-grid">
+          <span>
+            <small>月度跑量</small>
+            <b>{{ formatDistance((summary.totalDistanceKm || 0) * 1000) }}</b>
+          </span>
+          <span>
+            <small>负荷走势</small>
+            <b>{{ trainingLoadTrendText }}</b>
+          </span>
+          <span>
+            <small>运动时长</small>
+            <b>{{ formatClockDuration(summary.totalDurationS) }}</b>
+          </span>
+        </div>
+      </section>
+
       <div class="metric-grid">
         <MetricCard label="总距离" :value="formatDistance((summary.totalDistanceKm || 0) * 1000)" />
         <MetricCard label="卡路里" :value="formatCalories(summary.totalCalories)" />
@@ -45,7 +98,7 @@
       <section class="panel achievement-panel">
         <div class="panel-heading">
           <div>
-            <p class="overline">Achievements</p>
+            <p class="overline">训练成就</p>
             <h2>成就统计</h2>
           </div>
         </div>
@@ -91,12 +144,12 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { ChevronLeft, ChevronRight } from '@lucide/vue'
 
 import ChartPanel from '@/components/ChartPanel.vue'
 import MetricCard from '@/components/MetricCard.vue'
-import SportTabs from '@/components/SportTabs.vue'
 import StateBlock from '@/components/StateBlock.vue'
-import { sportFilters } from '@/mock/garsync'
+import { sportFilters } from '@/constants/sports'
 import { getActivityTypeStats, getPersonalBests, getSummaryStats, getTimelineStats } from '@/services/stats'
 import { formatCalories, formatClockDuration, formatDistance, formatFatKg, formatPaceSeconds } from '@/utils/formatters'
 
@@ -108,7 +161,7 @@ const tabs = [
 
 const router = useRouter()
 const mode = ref('month')
-const selected = ref('2026-06')
+const selected = ref(todayText().slice(0, 7))
 const activityType = ref('all')
 const selectedBarMetric = ref('distance')
 const summary = ref({})
@@ -153,12 +206,31 @@ const barMetrics = [
   },
 ]
 
-const selectedLabel = computed(() => (mode.value === 'year' ? selected.value.slice(0, 4) : selected.value))
+const currentPeriodLabel = computed(() => {
+  if (mode.value === 'all') return '全部时间'
+  if (mode.value === 'year') return `${selected.value.slice(0, 4)} 年`
+  return selected.value
+})
 const runningAchievementKeys = ['longest_distance', 'fastest_5k', 'fastest_10k', 'fastest_half_marathon', 'fastest_marathon']
 const cyclingAchievementKeys = ['longest_distance', 'fastest_avg_speed', 'highest_elevation_gain', 'highest_training_load']
 const runningAchievements = computed(() => pickAchievements(personalBests.value.running, runningAchievementKeys))
 const cyclingAchievements = computed(() => pickAchievements(personalBests.value.cycling, cyclingAchievementKeys))
 const activeBarMetric = computed(() => barMetrics.find((metric) => metric.key === selectedBarMetric.value) || barMetrics[0])
+const summaryActivityCountText = computed(() => `${Number(summary.value.activityCount || summary.value.totalActivities || 0)} 次`)
+const trainingLoadTrendText = computed(() => {
+  const load = Number(summary.value.totalTrainingLoad)
+  if (Number.isFinite(load) && load > 0) return load.toFixed(1)
+
+  const timelineLoad = timeline.value.reduce((sum, row) => sum + Number(row.totalTrainingLoad || 0), 0)
+  return timelineLoad > 0 ? timelineLoad.toFixed(1) : '--'
+})
+const hasStats = computed(() => (
+  Number(summary.value.activityCount || summary.value.totalActivities || 0) > 0
+  || Number(summary.value.totalDistanceKm || 0) > 0
+  || Number(summary.value.totalDurationS || 0) > 0
+  || typeStats.value.some((item) => Number(item.activity_count || 0) > 0)
+  || [...(personalBests.value.running || []), ...(personalBests.value.cycling || [])].some((item) => item.value != null)
+))
 
 const barOption = computed(() => {
   const metric = activeBarMetric.value

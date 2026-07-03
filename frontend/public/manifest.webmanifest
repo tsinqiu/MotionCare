@@ -1,0 +1,27 @@
+{
+  "name": "MotionCare",
+  "short_name": "MotionCare",
+  "description": "面向跑者的训练负荷、恢复状态和运动记录 App",
+  "lang": "zh-CN",
+  "start_url": "/today",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#15b66a",
+  "background_color": "#eef8f2",
+  "categories": ["health", "fitness", "sports"],
+  "icons": [
+    {
+      "src": "/icons/motioncare-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/motioncare-maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}

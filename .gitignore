@@ -9,12 +9,38 @@ env/
 node_modules/
 dist/
 .vite/
+.playwright-cli/
 
 # IDE / OS
 .vscode/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Local agent, cache, coverage, and temporary artifacts
+.agents/
+.claude/
+.cursor/
+.aider*
+.codex/
+docs/superpowers/
+.cache/
+coverage/
+.nyc_output/
+.tmp/
+tmp/
+temp/
+.tmp-*
+*.tmp.*
+*.temp
+*.swp
+*.swo
+*~
+*.pid
+*.pid.lock
+*.orig
+*.rej
+*.err
 
 # Local secrets and runtime files
 .env
@@ -42,8 +68,25 @@ id_ed25519
 *.dump
 *.sql.gz
 
-# Motion Analysis local data and generated artifacts
+# MotionCare local data and generated artifacts
 database/data/
 database/.garmin_tokens/
 database/sql/02_import_data.sql
+backend/uploads/
 backend/ml/models/
+
+# Android / Capacitor generated artifacts
+frontend/android/.gradle/
+frontend/android/build/
+frontend/android/app/build/
+frontend/android/capacitor-cordova-android-plugins/build/
+frontend/android/app/src/main/assets/
+frontend/android/local.properties
+frontend/android/replay_pid*.log
+
+# Shared demo seed data is intentionally committed so collaborators do not
+# repeatedly crawl Garmin.
+!database/shared/
+!database/shared/**
+!database/shared/*.sql.gz
+!database/shared/*.zip

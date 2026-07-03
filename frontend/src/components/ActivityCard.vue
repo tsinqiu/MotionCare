@@ -1,6 +1,6 @@
 <template>
   <article
-    class="activity-card"
+    class="activity-card rq-activity-card"
     :class="sportClass"
     :style="{ '--sport-color': sportColor }"
     role="button"
@@ -12,7 +12,8 @@
     <div class="activity-card-main">
       <span class="activity-accent" aria-hidden="true"></span>
       <span class="activity-icon" aria-hidden="true">
-        <component :is="sportIcon" :size="22" />
+        <img v-if="activity.photo_path" :src="photoUrl(activity.photo_path)" class="activity-thumb" alt="" />
+        <component :is="sportIcon" v-else :size="22" />
       </span>
       <span class="activity-copy">
         <span class="activity-title">
@@ -42,6 +43,18 @@
         <small>卡路里</small>
         <b>{{ formatCalories(activity.total_calories) }}</b>
       </span>
+      <span v-if="trainingLoadValue !== '--'">
+        <small>训练负荷</small>
+        <b>{{ trainingLoadValue }}</b>
+      </span>
+      <span v-if="activity.perceived_effort">
+        <small>体感</small>
+        <b>{{ activity.perceived_effort }}/10</b>
+      </span>
+      <span v-if="activity.weather_condition || activity.temperature_c != null">
+        <small>天气</small>
+        <b>{{ weatherText }}</b>
+      </span>
     </div>
 
     <div v-if="$slots.actions" class="activity-card-actions">
@@ -62,6 +75,7 @@ import {
   formatPace,
   formatSpeed,
 } from '@/utils/formatters'
+import { resolveMediaUrl } from '@/services/http'
 
 const props = defineProps({
   activity: {
@@ -101,4 +115,24 @@ const speedLabel = computed(() => (sportClass.value === 'ride' ? '速度' : '配
 const speedValue = computed(() => (sportClass.value === 'ride'
   ? formatSpeed(props.activity.avg_speed_mps)
   : formatPace(props.activity.avg_speed_mps)))
+const trainingLoadValue = computed(() => {
+  const load = props.activity.activity_training_load
+  if (load === null || load === undefined || load === '') return '--'
+  const numeric = Number(load)
+  return Number.isFinite(numeric) ? `${Math.round(numeric)}` : '--'
+})
+
+const weatherText = computed(() => {
+  const condition = props.activity.weather_condition || '--'
+  const temp = props.activity.temperature_c
+  return temp === null || temp === undefined ? condition : `${condition} ${Math.round(temp)}°C`
+})
+
+function photoUrl(path) {
+  return resolveMediaUrl(path)
+}
 </script>
+
+<style scoped>
+.activity-thumb { width: 32px; height: 32px; border-radius: 6px; object-fit: cover; }
+</style>

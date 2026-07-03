@@ -1,4 +1,5 @@
 const db = require('../db');
+const { ApiError } = require('../errors');
 
 const SORT_COLUMNS = {
   local_start_time: 'a.local_start_time',
@@ -242,11 +243,18 @@ async function listActivities({
       u.username AS ownerUsername,
       a.data_source AS dataSource,
       a.is_manual AS isManual,
-      ROUND(s.total_distance_m / 1000, 2) AS fitDistanceKm,
+      a.shoe_id AS shoeId,
+      a.perceived_effort AS perceivedEffort,
+      a.photo_path AS photoPath,
+      a.weather_condition AS weatherCondition,
+      a.temperature_c AS temperatureC,
+      a.humidity_percent AS humidityPercent,
+      a.feels_like_c AS feelsLikeC,
+      ROUND(js.distance_m / 1000, 2) AS fitDistanceKm,
       ROUND(js.distance_m / 1000, 2) AS jsonDistanceKm,
-      s.total_timer_time_s AS fitTimerTimeS,
-      COALESCE(js.distance_m, s.total_distance_m) AS distanceM,
-      COALESCE(js.duration_s, s.total_timer_time_s) AS durationS,
+      js.duration_s AS fitTimerTimeS,
+      js.distance_m AS distanceM,
+      js.duration_s AS durationS,
       js.moving_duration_s AS movingDurationS,
       js.elapsed_duration_s AS elapsedDurationS,
       js.calories,
@@ -255,22 +263,23 @@ async function listActivities({
       ROUND(js.duration_s / NULLIF(js.distance_m / 1000, 0), 2) AS avgPaceSecPerKm,
       js.avg_heart_rate_bpm AS avgHeartRateBpm,
       js.max_heart_rate_bpm AS maxHeartRateBpm,
-      COALESCE(js.avg_cadence_spm, s.avg_cadence) AS avgCadenceSpm,
+      js.avg_cadence_spm AS avgCadenceSpm,
       js.max_cadence_spm AS maxCadenceSpm,
-      COALESCE(js.avg_power_w, s.avg_power_w) AS avgPowerW,
-      COALESCE(js.max_power_w, s.max_power_w) AS maxPowerW,
-      COALESCE(js.normalized_power_w, s.normalized_power_w) AS normalizedPowerW,
-      COALESCE(js.elevation_gain_m, s.total_ascent_m) AS elevationGainM,
-      COALESCE(js.elevation_loss_m, s.total_descent_m) AS elevationLossM,
+      js.avg_power_w AS avgPowerW,
+      js.max_power_w AS maxPowerW,
+      js.normalized_power_w AS normalizedPowerW,
+      js.elevation_gain_m AS elevationGainM,
+      js.elevation_loss_m AS elevationLossM,
       js.activity_training_load AS activityTrainingLoad,
       js.aerobic_training_effect AS aerobicTrainingEffect,
       js.anaerobic_training_effect AS anaerobicTrainingEffect,
+      js.aerobic_training_effect_message AS aerobicTrainingEffectMessage,
+      js.anaerobic_training_effect_message AS anaerobicTrainingEffectMessage,
       js.training_effect_label AS trainingEffectLabel,
       js.vo2max,
       js.body_battery_delta AS bodyBatteryDelta
     FROM Activities a
     LEFT JOIN Users u ON u.id = a.owner_user_id
-    LEFT JOIN Sessions s ON s.activity_id = a.id
     LEFT JOIN ActivitySummaries js ON js.activity_id = a.id
     ${filters.clause}
     ORDER BY ${sortColumn} ${direction}, a.id DESC
@@ -309,8 +318,20 @@ async function getActivityById(activityId) {
         u.username AS ownerUsername,
         a.data_source AS dataSource,
         a.is_manual AS isManual,
-        s.total_elapsed_time_s AS fitElapsedTimeS,
-        s.total_timer_time_s AS fitTimerTimeS,
+        a.shoe_id AS shoeId,
+        a.perceived_effort AS perceivedEffort,
+        a.photo_path AS photoPath,
+        a.photo_original_name AS photoOriginalName,
+        a.photo_mime_type AS photoMimeType,
+        a.photo_size_bytes AS photoSizeBytes,
+        a.weather_condition AS weatherCondition,
+        a.temperature_c AS temperatureC,
+        a.humidity_percent AS humidityPercent,
+        a.feels_like_c AS feelsLikeC,
+        a.weather_source AS weatherSource,
+        a.weather_updated_at AS weatherUpdatedAt,
+        js.elapsed_duration_s AS fitElapsedTimeS,
+        js.duration_s AS fitTimerTimeS,
         js.elapsed_duration_s AS elapsedDurationS,
         js.duration_s AS durationS,
         js.moving_duration_s AS movingDurationS,
@@ -320,25 +341,27 @@ async function getActivityById(activityId) {
         js.max_speed_mps AS maxSpeedMps,
         js.avg_heart_rate_bpm AS avgHeartRateBpm,
         js.max_heart_rate_bpm AS maxHeartRateBpm,
-        s.avg_cadence AS fitSingleLegCadence,
-        COALESCE(js.avg_cadence_spm, s.avg_cadence) AS avgCadenceSpm,
+        js.avg_cadence_spm AS fitSingleLegCadence,
+        js.avg_cadence_spm AS avgCadenceSpm,
         js.max_cadence_spm AS maxCadenceSpm,
-        COALESCE(js.avg_power_w, s.avg_power_w) AS avgPowerW,
-        COALESCE(js.max_power_w, s.max_power_w) AS maxPowerW,
-        COALESCE(js.normalized_power_w, s.normalized_power_w) AS normalizedPowerW,
+        js.avg_power_w AS avgPowerW,
+        js.max_power_w AS maxPowerW,
+        js.normalized_power_w AS normalizedPowerW,
         js.activity_training_load AS activityTrainingLoad,
         js.aerobic_training_effect AS aerobicTrainingEffect,
         js.anaerobic_training_effect AS anaerobicTrainingEffect,
+        js.aerobic_training_effect_message AS aerobicTrainingEffectMessage,
+        js.anaerobic_training_effect_message AS anaerobicTrainingEffectMessage,
         js.training_effect_label AS trainingEffectLabel,
         js.vo2max,
         js.body_battery_delta AS bodyBatteryDelta,
-        js.water_estimated_ml AS waterEstimatedMl,
-        COALESCE(js.elevation_gain_m, s.total_ascent_m) AS elevationGainM,
-        COALESCE(js.elevation_loss_m, s.total_descent_m) AS elevationLossM
+        js.elevation_gain_m AS elevationGainM,
+        js.elevation_loss_m AS elevationLossM,
+        s.name AS shoeName, s.brand AS shoeBrand, s.distance_km AS shoeDistanceKm
       FROM Activities a
       LEFT JOIN Users u ON u.id = a.owner_user_id
-      LEFT JOIN Sessions s ON s.activity_id = a.id
       LEFT JOIN ActivitySummaries js ON js.activity_id = a.id
+      LEFT JOIN Shoes s ON s.id = a.shoe_id
       WHERE a.id = ?
     `,
     [activityId]
@@ -350,6 +373,22 @@ async function getActivityById(activityId) {
 async function activityExists(activityId) {
   const rows = await db.query('SELECT id FROM Activities WHERE id = ? LIMIT 1', [activityId]);
   return rows.length > 0;
+}
+
+async function getActivityAccess(activityId) {
+  const rows = await db.query(
+    'SELECT id, owner_user_id AS ownerUserId FROM Activities WHERE id = ? LIMIT 1',
+    [activityId]
+  );
+  return rows[0] || null;
+}
+
+async function assertActivityReadable(user, activityId) {
+  const activity = await getActivityAccess(activityId);
+  if (!activity || (user.role !== 'admin' && Number(activity.ownerUserId) !== Number(user.id))) {
+    throw new ApiError(404, 'activity not found', 'ACTIVITY_NOT_FOUND');
+  }
+  return activity;
 }
 
 async function getTrackPoints(activityId, { limit, offset }) {
@@ -1125,10 +1164,218 @@ async function getDashboardOverview(filters = {}) {
   };
 }
 
+async function getTodayHealth(userId, date) {
+  const target = date || new Date().toISOString().slice(0, 10);
+  const [dhs] = await db.query(
+    `SELECT
+      steps, distance_m AS distanceM, calories, active_calories AS activeCalories,
+      moderate_intensity_minutes AS moderateIntensityMinutes,
+      vigorous_intensity_minutes AS vigorousIntensityMinutes,
+      resting_heart_rate_bpm AS restingHeartRateBpm,
+      avg_stress_level AS avgStressLevel, max_stress_level AS maxStressLevel,
+      body_battery_charged AS bodyBatteryCharged,
+      stress_duration_s AS stressDurationS,
+      low_stress_duration_s AS lowStressDurationS,
+      high_stress_duration_s AS highStressDurationS,
+      sleeping_seconds AS sleepingSeconds,
+      avg_waking_respiration_value AS avgWakingRespiration
+    FROM DailyHealthSummaries
+    WHERE user_id = ? AND summary_date = ?
+    LIMIT 1`,
+    [userId, target]
+  );
+  const [sleep] = await db.query(
+    `SELECT
+      duration_s AS durationS, sleep_score AS sleepScore,
+      deep_sleep_s AS deepSleepS, light_sleep_s AS lightSleepS, rem_sleep_s AS remSleepS,
+      avg_hrv AS avgHrv, hrv_status AS hrvStatus,
+      avg_heart_rate_during_sleep AS avgHeartRateDuringSleep,
+      avg_sleep_stress AS avgSleepStress
+    FROM SleepSummaries
+    WHERE user_id = ? AND sleep_date = ?
+    LIMIT 1`,
+    [userId, target]
+  );
+  const [training] = await db.query(
+    `SELECT snapshot_date AS snapshotDate, vo2max,
+            training_status AS trainingStatus, load_balance AS loadBalance,
+            acute_training_load AS acuteTrainingLoad,
+            chronic_training_load AS chronicTrainingLoad,
+            acute_chronic_workload_ratio AS acuteChronicWorkloadRatio,
+            acwr_status AS acwrStatus,
+            acwr_percent AS acwrPercent,
+            optimal_load_min AS optimalLoadMin,
+            optimal_load_max AS optimalLoadMax,
+            low_aerobic_load AS lowAerobicLoad,
+            low_aerobic_target_min AS lowAerobicTargetMin,
+            low_aerobic_target_max AS lowAerobicTargetMax,
+            high_aerobic_load AS highAerobicLoad,
+            high_aerobic_target_min AS highAerobicTargetMin,
+            high_aerobic_target_max AS highAerobicTargetMax,
+            anaerobic_load AS anaerobicLoad,
+            anaerobic_target_min AS anaerobicTargetMin,
+            anaerobic_target_max AS anaerobicTargetMax
+     FROM TrainingStatusSnapshots
+     WHERE user_id = ? AND snapshot_date <= ?
+     ORDER BY snapshot_date DESC
+     LIMIT 1`,
+    [userId, target]
+  );
+  const [ftp] = await db.query(
+    `SELECT snapshot_date AS snapshotDate, ftp_w AS cyclingFtp, sport, source
+     FROM CyclingFtpSnapshots
+     WHERE user_id = ? AND snapshot_date <= ?
+     ORDER BY snapshot_date DESC
+     LIMIT 1`,
+    [userId, target]
+  );
+  return { ...(dhs || {}), ...(sleep || {}), ...(training || {}), ...(ftp || {}) };
+}
+
+async function updateActivityMeta(user, activityId, payload) {
+  const rows = await db.query('SELECT owner_user_id FROM Activities WHERE id = ?', [activityId]);
+  if (!rows.length) {
+    const err = new Error('activity not found');
+    err.status = 404;
+    throw err;
+  }
+
+  if (user.role !== 'admin' && rows[0].owner_user_id !== user.id) {
+    const err = new Error('forbidden');
+    err.status = 403;
+    throw err;
+  }
+
+  const sets = [];
+  const params = [];
+
+  if (payload.activityName !== undefined) {
+    sets.push('activity_name = ?');
+    params.push(payload.activityName);
+  }
+
+  if (payload.perceivedEffort !== undefined && payload.perceivedEffort !== null && payload.perceivedEffort !== '') {
+    const effort = Number(payload.perceivedEffort);
+    if (!Number.isInteger(effort) || effort < 1 || effort > 10) {
+      const err = new Error('perceivedEffort must be an integer from 1 to 10');
+      err.status = 400;
+      throw err;
+    }
+    sets.push('perceived_effort = ?');
+    params.push(effort);
+  } else if (payload.perceivedEffort === '' || payload.perceivedEffort === null) {
+    sets.push('perceived_effort = NULL');
+  }
+
+  if (!sets.length) {
+    return getActivityById(activityId);
+  }
+
+  params.push(activityId);
+  await db.query(`UPDATE Activities SET ${sets.join(', ')} WHERE id = ?`, params);
+
+  return getActivityById(activityId);
+}
+
+async function updateActivityPhoto(user, activityId, fileInfo) {
+  const rows = await db.query('SELECT owner_user_id FROM Activities WHERE id = ?', [activityId]);
+  if (!rows.length) {
+    const err = new Error('activity not found');
+    err.status = 404;
+    throw err;
+  }
+
+  if (user.role !== 'admin' && rows[0].owner_user_id !== user.id) {
+    const err = new Error('forbidden');
+    err.status = 403;
+    throw err;
+  }
+
+  await db.query(
+    `UPDATE Activities SET photo_path = ?, photo_original_name = ?, photo_mime_type = ?, photo_size_bytes = ? WHERE id = ?`,
+    [fileInfo.path, fileInfo.originalName || null, fileInfo.mimeType || null, fileInfo.size != null ? Number(fileInfo.size) : null, activityId]
+  );
+
+  return getActivityById(activityId);
+}
+
+async function updateActivityWeather(user, activityId, payload, source = 'manual') {
+  const rows = await db.query('SELECT owner_user_id FROM Activities WHERE id = ?', [activityId]);
+  if (!rows.length) {
+    const err = new Error('activity not found');
+    err.status = 404;
+    throw err;
+  }
+
+  if (user.role !== 'admin' && rows[0].owner_user_id !== user.id) {
+    const err = new Error('forbidden');
+    err.status = 403;
+    throw err;
+  }
+
+  if (payload.weatherCondition !== undefined && payload.weatherCondition !== null) {
+    const text = String(payload.weatherCondition).trim();
+    if (text.length > 80) {
+      const err = new Error('weatherCondition must be at most 80 characters');
+      err.status = 400;
+      throw err;
+    }
+  }
+
+  if (payload.temperatureC !== undefined && payload.temperatureC !== null && payload.temperatureC !== '') {
+    const temp = Number(payload.temperatureC);
+    if (!Number.isFinite(temp) || temp < -80 || temp > 80) {
+      const err = new Error('temperatureC must be from -80 to 80');
+      err.status = 400;
+      throw err;
+    }
+  }
+
+  if (payload.humidityPercent !== undefined && payload.humidityPercent !== null && payload.humidityPercent !== '') {
+    const humid = Number(payload.humidityPercent);
+    if (!Number.isInteger(humid) || humid < 0 || humid > 100) {
+      const err = new Error('humidityPercent must be an integer from 0 to 100');
+      err.status = 400;
+      throw err;
+    }
+  }
+
+  if (payload.feelsLikeC !== undefined && payload.feelsLikeC !== null && payload.feelsLikeC !== '') {
+    const feels = Number(payload.feelsLikeC);
+    if (!Number.isFinite(feels) || feels < -100 || feels > 100) {
+      const err = new Error('feelsLikeC must be from -100 to 100');
+      err.status = 400;
+      throw err;
+    }
+  }
+
+  const weatherCondition = payload.weatherCondition !== undefined && payload.weatherCondition !== null && payload.weatherCondition !== ''
+    ? String(payload.weatherCondition).trim()
+    : null;
+  const temperatureC = payload.temperatureC !== undefined && payload.temperatureC !== null && payload.temperatureC !== ''
+    ? Number(payload.temperatureC)
+    : null;
+  const humidityPercent = payload.humidityPercent !== undefined && payload.humidityPercent !== null && payload.humidityPercent !== ''
+    ? Number(payload.humidityPercent)
+    : null;
+  const feelsLikeC = payload.feelsLikeC !== undefined && payload.feelsLikeC !== null && payload.feelsLikeC !== ''
+    ? Number(payload.feelsLikeC)
+    : null;
+
+  await db.query(
+    `UPDATE Activities SET weather_condition = ?, temperature_c = ?, humidity_percent = ?, feels_like_c = ?, weather_source = ?, weather_updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+    [weatherCondition, temperatureC, humidityPercent, feelsLikeC, source, activityId]
+  );
+
+  return getActivityById(activityId);
+}
+
 module.exports = {
   listActivities,
   getActivityById,
   activityExists,
+  getActivityAccess,
+  assertActivityReadable,
   getTrackPoints,
   getHeartRateSeries,
   getSpeedSeries,
@@ -1142,5 +1389,9 @@ module.exports = {
   getHeartRateZones,
   getLoadBalance,
   getPersonalBests,
-  getDashboardOverview
+  getDashboardOverview,
+  getTodayHealth,
+  updateActivityMeta,
+  updateActivityPhoto,
+  updateActivityWeather
 };

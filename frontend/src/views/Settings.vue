@@ -1,13 +1,28 @@
 <template>
   <div class="page-stack">
-    <section class="dark-panel">
+    <section class="settings-rq-panel">
       <div class="section-heading">
         <div>
-          <h2>设置</h2>
+          <p class="overline">设置偏好</p>
+          <h2>跑者偏好</h2>
         </div>
         <span class="status-chip good">隐私优先</span>
       </div>
-      <p class="muted-copy">系统只展示必要的账号和运动数据，不在页面中暴露数据库密码、密钥或个人轨迹原始文件。</p>
+      <p class="muted-copy">MotionCare 只展示必要的账号和运动信息，不会在页面中显示密码、密钥或完整轨迹文件。</p>
+      <div class="settings-preference-grid">
+        <span>
+          <small>资料完整度</small>
+          <b>{{ profileCompletion }}%</b>
+        </span>
+        <span>
+          <small>训练单位</small>
+          <b>{{ unitSummary }}</b>
+        </span>
+        <span>
+          <small>隐私策略</small>
+          <b>{{ privacySummary }}</b>
+        </span>
+      </div>
     </section>
 
     <section class="dark-panel">
@@ -19,10 +34,10 @@
       </div>
       <div class="account-summary">
         <div class="account-avatar">{{ initials }}</div>
-        <div>
+        <div class="account-summary__body">
           <strong>{{ authSession.user?.username || '已登录用户' }}</strong>
           <span>{{ authSession.user?.email || '未提供邮箱' }}</span>
-          <small>状态：{{ authSession.user?.status || 'active' }}</small>
+          <small>{{ accountStatusLabel }}</small>
         </div>
         <button class="secondary-link" type="button" @click="handleLogout">退出登录</button>
       </div>
@@ -92,7 +107,11 @@
         <span>同步健康数据</span>
         <input v-model="settings.healthSync" type="checkbox" />
       </label>
-      <div class="settings-actions">
+      <div class="settings-actions settings-save-card">
+        <div>
+          <strong>保存偏好</strong>
+          <small>同步资料、单位和隐私设置</small>
+        </div>
         <button class="primary-link" type="submit" :disabled="saving">{{ saving ? '保存中' : '保存设置' }}</button>
         <span v-if="saved" class="success-copy">设置已保存。</span>
       </div>
@@ -127,7 +146,30 @@ const loading = ref(false)
 const saving = ref(false)
 const saved = ref(false)
 const roleLabel = computed(() => authSession.user?.role === 'admin' ? '管理员' : '普通用户')
+const accountStatusLabel = computed(() => (
+  authSession.user?.status === 'disabled' ? '账号状态：已停用' : '账号状态：正常'
+))
 const initials = computed(() => String(authSession.user?.username || 'GS').slice(0, 2).toUpperCase())
+const profileCompletion = computed(() => {
+  const fields = [
+    Boolean(authSession.user?.username),
+    Boolean(authSession.user?.email),
+    Boolean(profile.bio),
+    Boolean(settings.distanceUnit),
+    Boolean(settings.paceUnit),
+  ]
+  return Math.round((fields.filter(Boolean).length / fields.length) * 100)
+})
+const unitSummary = computed(() => {
+  const distance = settings.distanceUnit === 'mi' ? '英里' : '公里'
+  const pace = settings.paceUnit === 'min_per_mile' ? '英里配速' : '公里配速'
+  return `${distance} / ${pace}`
+})
+const privacySummary = computed(() => {
+  if (settings.defaultPrivacy === 'public') return '公开可见'
+  if (settings.defaultPrivacy === 'followers') return '关注者可见'
+  return '仅自己可见'
+})
 
 function syncProfile() {
   profile.bio = authSession.user?.bio || ''

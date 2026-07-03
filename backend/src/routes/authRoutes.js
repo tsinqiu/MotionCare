@@ -1,5 +1,6 @@
 const express = require('express');
 const defaultAuthService = require('../services/authService');
+const defaultSecurityService = require('../services/securityService');
 const { ApiError } = require('../errors');
 const { asyncHandler } = require('../http');
 const { authenticate } = require('../middleware/authMiddleware');
@@ -21,7 +22,10 @@ function requireEmail(value) {
   return email;
 }
 
-function createAuthRouter(authService = defaultAuthService) {
+function createAuthRouter(
+  authService = defaultAuthService,
+  securityService = defaultSecurityService
+) {
   const router = express.Router();
 
   router.post(
@@ -41,9 +45,45 @@ function createAuthRouter(authService = defaultAuthService) {
   router.post(
     '/auth/login',
     asyncHandler(async (req, res) => {
-      const result = await authService.login({
-        email: requireEmail(req.body.email),
-        password: requireText(req.body.password, 'password', { min: 1, max: 200 })
+      const email = requireEmail(req.body.email);
+      const password = requireText(req.body.password, 'password', { min: 1, max: 200 });
+      await securityService.assertLoginAllowed({ email, req });
+
+      let result;
+      try {
+        result = await authService.login({ email, password });
+      } catch (error) {
+        const failureReason = error.code || 'LOGIN_FAILED';
+        await securityService.recordLoginAttempt({
+          email,
+          success: false,
+          failureReason,
+          req
+        });
+        await securityService.recordSecurityEvent({
+          eventType: 'LOGIN_FAILED',
+          result: 'failure',
+          resourceType: 'auth',
+          resourceId: email,
+          detail: { failureReason },
+          req
+        });
+        throw error;
+      }
+
+      await securityService.recordLoginAttempt({
+        email,
+        userId: result.user.id,
+        success: true,
+        req
+      });
+      await securityService.recordSecurityEvent({
+        userId: result.user.id,
+        eventType: 'LOGIN_SUCCESS',
+        result: 'success',
+        resourceType: 'auth',
+        resourceId: email,
+        req
       });
       sendData(res, result);
     })

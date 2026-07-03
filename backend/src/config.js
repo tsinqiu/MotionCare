@@ -11,6 +11,13 @@ function parseInteger(value, fallback) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function getRateLimitDefaults(nodeEnv) {
+  if (nodeEnv === 'production') {
+    return { globalMax: 1200, authMax: 60 };
+  }
+  return { globalMax: 3000, authMax: 120 };
+}
+
 function parseProviderOrder(value) {
   const supported = new Set(['deepseek', 'ollama']);
   const providers = String(value || 'deepseek,ollama')
@@ -22,7 +29,19 @@ function parseProviderOrder(value) {
 
 function parseCorsOrigins(value, serverPort) {
   const localApiOrigins = [`http://127.0.0.1:${serverPort}`, `http://localhost:${serverPort}`];
-  const localFrontendOrigins = ['http://127.0.0.1:5173', 'http://localhost:5173'];
+  const localFrontendOrigins = [
+    'http://127.0.0.1:5173',
+    'http://localhost:5173',
+    'http://127.0.0.1:5177',
+    'http://localhost:5177',
+    'http://127.0.0.1:5178',
+    'http://localhost:5178',
+    'http://127.0.0.1:4173',
+    'http://localhost:4173',
+    'https://localhost',
+    'http://localhost',
+    'capacitor://localhost'
+  ];
 
   if (!value) {
     return [...localFrontendOrigins, ...localApiOrigins];
@@ -57,7 +76,8 @@ function resolveProjectPath(value, fallback) {
   return path.resolve(PROJECT_ROOT, target);
 }
 
-const serverPort = parseInteger(process.env.PORT, 8080);
+const serverPort = parseInteger(process.env.PORT, 8089);
+const rateLimitDefaults = getRateLimitDefaults(process.env.NODE_ENV);
 
 const config = {
   server: {
@@ -88,13 +108,29 @@ const config = {
       password: process.env.ADMIN_PASSWORD || ''
     }
   },
+  security: {
+    trustProxy: process.env.TRUST_PROXY === 'true',
+    jsonLimit: process.env.JSON_BODY_LIMIT || '1mb',
+    globalRateLimitWindowMs: parseInteger(process.env.GLOBAL_RATE_LIMIT_WINDOW_MS, 15 * 60 * 1000),
+    globalRateLimitMax: parseInteger(process.env.GLOBAL_RATE_LIMIT_MAX, rateLimitDefaults.globalMax),
+    authRateLimitWindowMs: parseInteger(process.env.AUTH_RATE_LIMIT_WINDOW_MS, 15 * 60 * 1000),
+    authRateLimitMax: parseInteger(process.env.AUTH_RATE_LIMIT_MAX, rateLimitDefaults.authMax),
+    loginFailureWindowMs: parseInteger(process.env.LOGIN_FAILURE_WINDOW_MS, 10 * 60 * 1000),
+    loginFailureMax: parseInteger(process.env.LOGIN_FAILURE_MAX, 5),
+    loginBlockMinutes: parseInteger(process.env.LOGIN_BLOCK_MINUTES, 10)
+  },
   cache: {
     statsTtlSeconds: parseInteger(process.env.STATS_CACHE_TTL_SECONDS, 60)
   },
   uploads: {
     root: resolveBackendPath(process.env.UPLOAD_ROOT, 'uploads'),
     exploreVideosDir: resolveBackendPath(process.env.EXPLORE_VIDEO_UPLOAD_DIR, 'uploads/explore-videos'),
-    maxVideoBytes: parseInteger(process.env.EXPLORE_VIDEO_MAX_BYTES, 200 * 1024 * 1024)
+    exploreImagesDir: resolveBackendPath(process.env.EXPLORE_IMAGE_UPLOAD_DIR, 'uploads/explore-images'),
+    communityImagesDir: resolveBackendPath(process.env.COMMUNITY_IMAGE_UPLOAD_DIR, 'uploads/community-images'),
+    activityImagesDir: resolveBackendPath(process.env.ACTIVITY_IMAGE_UPLOAD_DIR, 'uploads/activity-images'),
+    shoeImagesDir: resolveBackendPath(process.env.SHOE_IMAGE_UPLOAD_DIR, 'uploads/shoe-images'),
+    maxVideoBytes: parseInteger(process.env.EXPLORE_VIDEO_MAX_BYTES, 200 * 1024 * 1024),
+    maxImageBytes: parseInteger(process.env.IMAGE_UPLOAD_MAX_BYTES, 10 * 1024 * 1024)
   },
   ml: {
     pythonPath: process.env.ML_PYTHON_PATH || 'python',
@@ -102,6 +138,10 @@ const config = {
       resolveBackendPath(process.env.ML_PREDICT_SCRIPT, 'ml/predict_running.py'),
     modelPath:
       resolveBackendPath(process.env.ML_MODEL_PATH, 'ml/models/running_model.joblib'),
+    coachPredictScriptPath:
+      resolveBackendPath(process.env.ML_COACH_PREDICT_SCRIPT, 'ml/predict_coach.py'),
+    coachModelPath:
+      resolveBackendPath(process.env.ML_COACH_MODEL_PATH, 'ml/models/coach_model.joblib'),
     timeoutMs: parseInteger(process.env.ML_TIMEOUT_MS, 10000)
   },
   ai: {
@@ -126,6 +166,10 @@ const config = {
       process.env.GARMIN_IMPORT_SCRIPT,
       'database/scripts/import_fit_files.py'
     ),
+    healthImportScriptPath: resolveProjectPath(
+      process.env.GARMIN_HEALTH_IMPORT_SCRIPT,
+      'database/scripts/import_garmin_health.py'
+    ),
     tokenBaseDir: resolveProjectPath(
       process.env.GARMIN_TOKEN_BASE_DIR,
       'database/.garmin_tokens/users'
@@ -145,3 +189,4 @@ const config = {
 };
 
 module.exports = config;
+module.exports.getRateLimitDefaults = getRateLimitDefaults;

@@ -2,7 +2,7 @@
   <section class="panel session-detail-panel wide">
     <div class="panel-heading">
       <div>
-        <p class="overline">Session</p>
+        <p class="overline">运动详情</p>
         <h2>详情</h2>
       </div>
     </div>
@@ -35,24 +35,24 @@ function numberValue(value) {
 
 function formatMeters(value) {
   const meters = numberValue(value)
-  return meters === null ? '--' : `${Math.round(meters)} m`
+  return meters === null ? '--' : `${Math.round(meters)} 米`
 }
 
 function formatBpm(value) {
   const bpm = numberValue(value)
-  return bpm === null ? '--' : `${Math.round(bpm)} bpm`
+  return bpm === null ? '--' : `${Math.round(bpm)} 次/分`
 }
 
 function formatCadence(value) {
   const cadence = numberValue(value)
   if (cadence === null) return '--'
   const fullCadence = cadence < 130 ? cadence * 2 : cadence
-  return `${Math.round(fullCadence)} spm`
+  return `${Math.round(fullCadence)} 步/分钟`
 }
 
 function formatPower(value) {
   const power = numberValue(value)
-  return power === null ? '--' : `${Math.round(power)} W`
+  return power === null ? '--' : `${Math.round(power)} 瓦`
 }
 
 const isRunning = computed(() => {

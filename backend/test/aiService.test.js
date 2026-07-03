@@ -1,240 +1,505 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const ENV_KEYS = [
-  'AI_PROVIDER',
-  'AI_PROVIDER_ORDER',
-  'AI_MODEL',
-  'AI_DEEPSEEK_MODEL',
-  'AI_DEEPSEEK_BASE_URL',
-  'DEEPSEEK_API_KEY',
-  'AI_DEEPSEEK_API_KEY',
-  'AI_OLLAMA_MODEL',
-  'AI_OLLAMA_BASE_URL',
-  'AI_TIMEOUT_MS',
-  'AI_FALLBACK_RULES'
-];
+const aiService = require('../src/services/aiService');
+const activityService = require('../src/services/activityService');
+const config = require('../src/config');
+const db = require('../src/db');
 
-const originalEnv = ENV_KEYS.reduce((acc, key) => {
-  acc[key] = process.env[key];
-  return acc;
-}, {});
-const originalFetch = global.fetch;
-
-function resetAiModules() {
-  delete require.cache[require.resolve('../src/config')];
-  delete require.cache[require.resolve('../src/services/aiService')];
-}
-
-function setAiEnv(values) {
-  for (const key of ENV_KEYS) {
-    process.env[key] = '';
+function withActivityStubs(stubs, fn) {
+  const originals = {};
+  for (const [name, value] of Object.entries(stubs)) {
+    originals[name] = activityService[name];
+    activityService[name] = value;
   }
-  Object.assign(process.env, values);
-}
 
-function loadAiService(values, fetchImpl) {
-  setAiEnv({
-    AI_TIMEOUT_MS: '1000',
-    AI_FALLBACK_RULES: 'true',
-    ...values
-  });
-  global.fetch = fetchImpl;
-  resetAiModules();
-  const aiService = require('../src/services/aiService');
-  const activityService = require('../src/services/activityService');
-  activityService.getDashboardOverview = async () => ({
-    recentActivities: [{ id: 1, activityType: 'running', distanceM: 5000 }],
-    monthlySummary: { activityCount: 1, totalDistanceKm: 5 },
-    yearlySummary: {},
-    trainingLoad: [{ dailyTrainingLoad: 80, ctl: 20, atl: 24, tsb: -4 }],
-    personalBests: {}
-  });
-  activityService.getActivityById = async (id) => (id === 1
-    ? { id: 1, activityType: 'running', distanceM: 5000, durationS: 1800, avgHeartRateBpm: 145 }
-    : null);
-  return aiService;
-}
-
-function jsonResponse(payload, status = 200) {
-  return {
-    ok: status >= 200 && status < 300,
-    status,
-    json: async () => payload,
-    text: async () => JSON.stringify(payload)
-  };
-}
-
-test.afterEach(() => {
-  for (const key of ENV_KEYS) {
-    if (originalEnv[key] === undefined) {
-      delete process.env[key];
-    } else {
-      process.env[key] = originalEnv[key];
-    }
-  }
-  global.fetch = originalFetch;
-  resetAiModules();
-});
-
-test('aiService reports DeepSeek unavailable without API key and falls back to rules', async () => {
-  let fetchCount = 0;
-  const aiService = loadAiService({
-    AI_PROVIDER: 'deepseek',
-    DEEPSEEK_API_KEY: '',
-    AI_DEEPSEEK_MODEL: 'deepseek-chat'
-  }, async () => {
-    fetchCount += 1;
-    return jsonResponse({});
-  });
-
-  const health = await aiService.getHealth();
-  assert.equal(health.provider, 'rules');
-  assert.deepEqual(health.configuredProviders, ['deepseek']);
-  assert.equal(health.providers.deepseek.configured, false);
-
-  const result = await aiService.chat({ message: '今天适合训练吗？' }, { id: 2 });
-  assert.equal(result.meta.ai.provider, 'rules');
-  assert.equal(result.meta.ai.fallback, true);
-  assert.equal(fetchCount, 0);
-});
-
-test('aiService calls DeepSeek chat completions when configured', async () => {
-  const calls = [];
-  const aiService = loadAiService({
-    AI_PROVIDER: 'deepseek',
-    DEEPSEEK_API_KEY: 'test-key',
-    AI_DEEPSEEK_MODEL: 'deepseek-chat'
-  }, async (url, options) => {
-    calls.push({ url, options });
-    return jsonResponse({
-      choices: [{ message: { content: 'DeepSeek 建议：今天适合轻松有氧。' } }]
-    });
-  });
-
-  const result = await aiService.chat({ message: '今天适合训练吗？' }, { id: 2 });
-
-  assert.equal(result.meta.ai.provider, 'deepseek');
-  assert.equal(result.meta.ai.model, 'deepseek-chat');
-  assert.equal(result.meta.ai.fallback, false);
-  assert.match(result.data.content, /DeepSeek 建议/);
-  assert.equal(calls.length, 1);
-  assert.match(calls[0].url, /https:\/\/api\.deepseek\.com\/chat\/completions$/);
-  assert.equal(calls[0].options.headers.Authorization, 'Bearer test-key');
-});
-
-test('aiService falls back when DeepSeek JSON response is invalid', async () => {
-  const aiService = loadAiService({
-    AI_PROVIDER: 'deepseek',
-    DEEPSEEK_API_KEY: 'test-key',
-    AI_DEEPSEEK_MODEL: 'deepseek-chat'
-  }, async () => jsonResponse({
-    choices: [{ message: { content: '这不是 JSON' } }]
-  }));
-
-  const brief = await aiService.getDailyBrief({ id: 2 });
-  assert.equal(brief.meta.ai.provider, 'rules');
-  assert.equal(brief.meta.ai.fallback, true);
-  assert.equal(brief.meta.ai.reason, 'AI_RESPONSE_INVALID');
-
-  const analysis = await aiService.analyzeActivity({ activityId: 1 }, { id: 2 });
-  assert.equal(analysis.meta.ai.provider, 'rules');
-  assert.equal(analysis.meta.ai.fallback, true);
-  assert.equal(analysis.meta.ai.reason, 'AI_RESPONSE_INVALID');
-});
-
-test('aiService fills missing DeepSeek daily brief sections from rules', async () => {
-  const aiService = loadAiService({
-    AI_PROVIDER: 'deepseek',
-    DEEPSEEK_API_KEY: 'test-key',
-    AI_DEEPSEEK_MODEL: 'deepseek-chat'
-  }, async () => jsonResponse({
-    choices: [{
-      message: {
-        content: JSON.stringify({
-          headline: '今日训练负荷较高，注意恢复',
-          recommendation: '建议明天安排低强度恢复。',
-          metrics: [{ label: '今日训练负荷', value: '80', tone: 'warning' }]
-        })
+  return Promise.resolve()
+    .then(fn)
+    .finally(() => {
+      for (const [name, value] of Object.entries(originals)) {
+        activityService[name] = value;
       }
-    }]
-  }));
+    });
+}
 
-  const brief = await aiService.getDailyBrief({ id: 2 });
+function withAiEnvironment({ activityStubs = {}, dbQuery, aiConfig = {}, mlConfig = {}, fetchImpl }, fn) {
+  const originalDbQuery = db.query;
+  const originalFetch = global.fetch;
+  const originalAiConfig = { ...config.ai };
+  const originalMlConfig = { ...config.ml };
 
-  assert.equal(brief.meta.ai.provider, 'deepseek');
-  assert.equal(brief.meta.ai.fallback, false);
-  assert.equal(brief.data.sections.length, 3);
-  assert.equal(brief.data.sections[0].key, 'recent');
-  assert.match(brief.data.sections[0].text, /近期共有|近期暂无运动记录/);
-  assert.equal(brief.data.metrics.length, 4);
+  if (dbQuery) db.query = dbQuery;
+  if (fetchImpl) global.fetch = fetchImpl;
+  Object.assign(config.ai, aiConfig);
+  Object.assign(config.ml, { coachModelPath: '__missing_coach_model__.joblib', ...mlConfig });
+
+  return withActivityStubs(activityStubs, fn)
+    .finally(() => {
+      db.query = originalDbQuery;
+      global.fetch = originalFetch;
+      Object.assign(config.ai, originalAiConfig);
+      Object.assign(config.ml, originalMlConfig);
+    });
+}
+
+function ragDbQuery(sql) {
+  if (sql.includes('MAX(latest_date)')) {
+    return [{ latestDate: '2026-06-29' }];
+  }
+  if (sql.includes('COUNT(*) AS activityCount')) {
+    return [{
+      activityCount: 3,
+      totalDistanceKm: 18.2,
+      totalDurationH: 2.4,
+      totalTrainingLoad: 210,
+      avgHeartRateBpm: 148,
+      avgTemperatureC: 31,
+      avgHumidityPercent: 72,
+      weatherSamples: 2
+    }];
+  }
+  if (sql.includes('FROM Activities a') && sql.includes('LEFT JOIN ActivitySummaries')) {
+    return [{
+      id: 1,
+      localDate: '2026-06-29',
+      activityName: '无锡市 跑步',
+      activityType: 'running',
+      distanceM: 5000,
+      durationS: 1800,
+      avgHeartRateBpm: 145,
+      activityTrainingLoad: 80,
+      weatherCondition: '多云',
+      temperatureC: 31,
+      humidityPercent: 72,
+      feelsLikeC: 35
+    }];
+  }
+  if (sql.includes('FROM DailyHealthSummaries')) {
+    return [{
+      summaryDate: '2026-06-29',
+      steps: 9000,
+      avgStressLevel: 52,
+      restingHeartRateBpm: 55,
+      bodyBatteryDrained: 65,
+      minBodyBattery: 28,
+      maxBodyBattery: 72
+    }];
+  }
+  if (sql.includes('FROM SleepSummaries')) {
+    return [{
+      sleepDate: '2026-06-29',
+      durationS: 19800,
+      sleepScore: 58,
+      avgHrv: 42,
+      hrvStatus: 'unbalanced',
+      avgSleepStress: 32
+    }];
+  }
+  if (sql.includes('FROM TrainingStatusSnapshots')) {
+    return [{
+      snapshotDate: '2026-06-29',
+      trainingStatus: 'MAINTAINING',
+      acuteTrainingLoad: 720,
+      chronicTrainingLoad: 540,
+      acuteChronicWorkloadRatio: 1.33,
+      optimalLoadMax: 650
+    }];
+  }
+  return [];
+}
+
+test('aiService reports DeepSeek provider with rule fallback', async () => {
+  const health = await aiService.getHealth();
+
+  assert.equal(health.provider, 'deepseek');
+  assert.equal(health.activeProvider, health.deepseekConfigured ? 'deepseek' : 'rules');
+  assert.equal(health.fallbackRules, true);
 });
 
-test('aiService auto mode tries DeepSeek first and then Ollama', async () => {
-  const urls = [];
-  const aiService = loadAiService({
-    AI_PROVIDER: 'auto',
-    AI_PROVIDER_ORDER: 'deepseek,ollama',
-    DEEPSEEK_API_KEY: 'bad-key',
-    AI_DEEPSEEK_MODEL: 'deepseek-chat',
-    AI_OLLAMA_MODEL: 'qwen2.5:1.5b-instruct'
-  }, async (url) => {
-    urls.push(url);
-    if (url.includes('deepseek')) {
-      return jsonResponse({ error: { message: 'unauthorized' } }, 401);
+test('aiService stays serviceable through rules when DeepSeek is not configured', async () => {
+  await withAiEnvironment({
+    aiConfig: { deepseekApiKey: '', fallbackRules: true }
+  }, async () => {
+    const health = await aiService.getHealth();
+
+    assert.equal(health.status, 'ok');
+    assert.equal(health.activeProvider, 'rules');
+    assert.equal(health.deepseekConfigured, false);
+    assert.equal(health.rulesAvailable, true);
+    assert.equal(health.coach.status, 'fallback');
+  });
+});
+
+test('aiService daily brief uses visible dashboard overview', async () => {
+  await withAiEnvironment({
+    dbQuery: async () => [],
+    aiConfig: { deepseekApiKey: '' },
+    activityStubs: {
+      getDashboardOverview: async (filters) => {
+      assert.deepEqual(filters, { owner: 'all', ownerUserId: 7 });
+      return {
+        recentActivities: [{ id: 1, activityType: 'running', distanceM: 5000 }],
+        monthlySummary: { activityCount: 1, totalDistanceKm: 5 },
+        trainingLoad: [{ dailyTrainingLoad: 80, ctl: 20, atl: 24, tsb: -4 }]
+      };
     }
-    return jsonResponse({ message: { content: 'Ollama 建议：保持轻松。' } });
+    }
+  }, async () => {
+    const brief = await aiService.getDailyBrief({ id: 7 });
+
+    assert.equal(brief.meta.ai.provider, 'rules');
+    assert.equal(brief.data.sections.length, 5);
+    assert.equal(brief.data.metrics.length, 4);
+    assert.equal(typeof brief.data.placements.trainingLoad.text, 'string');
+    assert.match(brief.data.sections[0].text, /近期共有 1 次运动/);
   });
-
-  const result = await aiService.chat({ message: '最近负荷怎么样？' }, { id: 2 });
-
-  assert.equal(result.meta.ai.provider, 'ollama');
-  assert.equal(result.meta.ai.model, 'qwen2.5:1.5b-instruct');
-  assert.match(result.data.content, /Ollama 建议/);
-  assert.equal(urls.some((url) => url.includes('deepseek')), true);
-  assert.equal(urls.some((url) => url.includes('/api/chat')), true);
 });
 
-test('aiService deepseek mode does not call Ollama after DeepSeek failure', async () => {
-  const urls = [];
-  const aiService = loadAiService({
-    AI_PROVIDER: 'deepseek',
-    DEEPSEEK_API_KEY: 'bad-key',
-    AI_DEEPSEEK_MODEL: 'deepseek-chat'
-  }, async (url) => {
-    urls.push(url);
-    return jsonResponse({ error: { message: 'quota exceeded' } }, 402);
+test('aiService daily brief uses DeepSeek JSON with RAG system context', async () => {
+  let requestBody;
+  await withAiEnvironment({
+    dbQuery: ragDbQuery,
+    aiConfig: {
+      deepseekApiKey: 'test-key',
+      deepseekModel: 'deepseek-chat',
+      deepseekBaseUrl: 'https://api.deepseek.com',
+      fallbackRules: true
+    },
+    activityStubs: {
+      getDashboardOverview: async () => ({
+        recentActivities: [{ id: 1, activityType: 'running', distanceM: 5000 }],
+        monthlySummary: { activityCount: 1, totalDistanceKm: 5 },
+        trainingLoad: [{ dailyTrainingLoad: 80, ctl: 20, atl: 35, tsb: -15 }]
+      })
+    },
+    fetchImpl: async (_url, init) => {
+      requestBody = JSON.parse(init.body);
+      return {
+        ok: true,
+        json: async () => ({
+          choices: [{
+            message: {
+              content: JSON.stringify({
+                headline: 'DeepSeek 恢复建议',
+                riskLevel: 'orange',
+                recommendation: '今天以恢复跑和拉伸为主，避开高温时段。',
+                weatherAdvice: '体感温度较高，户外训练要降低目标配速。',
+                loadAdvice: '负荷偏紧，避免继续堆强度。',
+                sleepAdvice: '睡眠评分偏低，优先补睡。',
+                recoveryAdvice: '恢复优先，保留轻松活动即可。',
+                sections: [
+                  { key: 'recent', title: '近期运动', tone: 'warning', text: '近期训练连续性较强。' },
+                  { key: 'body', title: '负荷状态', tone: 'warning', text: '短期负荷偏高。' },
+                  { key: 'sleep', title: '睡眠恢复', tone: 'warning', text: '睡眠和 HRV 提示恢复不足。' },
+                  { key: 'weather', title: '天气影响', tone: 'warning', text: '高温高湿会放大体感强度。' },
+                  { key: 'today', title: '今日安排', tone: 'warning', text: '安排恢复跑或休息。' }
+                ],
+                placements: {
+                  today: { title: '今日智能建议', tone: 'warning', text: '恢复优先。' },
+                  trainingLoad: { title: '负荷建议', tone: 'warning', text: '降低强度。' },
+                  sleep: { title: '睡眠与恢复建议', tone: 'warning', text: '优先补睡。' },
+                  weather: { title: '天气影响', tone: 'warning', text: '避开高温。' }
+                }
+              })
+            }
+          }]
+        })
+      };
+    }
+  }, async () => {
+    const result = await aiService.getDailyBrief({ id: 7 });
+
+    assert.equal(result.meta.ai.provider, 'deepseek');
+    assert.equal(result.meta.ai.fallback, false);
+    assert.equal(result.data.headline, 'DeepSeek 恢复建议');
+    assert.equal(result.data.placements.trainingLoad.text, '降低强度。');
+    assert.equal(result.data.ml.provider, 'rules');
+    assert.equal(result.meta.ai.contextSignals.mlProvider, 'rules');
+    assert.equal(result.data.metrics.length, 4);
+    assert.equal(requestBody.messages[0].role, 'system');
+    assert.equal(requestBody.messages[1].role, 'user');
+    assert.match(requestBody.messages[0].content, /近期运动明细/);
+    assert.match(requestBody.messages[0].content, /本地模型输出/);
+    assert.match(requestBody.messages[1].content, /只返回一个 JSON 对象/);
+    assert.doesNotMatch(JSON.stringify(result), /近期运动明细|system prompt|28天运动汇总/);
   });
-
-  const result = await aiService.chat({ message: '今天怎么安排？' }, { id: 2 });
-
-  assert.equal(result.meta.ai.provider, 'rules');
-  assert.equal(result.meta.ai.fallback, true);
-  assert.equal(urls.length, 1);
-  assert.equal(urls[0].includes('deepseek'), true);
-  assert.equal(urls.some((url) => url.includes('/api/chat')), false);
 });
 
-test('aiService uses visible dashboard overview instead of current-user-only data', async () => {
-  const aiService = loadAiService({
-    AI_PROVIDER: 'deepseek',
-    DEEPSEEK_API_KEY: ''
-  }, async () => jsonResponse({}));
-  const activityService = require('../src/services/activityService');
-  let receivedFilters = null;
-  activityService.getDashboardOverview = async (filters) => {
-    receivedFilters = filters;
-    return {
+test('aiService daily brief falls back to rules for invalid DeepSeek JSON', async () => {
+  await withAiEnvironment({
+    dbQuery: ragDbQuery,
+    aiConfig: {
+      deepseekApiKey: 'test-key',
+      fallbackRules: true
+    },
+    activityStubs: {
+      getDashboardOverview: async () => ({
+        recentActivities: [{ id: 1, activityType: 'running', distanceM: 5000 }],
+        monthlySummary: { activityCount: 1, totalDistanceKm: 5 },
+        trainingLoad: [{ dailyTrainingLoad: 80, ctl: 20, atl: 35, tsb: -15 }]
+      })
+    },
+    fetchImpl: async () => ({
+      ok: true,
+      json: async () => ({ choices: [{ message: { content: '不是 JSON' } }] })
+    })
+  }, async () => {
+    const result = await aiService.getDailyBrief({ id: 7 });
+
+    assert.equal(result.meta.ai.provider, 'rules');
+    assert.equal(result.meta.ai.fallback, true);
+    assert.equal(result.meta.ai.contextSignals.activityCount28d, 3);
+  });
+});
+
+test('aiService chat rejects empty messages and answers sports questions', async () => {
+  await assert.rejects(
+    () => aiService.chat({ message: '' }, { id: 2 }),
+    (error) => error.code === 'INVALID_AI_INPUT'
+  );
+
+  await withAiEnvironment({
+    dbQuery: async () => [],
+    aiConfig: { deepseekApiKey: '' },
+    activityStubs: {
+      getDashboardOverview: async () => ({
       recentActivities: [],
       monthlySummary: {},
-      yearlySummary: {},
-      trainingLoad: [],
-      personalBests: {}
-    };
-  };
+      trainingLoad: []
+    })
+    }
+  }, async () => {
+    const result = await aiService.chat({ message: '今天适合训练吗？' }, { id: 2 });
 
-  await aiService.chat({ message: '今天适合训练吗？' }, { id: 7 });
+    assert.equal(result.data.role, 'assistant');
+    assert.equal(result.meta.ai.provider, 'rules');
+    assert.equal(result.meta.ai.contextWindowDays, 28);
+    assert.match(result.data.content, /近期暂无运动记录/);
+  });
+});
 
-  assert.equal(receivedFilters.owner, 'all');
-  assert.equal(receivedFilters.ownerUserId, 7);
+test('aiService sends RAG context as DeepSeek system message only', async () => {
+  let requestBody;
+  await withAiEnvironment({
+    dbQuery: ragDbQuery,
+    aiConfig: {
+      deepseekApiKey: 'test-key',
+      deepseekModel: 'deepseek-chat',
+      deepseekBaseUrl: 'https://api.deepseek.com',
+      fallbackRules: true
+    },
+    activityStubs: {
+      getDashboardOverview: async () => ({
+        recentActivities: [{ id: 1, activityType: 'running', distanceM: 5000 }],
+        monthlySummary: { activityCount: 1, totalDistanceKm: 5 },
+        trainingLoad: [{ dailyTrainingLoad: 80, ctl: 20, atl: 35, tsb: -15 }]
+      })
+    },
+    fetchImpl: async (_url, init) => {
+      requestBody = JSON.parse(init.body);
+      return {
+        ok: true,
+        json: async () => ({ choices: [{ message: { content: '今天建议恢复跑，并避开高温时段。' } }] })
+      };
+    }
+  }, async () => {
+    const result = await aiService.chat({ message: '今天适合训练吗？' }, { id: 7 });
+
+    assert.equal(result.meta.ai.provider, 'deepseek');
+    assert.equal(result.meta.ai.fallback, false);
+    assert.equal(result.data.content, '今天建议恢复跑，并避开高温时段。');
+    assert.equal(requestBody.model, 'deepseek-chat');
+    assert.equal(requestBody.messages[0].role, 'system');
+    assert.equal(requestBody.messages[1].role, 'user');
+    assert.equal(requestBody.messages[1].content, '今天适合训练吗？');
+    assert.match(requestBody.messages[0].content, /近期运动明细/);
+    assert.match(requestBody.messages[0].content, /多云/);
+    assert.match(requestBody.messages[0].content, /本地模型输出/);
+    assert.doesNotMatch(requestBody.messages[1].content, /近期运动明细|28天运动汇总|system prompt/);
+    assert.doesNotMatch(JSON.stringify(result), /近期运动明细|system prompt|28天运动汇总/);
+  });
+});
+
+test('aiService falls back to rules when DeepSeek fails', async () => {
+  await withAiEnvironment({
+    dbQuery: ragDbQuery,
+    aiConfig: {
+      deepseekApiKey: 'test-key',
+      fallbackRules: true
+    },
+    activityStubs: {
+      getDashboardOverview: async () => ({
+        recentActivities: [],
+        monthlySummary: {},
+        trainingLoad: []
+      })
+    },
+    fetchImpl: async () => ({ ok: false, json: async () => ({}) })
+  }, async () => {
+    const result = await aiService.chat({ message: '最近训练负荷怎么样？' }, { id: 7 });
+
+    assert.equal(result.meta.ai.provider, 'rules');
+    assert.equal(result.meta.ai.fallback, true);
+    assert.equal(result.meta.ai.contextSignals.activityCount28d, 3);
+  });
+});
+
+test('aiService saves feedback without prompt content', async () => {
+  const queries = [];
+  await withAiEnvironment({
+    dbQuery: async (sql, params = []) => {
+      queries.push({ sql, params });
+      if (sql.includes('INSERT INTO AiCoachFeedback')) {
+        return { insertId: 42 };
+      }
+      return [];
+    }
+  }, async () => {
+    const result = await aiService.submitFeedback({
+      suggestionType: 'daily_brief',
+      feedback: 'helpful',
+      suggestionDate: '2026-06-29',
+      modelVersion: 'coach-v1',
+      ml: {
+        provider: 'local_model',
+        riskLevel: 'orange',
+        loadAction: 'reduce',
+        weatherRisk: 'high'
+      },
+      coachSystemPrompt: 'should not be stored'
+    }, { id: 7 });
+
+    assert.equal(result.data.saved, true);
+    assert.equal(result.data.id, 42);
+    const insert = queries.find((item) => item.sql.includes('INSERT INTO AiCoachFeedback'));
+    assert.ok(insert);
+    assert.equal(insert.params[0], 7);
+    assert.equal(insert.params[2], 'daily_brief');
+    assert.equal(insert.params[4], 'helpful');
+    assert.doesNotMatch(JSON.stringify(insert.params), /should not be stored|system prompt/i);
+  });
+});
+
+test('aiService feedback writes do not require CREATE privilege when tables exist', async () => {
+  const queries = [];
+  await withAiEnvironment({
+    dbQuery: async (sql, params = []) => {
+      queries.push({ sql, params });
+      if (/SHOW TABLES LIKE/i.test(sql)) {
+        return [{ tableName: params[0] }];
+      }
+      if (/CREATE TABLE/i.test(sql)) {
+        const error = new Error('CREATE command denied');
+        error.code = 'ER_TABLEACCESS_DENIED_ERROR';
+        throw error;
+      }
+      if (sql.includes('INSERT INTO AiCoachFeedback')) {
+        return { insertId: 43 };
+      }
+      if (sql.includes('INSERT INTO MorningReadinessFeedback')) {
+        return { insertId: 53 };
+      }
+      return [];
+    }
+  }, async () => {
+    const feedback = await aiService.submitFeedback({
+      suggestionType: 'daily_brief',
+      feedback: 'helpful',
+      suggestionDate: '2026-06-29'
+    }, { id: 7 });
+    const readiness = await aiService.submitMorningReadiness({
+      feedbackDate: '2026-06-30',
+      readinessScore: 3,
+      muscleSoreness: 'none',
+      mentalState: 'normal',
+      trainingWillingness: 'easy'
+    }, { id: 7 });
+
+    assert.equal(feedback.data.saved, true);
+    assert.equal(readiness.data.saved, true);
+    assert.ok(queries.some((item) => /SHOW TABLES LIKE/i.test(item.sql)));
+    assert.equal(queries.some((item) => /CREATE TABLE/i.test(item.sql)), false);
+  });
+});
+
+test('aiService rejects invalid feedback payloads', async () => {
+  await assert.rejects(
+    () => aiService.submitFeedback({ suggestionType: 'daily_brief', feedback: 'bad' }, { id: 7 }),
+    (error) => error.code === 'INVALID_AI_FEEDBACK'
+  );
+});
+
+test('aiService saves morning readiness feedback with upsert', async () => {
+  const queries = [];
+  await withAiEnvironment({
+    dbQuery: async (sql, params = []) => {
+      queries.push({ sql, params });
+      if (sql.includes('INSERT INTO MorningReadinessFeedback')) {
+        return { insertId: 52 };
+      }
+      return [];
+    }
+  }, async () => {
+    const result = await aiService.submitMorningReadiness({
+      feedbackDate: '2026-06-30',
+      readinessScore: 3,
+      muscleSoreness: 'mild',
+      mentalState: 'normal',
+      trainingWillingness: 'easy',
+      note: '腿有点酸'
+    }, { id: 7 });
+
+    assert.equal(result.data.saved, true);
+    assert.equal(result.data.id, 52);
+    const insert = queries.find((item) => item.sql.includes('INSERT INTO MorningReadinessFeedback'));
+    assert.ok(insert);
+    assert.equal(insert.params[0], 7);
+    assert.equal(insert.params[1], '2026-06-30');
+    assert.equal(insert.params[2], 3);
+    assert.equal(insert.params[3], 'mild');
+    assert.equal(insert.params[4], 'normal');
+    assert.equal(insert.params[5], 'easy');
+  });
+});
+
+test('aiService rejects invalid morning readiness payloads', async () => {
+  await assert.rejects(
+    () => aiService.submitMorningReadiness({
+      feedbackDate: '2026-06-30',
+      readinessScore: 8,
+      muscleSoreness: 'mild',
+      mentalState: 'normal',
+      trainingWillingness: 'easy'
+    }, { id: 7 }),
+    (error) => error.code === 'INVALID_MORNING_READINESS'
+  );
+  await assert.rejects(
+    () => aiService.submitMorningReadiness({
+      feedbackDate: '2026-06-30',
+      readinessScore: 3,
+      muscleSoreness: 'bad',
+      mentalState: 'normal',
+      trainingWillingness: 'easy'
+    }, { id: 7 }),
+    (error) => error.code === 'INVALID_MORNING_READINESS'
+  );
+});
+
+test('aiService analyzes existing activities and returns 404 for missing activity', async () => {
+  await withActivityStubs({
+    getActivityById: async (id) => (id === 1
+      ? { id: 1, activityType: 'running', distanceM: 5000, durationS: 1800, avgHeartRateBpm: 145 }
+      : null)
+  }, async () => {
+    const analysis = await aiService.analyzeActivity({ activityId: 1 }, { id: 2 });
+
+    assert.equal(analysis.meta.ai.provider, 'rules');
+    assert.equal(analysis.data.headline, '跑步智能分析');
+    assert.match(analysis.data.summary, /5 km/);
+
+    await assert.rejects(
+      () => aiService.analyzeActivity({ activityId: 999 }, { id: 2 }),
+      (error) => error.code === 'ACTIVITY_NOT_FOUND'
+    );
+  });
 });

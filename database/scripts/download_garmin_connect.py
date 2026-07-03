@@ -19,6 +19,21 @@ from garminconnect.exceptions import GarminConnectAuthenticationError
 
 DEFAULT_DATA_DIR = Path(__file__).resolve().parents[1] / "data" / "garmin_downloads"
 DEFAULT_TOKEN_DIR = Path(__file__).resolve().parents[1] / ".garmin_tokens"
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
+
+def load_backend_env() -> None:
+    env_path = PROJECT_ROOT / "backend" / ".env"
+    if not env_path.exists():
+        return
+    for line in env_path.read_text(encoding="utf-8").splitlines():
+        text = line.strip()
+        if not text or text.startswith("#") or "=" not in text:
+            continue
+        key, value = text.split("=", 1)
+        key = key.strip()
+        value = value.strip().strip('"').strip("'")
+        os.environ.setdefault(key, value)
 
 
 def safe_name(value: str | None) -> str:
@@ -117,10 +132,20 @@ EXTRA_JSON_KEYS = {
     "exercise-sets": "exerciseSets",
 }
 
+DEFAULT_EXTRAS = [
+    "details",
+    "hr-zones",
+    "power-zones",
+    "split-summaries",
+    "splits",
+    "typed-splits",
+    "exercise-sets",
+]
+
 
 def parse_extras(value: str) -> list[str]:
     if value == "all":
-        return list(EXTRA_FETCHERS)
+        return DEFAULT_EXTRAS
     items = [item.strip() for item in value.split(",") if item.strip()]
     unknown = [item for item in items if item not in EXTRA_FETCHERS]
     if unknown:
@@ -312,7 +337,72 @@ def fetch_activities_by_date_chunks(
     return activities
 
 
+def iter_dates(start_date: str, end_date: str):
+    current = parse_date(start_date)
+    end = parse_date(end_date)
+    if current > end:
+        raise SystemExit("--start-date must be before or equal to --end-date")
+    while current <= end:
+        yield current.strftime("%Y-%m-%d")
+        current += timedelta(days=1)
+
+
+HEALTH_FETCHERS = {
+    "daily": lambda client, day: client.get_stats_and_body(day),
+    "sleep": lambda client, day: client.get_sleep_data(day),
+    "rhr": lambda client, day: client.get_rhr_day(day),
+    "stress": lambda client, day: client.get_stress_data(day),
+    "heart_rates": lambda client, day: client.get_heart_rates(day),
+    "steps": lambda client, day: client.get_steps_data(day),
+    "intensity_minutes": lambda client, day: client.get_intensity_minutes_data(day),
+    "hrv": lambda client, day: client.get_hrv_data(day),
+    "training_status": lambda client, day: client.get_training_status(day),
+    "race_predictions": lambda client, _day: client.get_race_predictions(),
+    "lactate_threshold": lambda client, _day: client.get_lactate_threshold(),
+    "cycling_ftp": lambda client, _day: client.get_cycling_ftp(),
+}
+
+
+def fetch_health_json(client: Garmin, day: str, retries: int, wait_seconds: float) -> dict[str, Any]:
+    return {
+        key: garmin_call(
+            f"{key} health JSON for {day}",
+            retries,
+            wait_seconds,
+            lambda key=key: fetch_optional(key, lambda: HEALTH_FETCHERS[key](client, day)),
+        )
+        for key in HEALTH_FETCHERS
+    }
+
+
+def download_health_range(
+    client: Garmin,
+    out_dir: Path,
+    start_date: str,
+    end_date: str,
+    retries: int,
+    sleep_seconds: float,
+    force: bool,
+) -> list[str]:
+    health_dir = out_dir / "health"
+    health_dir.mkdir(parents=True, exist_ok=True)
+    downloaded: list[str] = []
+    days = list(iter_dates(start_date, end_date))
+    for index, day in enumerate(days, start=1):
+        path = health_dir / f"{day}.json"
+        if path.exists() and not force:
+            continue
+        print(f"[health {index}/{len(days)}] {day}")
+        dump_json(path, fetch_health_json(client, day, retries, sleep_seconds), force=True)
+        downloaded.append(day)
+        if sleep_seconds > 0 and index < len(days):
+            time.sleep(sleep_seconds)
+    return downloaded
+
+
 def main() -> None:
+    load_backend_env()
+
     parser = argparse.ArgumentParser(description="Download Garmin Connect activity JSON and FIT files.")
     parser.add_argument("--out-dir", type=Path, default=DEFAULT_DATA_DIR)
     parser.add_argument("--token-dir", type=Path, default=DEFAULT_TOKEN_DIR)
@@ -336,6 +426,8 @@ def main() -> None:
     )
     parser.add_argument("--skip-fit", action="store_true")
     parser.add_argument("--skip-json", action="store_true")
+    parser.add_argument("--include-health", action="store_true", help="Also download daily health JSON: sleep, resting HR, stress and Garmin analysis samples.")
+    parser.add_argument("--health-only", action="store_true", help="Only download daily health JSON, no activities.")
     parser.add_argument("--sleep", type=float, default=1.5, help="Seconds to wait between activities.")
     parser.add_argument("--extra-sleep", type=float, default=0.5, help="Seconds to wait between enriched JSON extra endpoints.")
     parser.add_argument("--retries", type=int, default=2, help="Retries for Garmin 429 rate-limit responses.")
@@ -366,6 +458,25 @@ def main() -> None:
             args.summary_out.parent.mkdir(parents=True, exist_ok=True)
             dump_json(args.summary_out, {"login": "ok"}, force=True)
         return
+
+    health_start = args.start_date or datetime.now().strftime("%Y-%m-%d")
+    health_end = args.end_date or datetime.now().strftime("%Y-%m-%d")
+    downloaded_health_days: list[str] = []
+    if args.include_health or args.health_only:
+        downloaded_health_days = download_health_range(
+            client,
+            args.out_dir,
+            health_start,
+            health_end,
+            args.retries,
+            args.sleep,
+            args.force,
+        )
+        if args.health_only:
+            if args.summary_out:
+                args.summary_out.parent.mkdir(parents=True, exist_ok=True)
+                dump_json(args.summary_out, {"downloadedHealthDays": downloaded_health_days}, force=True)
+            return
 
     if args.start_date:
         end_date = args.end_date or datetime.now().strftime("%Y-%m-%d")
@@ -455,8 +566,10 @@ def main() -> None:
                 "skippedExistingOrMissing": skipped,
                 "skippedKnown": skipped_known,
                 "downloadedActivityIds": downloaded_activity_ids,
+                "downloadedHealthDays": downloaded_health_days,
                 "jsonDir": str(json_dir),
                 "fitDir": str(fit_dir),
+                "healthDir": str(args.out_dir / "health"),
             },
             force=True,
         )
