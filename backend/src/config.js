@@ -11,6 +11,11 @@ function parseInteger(value, fallback) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function parseNumber(value, fallback) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
 function parseCorsOrigins(value, serverPort) {
   const localApiOrigins = [`http://127.0.0.1:${serverPort}`, `http://localhost:${serverPort}`];
   const localFrontendOrigins = ['http://127.0.0.1:5173', 'http://localhost:5173'];
@@ -102,7 +107,14 @@ const config = {
       resolveBackendPath(process.env.ML_COACH_PREDICT_SCRIPT, 'ml/predict_coach.py'),
     coachModelPath:
       resolveBackendPath(process.env.ML_COACH_MODEL_PATH, 'ml/models/coach_model.joblib'),
-    timeoutMs: parseInteger(process.env.ML_TIMEOUT_MS, 10000)
+    timeoutMs: parseInteger(process.env.ML_TIMEOUT_MS, 10000),
+    athleteProfile: {
+      age: parseInteger(process.env.ML_ATHLETE_AGE, 21),
+      halfMarathonPbMinutes: parseNumber(process.env.ML_HALF_MARATHON_PB_MINUTES, 79),
+      marathonPbMinutes: parseNumber(process.env.ML_MARATHON_PB_MINUTES, 176),
+      athleteTier: process.env.ML_ATHLETE_TIER || 'competitive_amateur',
+      trainingTolerance: process.env.ML_TRAINING_TOLERANCE || 'high'
+    }
   },
   ai: {
     provider: 'deepseek',

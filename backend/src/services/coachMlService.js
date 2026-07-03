@@ -12,6 +12,13 @@ const CACHE_TTL_MS = 5 * 60 * 1000;
 
 const RISK_ORDER = { green: 0, yellow: 1, orange: 2, red: 3 };
 const WEATHER_RISK_ORDER = { low: 0, medium: 1, high: 2 };
+const DEFAULT_ATHLETE_PROFILE = {
+  age: 21,
+  halfMarathonPbMinutes: 79,
+  marathonPbMinutes: 176,
+  athleteTier: 'competitive_amateur',
+  trainingTolerance: 'high'
+};
 const DEFAULT_LABEL_SOURCE_SUMMARY = {
   aggregate: { rule_pseudo: 1 },
   realLabelRatio: 0,
@@ -77,6 +84,65 @@ function sumBy(rows, mapper) {
 function avgBy(rows, mapper) {
   const values = rows.map(mapper).map(nullableNumber).filter((value) => value !== null);
   return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
+}
+
+function quantile(values, q) {
+  const sorted = values.map(nullableNumber).filter((value) => value !== null).sort((a, b) => a - b);
+  if (!sorted.length) return null;
+  const index = (sorted.length - 1) * q;
+  const lower = Math.floor(index);
+  const upper = Math.ceil(index);
+  if (lower === upper) return sorted[lower];
+  return sorted[lower] + (sorted[upper] - sorted[lower]) * (index - lower);
+}
+
+function percentileRank(value, values) {
+  const numericValue = nullableNumber(value);
+  const numericValues = values.map(nullableNumber).filter((item) => item !== null);
+  if (numericValue === null) return 50;
+  if (!numericValues.length) return numericValue > 0 ? 50 : 0;
+  const belowOrEqual = numericValues.filter((item) => item <= numericValue).length;
+  return round((belowOrEqual / numericValues.length) * 100, 1) || 0;
+}
+
+function safeRatio(value, baseline, fallback = 0) {
+  const numericValue = toNumber(value, 0);
+  const numericBaseline = toNumber(baseline, 0);
+  if (numericBaseline <= 0) return numericValue > 0 ? fallback : 0;
+  return round(numericValue / numericBaseline, 3) || 0;
+}
+
+function dailyActivityTotals(activities, latestDate, days, { includeLatest = false } = {}) {
+  const totals = new Map();
+  for (const activity of valuesInWindow(activities, latestDate, 'localDate', days)) {
+    const diff = daysBetween(latestDate, activity.localDate);
+    if (diff === null || (!includeLatest && diff === 0)) continue;
+    const day = dateOnly(activity.localDate);
+    if (!day) continue;
+    const current = totals.get(day) || { date: day, load: 0, distanceKm: 0, durationH: 0 };
+    current.load += toNumber(activity.activityTrainingLoad, 0);
+    current.distanceKm += toNumber(activity.distanceM, 0) / 1000;
+    current.durationH += toNumber(activity.durationS, 0) / 3600;
+    totals.set(day, current);
+  }
+  return [...totals.values()].sort((a, b) => String(a.date).localeCompare(String(b.date)));
+}
+
+function normalizeAthleteProfile(profile = {}) {
+  return {
+    ...DEFAULT_ATHLETE_PROFILE,
+    ...(config.ml?.athleteProfile || {}),
+    ...profile
+  };
+}
+
+function classifyRelativePerceivedEffort(features = {}) {
+  const load = toNumber(features.load_1d, 0);
+  const percentile = toNumber(features.session_load_percentile_90d, load > 0 ? 50 : 0);
+  if (load <= 0 && toNumber(features.hard_minutes_7d, 0) <= 0) return 'easy';
+  if (percentile < 40) return 'easy';
+  if (percentile <= 80) return 'moderate';
+  return 'hard';
 }
 
 function coverage(rows, latestDate, dateKey, days, predicate = () => true) {
@@ -171,6 +237,21 @@ function buildFeatureSet(overview = {}, context = {}) {
     toNumber(row.activityTrainingLoad, 0) >= 120 || toNumber(row.avgHeartRateBpm, 0) >= 155
   ), (row) => row.durationS) / 60, 1) || 0;
   features.rest_days_7d = clamp(7 - activeDays7d, 0, 7);
+  const history90 = dailyActivityTotals(activities, latestDate, 90);
+  const history28 = dailyActivityTotals(activities, latestDate, 28);
+  const historyForPercentiles = history90.length ? history90 : dailyActivityTotals(activities, latestDate, 365);
+  features.session_load_percentile_90d = percentileRank(features.load_1d, historyForPercentiles.map((item) => item.load));
+  features.distance_percentile_90d = percentileRank(features.distance_1d, historyForPercentiles.map((item) => item.distanceKm));
+  features.duration_percentile_90d = percentileRank(features.duration_1d, historyForPercentiles.map((item) => item.durationH));
+  const longRunBaseline = Math.max(0, ...history28.map((item) => item.distanceKm));
+  features.long_run_ratio_28d = safeRatio(features.distance_1d, longRunBaseline, 1);
+  const loadP80 = quantile(historyForPercentiles.map((item) => item.load), 0.8);
+  const previousHardDay = loadP80 === null
+    ? null
+    : historyForPercentiles.slice().reverse().find((item) => item.load >= loadP80);
+  const hardGap = previousHardDay ? daysBetween(latestDate, previousHardDay.date) : 90;
+  features.hard_session_gap_days = clamp(hardGap ?? 90, 0, 365);
+  features.load_spike_ratio_28d = safeRatio(features.load_1d, avgBy(history28, (item) => item.load), 1);
 
   features.atl = round(latestLoad.atl ?? latestTraining.acuteTrainingLoad, 2) || 0;
   features.ctl = round(latestLoad.ctl ?? latestTraining.chronicTrainingLoad, 2) || 0;
@@ -222,10 +303,18 @@ function riskMax(left, right) {
   return RISK_ORDER[right] > RISK_ORDER[left] ? right : left;
 }
 
-function rulePrediction(features) {
+function rulePrediction(features, athleteProfile = config.ml?.athleteProfile) {
   const weather = assessWeather(features);
+  const profile = normalizeAthleteProfile(athleteProfile);
+  const highTolerance = profile.trainingTolerance === 'high' || profile.athleteTier === 'competitive_amateur';
   const reasons = [];
   let score = 0;
+  let recoverySignalCount = 0;
+  const loadHabitSpike = (
+    toNumber(features.session_load_percentile_90d, 50) >= 85
+    || toNumber(features.load_spike_ratio_28d, 0) >= 1.35
+    || toNumber(features.long_run_ratio_28d, 0) >= 1.2
+  );
   const dataCompleteness = {
     sleepCoverage14d: round(features.sleep_coverage_14d, 3) || 0,
     weatherCoverage14d: round(features.weather_coverage_14d, 3) || 0,
@@ -234,20 +323,35 @@ function rulePrediction(features) {
     score: round(features.data_completeness_score, 1) || 0
   };
 
-  if (features.tsb < -25) {
+  if (features.sleep_score > 0 && features.sleep_score < 60) {
+    recoverySignalCount += 1;
+  } else if (features.sleep_duration_h > 0 && features.sleep_duration_h < 6) {
+    recoverySignalCount += 1;
+  }
+  if (features.hrv_delta_pct <= -15) recoverySignalCount += 1;
+  if (features.resting_hr_delta >= 5) recoverySignalCount += 1;
+  if (features.avg_stress >= 50) recoverySignalCount += 1;
+  if (features.body_battery_drained >= 60) recoverySignalCount += 1;
+
+  if (features.tsb < -25 && (!highTolerance || loadHabitSpike || recoverySignalCount >= 2)) {
     score += 3;
     reasons.push('TSB 显著偏低');
-  } else if (features.tsb < -10) {
+  } else if (features.tsb < -10 && (!highTolerance || recoverySignalCount >= 2)) {
     score += 1;
     reasons.push('TSB 偏低');
   }
 
-  if (features.acwr_7_28 >= 1.5) {
+  if (features.acwr_7_28 >= 1.5 && (!highTolerance || loadHabitSpike || recoverySignalCount >= 2)) {
     score += 2;
     reasons.push('近期负荷增长过快');
-  } else if (features.acwr_7_28 >= 1.3) {
+  } else if (features.acwr_7_28 >= 1.3 && (!highTolerance || loadHabitSpike)) {
     score += 1;
     reasons.push('近期负荷上升');
+  }
+
+  if (highTolerance && loadHabitSpike && recoverySignalCount > 0) {
+    score += 1;
+    reasons.push('相对本人近期习惯负荷偏高');
   }
 
   if (features.sleep_score > 0 && features.sleep_score < 60) {
@@ -341,6 +445,7 @@ function rulePrediction(features) {
       weatherRisk: weather.level,
       primaryRecommendation
     },
+    perceivedEffortLevel: classifyRelativePerceivedEffort(features),
     learnedSignals: null,
     labelSourceSummary: DEFAULT_LABEL_SOURCE_SUMMARY
   };
@@ -477,10 +582,20 @@ function modelCacheKey(context = {}) {
   } catch (_error) {
     modelMtime = 'missing';
   }
+  const signals = context.signals || {};
+  const dataSignals = [
+    signals.activityCount28d || 0,
+    signals.healthDays14d || 0,
+    signals.sleepDays14d || 0,
+    signals.trainingDays14d || 0,
+    signals.weatherSamples28d || 0,
+    signals.feedbackCount || context.feedbackPreference?.total || 0
+  ].join(',');
   return [
     context.userId || 'anonymous',
     context.latestDate || 'unknown',
-    modelMtime
+    modelMtime,
+    dataSignals
   ].join(':');
 }
 
@@ -508,7 +623,7 @@ async function predict({ overview = {}, context = {} } = {}) {
   if (cached) return cached;
 
   const features = buildFeatureSet(overview, context);
-  const fallbackPrediction = rulePrediction(features);
+  const fallbackPrediction = rulePrediction(features, context.athleteProfile);
   let prediction;
 
   try {
@@ -574,6 +689,13 @@ async function getHealth() {
     trainedAt,
     fallbackRules: true,
     featureCount: FEATURE_NAMES.length,
+    athleteProfile: normalizeAthleteProfile(),
+    cache: {
+      enabled: true,
+      ttlMs: CACHE_TTL_MS,
+      size: predictionCache.size,
+      keyIncludes: ['userId', 'latestDate', 'modelMtime', 'dataSignals']
+    },
     cacheSize: predictionCache.size
   };
 }
@@ -589,6 +711,8 @@ module.exports = {
   __private: {
     assessWeather,
     buildDataCompleteness,
+    classifyRelativePerceivedEffort,
+    modelCacheKey,
     normalizeModelPrediction
   }
 };

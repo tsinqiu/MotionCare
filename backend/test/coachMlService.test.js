@@ -56,6 +56,14 @@ function sampleContext(overrides = {}) {
       humidityPercent: 75,
       feelsLikeC: 35
     },
+    signals: {
+      activityCount28d: 2,
+      healthDays14d: 1,
+      sleepDays14d: 1,
+      trainingDays14d: 1,
+      weatherSamples28d: 1,
+      feedbackCount: 0
+    },
     ...overrides
   };
 }
@@ -77,6 +85,12 @@ test('coachMlService builds daily rolling features from RAG context', () => {
   assert.equal(features.weather_coverage_14d, 0.143);
   assert.equal(features.hrv_coverage_14d, 0.071);
   assert.equal(features.training_status_coverage_14d, 0.071);
+  assert.equal(features.session_load_percentile_90d, 0);
+  assert.equal(features.distance_percentile_90d, 0);
+  assert.equal(features.duration_percentile_90d, 0);
+  assert.equal(features.long_run_ratio_28d, 0.5);
+  assert.equal(features.hard_session_gap_days, 3);
+  assert.equal(features.load_spike_ratio_28d, 0.563);
 });
 
 test('coachMlService feature names match shared feature schema', () => {
@@ -99,6 +113,41 @@ test('coachMlService rules downgrade high heat and poor recovery', () => {
   assert.equal(prediction.primaryRecommendation, 'rest');
   assert.ok(prediction.topFactors.includes('体感温度较高'));
   assert.equal(prediction.dataCompleteness.score, 8.9);
+});
+
+test('coachMlService classifies perceived effort by personal percentile instead of fixed load', () => {
+  assert.equal(
+    coachMlService.__private.classifyRelativePerceivedEffort({
+      load_1d: 150,
+      hard_minutes_7d: 60,
+      session_load_percentile_90d: 70
+    }),
+    'moderate'
+  );
+  assert.equal(
+    coachMlService.__private.classifyRelativePerceivedEffort({
+      load_1d: 150,
+      hard_minutes_7d: 60,
+      session_load_percentile_90d: 92
+    }),
+    'hard'
+  );
+});
+
+test('coachMlService high tolerance still respects poor recovery signals', () => {
+  const prediction = coachMlService.rulePrediction({
+    ...Object.fromEntries(coachMlService.FEATURE_NAMES.map((name) => [name, 0])),
+    load_1d: 150,
+    session_load_percentile_90d: 70,
+    sleep_score: 55,
+    hrv_delta_pct: -20,
+    resting_hr_delta: 6,
+    weather_risk_level: 0,
+    data_completeness_score: 60
+  }, { trainingTolerance: 'high', athleteTier: 'competitive_amateur' });
+
+  assert.notEqual(prediction.loadAction, 'progress');
+  assert.ok(['yellow', 'orange', 'red'].includes(prediction.riskLevel));
 });
 
 test('coachMlService predict falls back to rules when local model is missing', async () => {
@@ -163,4 +212,24 @@ test('coachMlService health reports coach model governance fields', async () => 
   assert.equal(health.modelVersion, 'coach-v1');
   assert.equal(health.featureCount, coachMlService.FEATURE_NAMES.length);
   assert.equal(health.fallbackRules, true);
+  assert.equal(health.cache.enabled, true);
+  assert.equal(typeof health.cache.ttlMs, 'number');
+  assert.ok(health.cache.keyIncludes.includes('dataSignals'));
+});
+
+test('coachMlService cache key changes when data signals change', () => {
+  const base = sampleContext();
+  const changed = sampleContext({
+    signals: {
+      ...base.signals,
+      feedbackCount: 2
+    }
+  });
+
+  const firstKey = coachMlService.__private.modelCacheKey(base);
+  const secondKey = coachMlService.__private.modelCacheKey(changed);
+
+  assert.notEqual(firstKey, secondKey);
+  assert.match(firstKey, /2,1,1,1,1,0$/);
+  assert.match(secondKey, /2,1,1,1,1,2$/);
 });

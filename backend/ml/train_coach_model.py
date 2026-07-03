@@ -27,6 +27,13 @@ SOURCE_WEIGHTS = {
     "delayed_objective": 3.0,
     "rule_pseudo": 1.0,
 }
+DEFAULT_ATHLETE_PROFILE = {
+    "age": 21,
+    "halfMarathonPbMinutes": 79,
+    "marathonPbMinutes": 176,
+    "athleteTier": "competitive_amateur",
+    "trainingTolerance": "high",
+}
 
 
 def read_env(path: Path) -> dict[str, str]:
@@ -102,6 +109,38 @@ def weather_risk(feels_like: float, humidity: float, condition_risk: int) -> int
 def coverage(days: list[date], latest_day: date, window: int) -> float:
     start = latest_day - timedelta(days=window - 1)
     return len({day for day in days if start <= day <= latest_day}) / window
+
+
+def percentile_rank(value: float, values: list[float]) -> float:
+    numeric_values = [float(item) for item in values if item is not None and np.isfinite(float(item))]
+    if not numeric_values:
+        return 50 if value > 0 else 0
+    return len([item for item in numeric_values if item <= value]) / len(numeric_values) * 100
+
+
+def safe_ratio(value: float, baseline: float, fallback: float = 0) -> float:
+    if baseline <= 0:
+        return fallback if value > 0 else 0
+    return value / baseline
+
+
+def daily_totals(by_day: dict[date, list[dict[str, object]]], day: date) -> dict[str, float]:
+    rows = by_day.get(day, [])
+    return {
+        "date": day,
+        "load": sum(float(row.get("activity_training_load") or 0) for row in rows),
+        "distance": sum(float(row.get("distance_m") or 0) for row in rows) / 1000,
+        "duration": sum(float(row.get("duration_s") or 0) for row in rows) / 3600,
+    }
+
+
+def history_totals(by_day: dict[date, list[dict[str, object]]], latest_day: date, window: int) -> list[dict[str, float]]:
+    start = latest_day - timedelta(days=window)
+    return [
+        daily_totals(by_day, current_day)
+        for current_day in sorted(by_day)
+        if start <= current_day < latest_day
+    ]
 
 
 def build_daily_features(connection) -> list[dict[str, object]]:
@@ -204,6 +243,20 @@ def build_daily_features(connection) -> list[dict[str, object]]:
             if float(row.get("activity_training_load") or 0) >= 120 or float(row.get("avg_heart_rate_bpm") or 0) >= 155
         )
         features["rest_days_7d"] = max(0, 7 - active_days_7d)
+        history90 = history_totals(by_day, day, 90)
+        history28 = history_totals(by_day, day, 28)
+        history_for_percentiles = history90 or history_totals(by_day, day, 365)
+        features["session_load_percentile_90d"] = percentile_rank(features["load_1d"], [item["load"] for item in history_for_percentiles])
+        features["distance_percentile_90d"] = percentile_rank(features["distance_1d"], [item["distance"] for item in history_for_percentiles])
+        features["duration_percentile_90d"] = percentile_rank(features["duration_1d"], [item["duration"] for item in history_for_percentiles])
+        long_run_baseline = max([item["distance"] for item in history28], default=0)
+        features["long_run_ratio_28d"] = safe_ratio(features["distance_1d"], long_run_baseline, 1)
+        load_values = [item["load"] for item in history_for_percentiles if item["load"] > 0]
+        load_p80 = float(np.quantile(load_values, 0.8)) if load_values else None
+        previous_hard_days = [item["date"] for item in history_for_percentiles if load_p80 is not None and item["load"] >= load_p80]
+        features["hard_session_gap_days"] = (day - max(previous_hard_days)).days if previous_hard_days else 90
+        avg_load_28d = sum(item["load"] for item in history28) / len(history28) if history28 else 0
+        features["load_spike_ratio_28d"] = safe_ratio(features["load_1d"], avg_load_28d, 1)
 
         train_row = training.get(day, {})
         features["atl"] = float(train_row.get("acute_training_load") or 0)
@@ -275,13 +328,33 @@ def build_daily_features(connection) -> list[dict[str, object]]:
 def make_labels(row: dict[str, object]) -> dict[str, str]:
     score = 0
     reasons_weather = int(row["weather_risk_level"])
-    if float(row["tsb"]) < -25:
+    high_tolerance = DEFAULT_ATHLETE_PROFILE["trainingTolerance"] == "high"
+    load_habit_spike = (
+        float(row.get("session_load_percentile_90d") or 50) >= 85
+        or float(row.get("load_spike_ratio_28d") or 0) >= 1.35
+        or float(row.get("long_run_ratio_28d") or 0) >= 1.2
+    )
+    recovery_signals = 0
+    if 0 < float(row["sleep_score"]) < 60 or 0 < float(row["sleep_duration_h"]) < 6:
+        recovery_signals += 1
+    if float(row["hrv_delta_pct"]) <= -15:
+        recovery_signals += 1
+    if float(row["resting_hr_delta"]) >= 5:
+        recovery_signals += 1
+    if float(row["avg_stress"]) >= 50:
+        recovery_signals += 1
+    if float(row["body_battery_drained"]) >= 60:
+        recovery_signals += 1
+
+    if float(row["tsb"]) < -25 and (not high_tolerance or load_habit_spike or recovery_signals >= 2):
         score += 3
-    elif float(row["tsb"]) < -10:
+    elif float(row["tsb"]) < -10 and (not high_tolerance or recovery_signals >= 2):
         score += 1
-    if float(row["acwr_7_28"]) >= 1.5:
+    if float(row["acwr_7_28"]) >= 1.5 and (not high_tolerance or load_habit_spike or recovery_signals >= 2):
         score += 2
-    elif float(row["acwr_7_28"]) >= 1.3:
+    elif float(row["acwr_7_28"]) >= 1.3 and (not high_tolerance or load_habit_spike):
+        score += 1
+    if high_tolerance and load_habit_spike and recovery_signals > 0:
         score += 1
     if 0 < float(row["sleep_score"]) < 60:
         score += 2
@@ -357,6 +430,25 @@ def delayed_recovery_label(row: dict[str, object]) -> str | None:
     return None
 
 
+def legacy_perceived_effort_label(row: dict[str, object]) -> str:
+    if float(row.get("load_1d") or 0) >= 150 or float(row.get("hard_minutes_7d") or 0) >= 45:
+        return "hard"
+    if float(row.get("load_1d") or 0) >= 50:
+        return "moderate"
+    return "easy"
+
+
+def relative_perceived_effort_label(row: dict[str, object]) -> str:
+    if float(row.get("load_1d") or 0) <= 0 and float(row.get("hard_minutes_7d") or 0) <= 0:
+        return "easy"
+    percentile = float(row.get("session_load_percentile_90d") or 50)
+    if percentile < 40:
+        return "easy"
+    if percentile <= 80:
+        return "moderate"
+    return "hard"
+
+
 def perceived_effort_label(row: dict[str, object]) -> tuple[str, str]:
     effort = row.get("_perceived_effort_avg")
     if effort is not None:
@@ -366,11 +458,7 @@ def perceived_effort_label(row: dict[str, object]) -> tuple[str, str]:
         if effort <= 6:
             return "moderate", "user_feedback"
         return "hard", "user_feedback"
-    if float(row.get("load_1d") or 0) >= 150 or float(row.get("hard_minutes_7d") or 0) >= 45:
-        return "hard", "rule_pseudo"
-    if float(row.get("load_1d") or 0) >= 50:
-        return "moderate", "rule_pseudo"
-    return "easy", "rule_pseudo"
+    return relative_perceived_effort_label(row), "rule_pseudo"
 
 
 def advice_feedback_label(row: dict[str, object]) -> tuple[str, str]:
@@ -560,12 +648,24 @@ def main() -> None:
     labels_by_name: dict[str, list[str]] = defaultdict(list)
     weights_by_name: dict[str, list[float]] = defaultdict(list)
     sources_by_name: dict[str, list[str]] = defaultdict(list)
+    perceived_effort_pseudo_comparison = {
+        "legacyDistribution": Counter(),
+        "relativeDistribution": Counter(),
+        "changedCount": 0,
+    }
     for row in rows:
         label_bundle = build_label_bundle(row)
         for name, value in label_bundle.items():
             labels_by_name[name].append(str(value["label"]))
             weights_by_name[name].append(float(value["weight"]))
             sources_by_name[name].append(str(value["source"]))
+        if label_bundle["perceivedEffortLevel"]["source"] == "rule_pseudo":
+            legacy_label = legacy_perceived_effort_label(row)
+            relative_label = str(label_bundle["perceivedEffortLevel"]["label"])
+            perceived_effort_pseudo_comparison["legacyDistribution"][legacy_label] += 1
+            perceived_effort_pseudo_comparison["relativeDistribution"][relative_label] += 1
+            if legacy_label != relative_label:
+                perceived_effort_pseudo_comparison["changedCount"] += 1
 
     models = {}
     reports = {}
@@ -601,6 +701,7 @@ def main() -> None:
         "classes": classes,
         "testAccuracy": {name: report["testAccuracy"] for name, report in reports.items()},
         "labelSourceSummary": label_source_summary_payload,
+        "athleteProfile": DEFAULT_ATHLETE_PROFILE,
     }
     joblib.dump(bundle, output_path)
 
@@ -617,6 +718,12 @@ def main() -> None:
         "realLabelRatio": label_source_summary_payload["realLabelRatio"],
         "pseudoLabelRatio": label_source_summary_payload["pseudoLabelRatio"],
         "perceivedEffortCoverage": label_source_summary_payload["perceivedEffortCoverage"],
+        "perceivedEffortPseudoComparison": {
+            "legacyDistribution": dict(perceived_effort_pseudo_comparison["legacyDistribution"]),
+            "relativeDistribution": dict(perceived_effort_pseudo_comparison["relativeDistribution"]),
+            "changedCount": perceived_effort_pseudo_comparison["changedCount"],
+        },
+        "athleteProfile": DEFAULT_ATHLETE_PROFILE,
         "reports": reports,
     }, ensure_ascii=False, indent=2), encoding="utf-8")
     print(json.dumps(metadata, ensure_ascii=False, indent=2))
