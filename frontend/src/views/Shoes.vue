@@ -18,7 +18,6 @@
     <section class="dark-panel">
       <div class="section-heading">
         <div><h2>我的跑鞋</h2></div>
-        <button type="button" class="primary-link" @click="openCreate">添加跑鞋</button>
       </div>
 
       <form v-if="showForm" class="shoe-form" @submit.prevent="save">
@@ -60,12 +59,6 @@
         <div class="shoe-empty-grid">
           <span><small>磨损预警</small><b>600 km 提醒</b></span>
           <span><small>下一双跑鞋</small><b>从常用鞋开始</b></span>
-        </div>
-        <div class="shoe-empty-actions">
-          <button type="button" class="primary-link shoe-empty-action" @click="openCreate">
-            <FilePlus2 :size="16" aria-hidden="true" />
-            添加跑鞋
-          </button>
         </div>
       </div>
       <div v-else class="shoe-list">
@@ -145,7 +138,7 @@
 <script setup>
 import { computed, ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { FilePlus2, Footprints } from '@lucide/vue'
+import { Footprints } from '@lucide/vue'
 import { apiClient, resolveMediaUrl } from '@/services/http'
 import { normalizeActivity } from '@/services/activities'
 import ActivityCard from '@/components/ActivityCard.vue'
