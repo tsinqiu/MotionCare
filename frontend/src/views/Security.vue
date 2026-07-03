@@ -12,24 +12,53 @@
     <StateBlock v-else-if="!authSession.user" title="请重新登录" message="登录后可以查看账号安全状态。" action-label="去登录" @action="router.push('/login')" />
 
     <template v-else>
-      <section class="dark-panel">
+      <section class="security-rq-panel">
         <div class="section-heading">
           <div>
-            <p class="overline">账号与登录</p>
+            <p class="overline">数据保护</p>
             <h2>账号安全</h2>
-            <p>查看当前账号和 MotionCare 已启用的登录保护。</p>
           </div>
           <span class="status-chip good">已登录</span>
+        </div>
+        <div class="security-protection-score">
+          <span>
+            <small>保护指数</small>
+            <strong>{{ protectionScore }}</strong>
+          </span>
+          <i aria-hidden="true"></i>
+        </div>
+        <div class="security-protection-grid">
+          <span>
+            <small>登录状态</small>
+            <b>当前设备有效</b>
+          </span>
+          <span>
+            <small>数据范围</small>
+            <b>仅当前账号</b>
+          </span>
+          <span>
+            <small>设备保护</small>
+            <b>可随时退出</b>
+          </span>
         </div>
       </section>
 
       <div class="security-grid">
         <section class="dark-panel">
           <h2>当前账号</h2>
-          <div class="log-list">
-            <span>用户名 · {{ authSession.user.username || '--' }}</span>
-            <span>邮箱 · {{ authSession.user.email || '--' }}</span>
-            <span>身份 · {{ authSession.user.role === 'admin' ? '管理员' : '运动用户' }}</span>
+          <div class="log-list security-log-list">
+            <span>
+              <small>用户名</small>
+              <b class="security-log-list__value">{{ authSession.user.username || '--' }}</b>
+            </span>
+            <span>
+              <small>邮箱</small>
+              <b class="security-log-list__value">{{ authSession.user.email || '--' }}</b>
+            </span>
+            <span>
+              <small>身份</small>
+              <b class="security-log-list__value">{{ authSession.user.role === 'admin' ? '管理员' : '运动用户' }}</b>
+            </span>
           </div>
         </section>
         <section class="dark-panel">
@@ -42,7 +71,8 @@
         </section>
       </div>
 
-      <section class="dark-panel">
+      <section class="dark-panel security-device-card">
+        <p class="overline">退出设备</p>
         <h2>当前设备</h2>
         <p>退出后，本设备保存的登录状态会被清除。</p>
         <button class="secondary-link" type="button" @click="handleLogout">退出当前账号</button>
@@ -58,6 +88,7 @@ import StateBlock from '@/components/StateBlock.vue'
 import { authSession, initAuthSession, signOut } from '@/stores/authStore'
 
 const router = useRouter()
+const protectionScore = 92
 
 function handleLogout() {
   signOut()

@@ -12,24 +12,20 @@
     <StateBlock v-else-if="!authSession.user" title="未找到账号" message="请重新登录后查看个人信息。" action-label="去登录" @action="router.push('/login')" />
 
     <template v-else>
-      <section class="profile-head">
-        <div class="profile-avatar">{{ userInitial }}</div>
-        <div class="profile-meta">
-          <strong>{{ authSession.user.username }}</strong>
-          <small v-if="authSession.user.email">{{ authSession.user.email }}</small>
+      <section class="profile-head profile-rq-panel">
+        <div class="profile-head__main">
+          <div class="profile-avatar">{{ userInitial }}</div>
+            <div class="profile-meta">
+              <p class="overline">跑者档案</p>
+            <strong class="profile-meta__name">{{ authSession.user.username }}</strong>
+            <small v-if="authSession.user.email">{{ authSession.user.email }}</small>
+          </div>
+          <span class="status-chip good">{{ roleLabel }}</span>
         </div>
-        <span class="status-chip good">{{ roleLabel }}</span>
-      </section>
-
-      <section class="dark-panel race-card">
-        <div>
-          <p class="overline">目标赛事</p>
-          <h2>{{ targetRace.name }}</h2>
-          <p>{{ targetRace.date }} · {{ targetRace.distanceLabel }}</p>
-        </div>
-        <div class="race-countdown">
-          <strong>{{ raceCountdown.label }}</strong>
-          <small>按本地自然日计算</small>
+        <div class="runner-profile-grid">
+          <span><small>数据同步</small><b>Garmin</b></span>
+          <span><small>装备管理</small><b>跑鞋里程</b></span>
+          <span><small>隐私设置</small><b>私密优先</b></span>
         </div>
       </section>
 
@@ -92,14 +88,11 @@ import { Footprints, LogOut, Moon, RefreshCw, Settings, ShieldCheck, Sun } from 
 import { useRouter } from 'vue-router'
 
 import StateBlock from '@/components/StateBlock.vue'
-import { targetRace } from '@/constants/product'
 import { authSession, initAuthSession, signOut } from '@/stores/authStore'
 import { useThemeMode } from '@/composables/useThemeMode'
-import { getRaceCountdown } from '@/utils/productInsights'
 
 const router = useRouter()
 const { isNightTheme, toggleTheme } = useThemeMode()
-const raceCountdown = computed(() => getRaceCountdown(targetRace.date))
 const isAdmin = computed(() => authSession.user?.role === 'admin')
 const roleLabel = computed(() => isAdmin.value ? '管理员' : '运动用户')
 const userInitial = computed(() => (authSession.user?.username || '我').slice(0, 1).toUpperCase())
@@ -118,8 +111,7 @@ function handleLogout() {
 
 <style scoped>
 .profile-head {
-  display: flex;
-  align-items: center;
+  display: grid;
   gap: 14px;
   padding: var(--space-5);
   border-radius: var(--radius-xl);
@@ -128,6 +120,13 @@ function handleLogout() {
     radial-gradient(120% 120% at 0% 0%, rgb(33 212 123 / 0.14), transparent 55%),
     var(--panel);
   box-shadow: var(--shadow-sm);
+}
+.profile-head__main {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
 }
 .profile-avatar {
   flex: 0 0 auto;
@@ -142,12 +141,17 @@ function handleLogout() {
   font-weight: 700;
 }
 .profile-meta { flex: 1 1 auto; display: grid; gap: 3px; min-width: 0; }
-.profile-meta strong { font-size: var(--fs-h2); }
+.profile-meta__name {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fs-h2);
+  line-height: 1.12;
+}
 .profile-meta small { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
-.race-card { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
-.race-countdown { display: grid; gap: 4px; text-align: right; }
-.race-countdown strong { font-size: clamp(24px, 7vw, 34px); color: var(--green-strong); }
 
 .cell-section { display: grid; gap: 8px; }
 .cell-section__title {
@@ -171,10 +175,5 @@ function handleLogout() {
   background: var(--panel);
   color: var(--red);
   font-weight: 600;
-}
-
-@media (max-width: 700px) {
-  .race-card { align-items: flex-start; flex-direction: column; }
-  .race-countdown { text-align: left; }
 }
 </style>

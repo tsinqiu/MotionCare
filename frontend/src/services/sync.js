@@ -1,11 +1,8 @@
-import { collectionPayload, getEnvelope, mutateEnvelope } from '@/services/api'
+import { collectionPayload, getEnvelope } from '@/services/api'
 import { apiClient, unwrapApiResponse } from '@/services/http'
 
 const PROVIDER_NAMES = {
   garmin: 'Garmin Connect',
-  strava: 'Strava',
-  coros: 'COROS',
-  apple_health: 'Apple Health',
 }
 
 function normalizeStatus(status) {
@@ -91,18 +88,6 @@ export async function getGarminAccount() {
   return envelope.data
 }
 
-export async function updateProviderSettings(provider, payload) {
-  const envelope = await mutateEnvelope('put', `/sync/providers/${provider}/settings`, payload, {
-    normalizer: normalizeProvider,
-  })
-  return envelope.data
-}
-
-export async function authorizeProvider(provider) {
-  const envelope = await mutateEnvelope('post', `/sync/providers/${provider}/authorize`, {})
-  return envelope.data
-}
-
 export async function authorizeGarminAccount(payload) {
   const body = {
     email: payload.email,
@@ -115,11 +100,6 @@ export async function authorizeGarminAccount(payload) {
   })
   const envelope = unwrapApiResponse(response.data)
   return normalizeGarminAccount(envelope.data)
-}
-
-export async function disconnectProvider(provider) {
-  const envelope = await mutateEnvelope('post', `/sync/providers/${provider}/disconnect`, {})
-  return envelope.data
 }
 
 export async function disconnectGarminAccount() {

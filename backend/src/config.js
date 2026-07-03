@@ -29,7 +29,19 @@ function parseProviderOrder(value) {
 
 function parseCorsOrigins(value, serverPort) {
   const localApiOrigins = [`http://127.0.0.1:${serverPort}`, `http://localhost:${serverPort}`];
-  const localFrontendOrigins = ['http://127.0.0.1:5173', 'http://localhost:5173'];
+  const localFrontendOrigins = [
+    'http://127.0.0.1:5173',
+    'http://localhost:5173',
+    'http://127.0.0.1:5177',
+    'http://localhost:5177',
+    'http://127.0.0.1:5178',
+    'http://localhost:5178',
+    'http://127.0.0.1:4173',
+    'http://localhost:4173',
+    'https://localhost',
+    'http://localhost',
+    'capacitor://localhost'
+  ];
 
   if (!value) {
     return [...localFrontendOrigins, ...localApiOrigins];
@@ -126,6 +138,10 @@ const config = {
       resolveBackendPath(process.env.ML_PREDICT_SCRIPT, 'ml/predict_running.py'),
     modelPath:
       resolveBackendPath(process.env.ML_MODEL_PATH, 'ml/models/running_model.joblib'),
+    coachPredictScriptPath:
+      resolveBackendPath(process.env.ML_COACH_PREDICT_SCRIPT, 'ml/predict_coach.py'),
+    coachModelPath:
+      resolveBackendPath(process.env.ML_COACH_MODEL_PATH, 'ml/models/coach_model.joblib'),
     timeoutMs: parseInteger(process.env.ML_TIMEOUT_MS, 10000)
   },
   ai: {

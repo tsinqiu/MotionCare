@@ -33,7 +33,7 @@ async function create(userId, body) {
   const { name, brand, model, purchaseDate, photoPath, photoOriginalName, photoMimeType, photoSizeBytes,
     targetDistanceKm, initialDistanceKm, price } = body;
   if (!name || !name.trim()) throw Object.assign(new Error('name is required'), { status: 400 });
-  const [r] = await db.query(
+  const result = await db.query(
     `INSERT INTO Shoes (user_id, name, brand, model, purchase_date, photo_path, photo_original_name, photo_mime_type, photo_size_bytes,
       target_distance_km, initial_distance_km, price)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -41,7 +41,7 @@ async function create(userId, body) {
       photoPath || null, photoOriginalName || null, photoMimeType || null, photoSizeBytes || null,
       targetDistanceKm || null, initialDistanceKm || 0, price || null]
   );
-  return { id: r.insertId, name: name.trim(), brand, model, purchaseDate };
+  return { id: result.insertId, name: name.trim(), brand, model, purchaseDate };
 }
 
 async function getById(shoeId, userId) {

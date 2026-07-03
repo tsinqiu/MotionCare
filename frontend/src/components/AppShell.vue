@@ -1,14 +1,7 @@
 <template>
   <div class="app-viewport">
     <div class="phone-frame">
-      <van-nav-bar class="app-navbar" title="MotionCare">
-        <template #right>
-          <RouterLink class="app-navbar-action" to="/record">
-            <CirclePlus :size="18" />
-            记录运动
-          </RouterLink>
-        </template>
-      </van-nav-bar>
+      <van-nav-bar class="app-navbar" title="MotionCare" />
 
       <main ref="scrollEl" class="page-frame">
         <RouterView v-slot="{ Component }">
@@ -27,6 +20,7 @@
         <van-tabbar-item
           v-for="item in navItems"
           :key="item.to"
+          :class="{ 'app-tabbar-item--record': item.icon === 'record' }"
           :name="item.icon"
         >
           <span>{{ item.label }}</span>
@@ -41,7 +35,7 @@
 
 <script setup>
 import { computed, nextTick, ref, watch } from 'vue'
-import { Activity, Bot, CirclePlus, Gauge, HeartPulse, UserRound } from '@lucide/vue'
+import { Activity, Bot, Gauge, HeartPulse, MapPin, UserRound } from '@lucide/vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { primaryNavigation } from '@/constants/product'
@@ -53,6 +47,7 @@ const scrollEl = ref(null)
 const iconMap = {
   today: HeartPulse,
   activities: Activity,
+  record: MapPin,
   status: Gauge,
   coach: Bot,
   me: UserRound,

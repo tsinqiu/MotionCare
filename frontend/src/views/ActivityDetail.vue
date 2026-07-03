@@ -17,22 +17,63 @@
       v-else-if="!activity"
       title="未找到该活动"
       message="当前活动不存在，或没有可查看的记录。"
-      action-label="返回列表"
-      @action="router.push('/activities')"
     />
 
     <template v-else>
       <section class="app-hero detail-hero" :style="{ '--sport-color': sportColor }">
         <div>
-          <h2>{{ activity.activity_name || activity.activity_type }}</h2>
+          <p class="overline">运动详情</p>
+          <h2 class="detail-hero__title">{{ activity.activity_name || activity.activity_type }}</h2>
           <p>{{ formatDetailDateTime(activity.local_start_time) }} 开始</p>
         </div>
-        <div class="hero-actions">
-          <RouterLink class="secondary-link inverse" to="/activities">返回列表</RouterLink>
-          <button v-if="canManageManual" class="secondary-link inverse" type="button" @click="modalOpen = true">编辑</button>
-          <button v-if="canManageManual" class="danger-link" type="button" :disabled="isDeleting" @click="removeActivity">
-            {{ isDeleting ? '删除中' : '删除' }}
+        <div v-if="canManageManual" class="detail-action-bar">
+          <button v-if="canManageManual" class="detail-action detail-action--edit" type="button" @click="modalOpen = true">
+            <Pencil :size="16" />
+            <span>编辑</span>
           </button>
+          <button v-if="canManageManual" class="detail-action detail-action--danger" type="button" :disabled="isDeleting" @click="removeActivity">
+            <Trash2 :size="16" />
+            <span>{{ isDeleting ? '删除中' : '删除' }}</span>
+          </button>
+        </div>
+      </section>
+
+      <section class="rq-detail-summary" :style="{ '--sport-color': sportColor }">
+        <div class="rq-detail-summary__score">
+          <p class="overline">训练分析</p>
+          <strong>{{ formatTrainingLoad(activity.activity_training_load) }}</strong>
+          <span>训练负荷</span>
+        </div>
+        <div class="rq-detail-summary__body">
+          <div class="section-heading">
+            <div>
+              <p class="overline">{{ trainingLoadLevel.label }}</p>
+              <h2>{{ trainingLoadLevel.title }}</h2>
+            </div>
+            <span class="status-chip">{{ activity.activity_type || '训练' }}</span>
+          </div>
+          <p>{{ trainingLoadLevel.copy }}</p>
+          <div class="rq-detail-metrics">
+            <span><small>配速稳定</small><b>{{ paceStability }}</b></span>
+            <span><small>平均心率</small><b>{{ formatBpm(activity.avg_heart_rate_bpm) }}</b></span>
+            <span><small>累计爬升</small><b>{{ formatAscent(activity.total_ascent_m) }}</b></span>
+          </div>
+        </div>
+      </section>
+
+      <section class="rq-detail-splits">
+        <div class="section-heading">
+          <div>
+            <p class="overline">分段预览</p>
+            <h2>分段节奏</h2>
+          </div>
+        </div>
+        <div class="rq-detail-split-list">
+          <span v-for="split in detailSplitRows" :key="split.label">
+            <small>{{ split.label }}</small>
+            <b>{{ split.pace }}</b>
+            <em>{{ split.distance }} · {{ split.heartRate }}</em>
+          </span>
         </div>
       </section>
 
@@ -41,7 +82,7 @@
         <MetricCard label="总用时" :value="formatClockDuration(activity.total_timer_time_s)" />
         <MetricCard label="平均配速" :value="formatPace(activity.avg_speed_mps)" />
         <MetricCard label="累计爬升" :value="formatAscent(activity.total_ascent_m)" />
-        <MetricCard label="平均心率" :value="`${activity.avg_heart_rate_bpm || '--'} bpm`" />
+        <MetricCard label="平均心率" :value="formatBpm(activity.avg_heart_rate_bpm)" />
         <MetricCard label="训练负荷" :value="formatTrainingLoad(activity.activity_training_load)" />
       </div>
 
@@ -124,7 +165,7 @@
       <section class="dark-panel">
         <div class="section-heading">
           <div>
-            <p class="overline">AI Analysis</p>
+            <p class="overline">智能分析</p>
             <h2>运动智能分析</h2>
           </div>
           <button class="primary-link" type="button" :disabled="analysisLoading" @click="runAnalysis">
@@ -166,8 +207,9 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { Pencil, Trash2 } from '@lucide/vue'
 
 import ChartPanel from '@/components/ChartPanel.vue'
 import LapTable from '@/components/LapTable.vue'
@@ -191,7 +233,7 @@ import {
 } from '@/services/activities'
 import { authSession } from '@/stores/authStore'
 import { formatClockDuration, formatDistance, formatPace, formatPaceSeconds } from '@/utils/formatters'
-import { apiClient } from '@/services/http'
+import { apiClient, resolveMediaUrl } from '@/services/http'
 
 const route = useRoute()
 const router = useRouter()
@@ -236,8 +278,79 @@ const canEditActivity = computed(() => {
 })
 const analysisInsights = computed(() => analysis.value?.insights || [])
 const analysisSuggestions = computed(() => analysis.value?.suggestions || [])
+const trainingLoadValue = computed(() => {
+  const load = Number(activity.value?.activity_training_load)
+  return Number.isFinite(load) ? load : null
+})
+const trainingLoadLevel = computed(() => {
+  const load = trainingLoadValue.value
+  if (load === null) {
+    return {
+      label: '待评估',
+      title: '等待训练负荷',
+      copy: '同步更多运动后，这里会按负荷强度给出当次训练判断。',
+    }
+  }
+  if (load < 50) {
+    return {
+      label: '轻松',
+      title: '恢复友好',
+      copy: '这次训练偏轻，适合用于恢复、技术动作或维持跑感。',
+    }
+  }
+  if (load < 120) {
+    return {
+      label: '稳定',
+      title: '有氧积累',
+      copy: '负荷处在可持续区间，适合作为近期训练量的稳定输入。',
+    }
+  }
+  if (load < 220) {
+    return {
+      label: '偏强',
+      title: '重点训练',
+      copy: '这次训练刺激明显，后续安排可以留意恢复和睡眠表现。',
+    }
+  }
+  return {
+    label: '高压',
+    title: '需要恢复',
+    copy: '训练负荷较高，建议把下一次训练安排为轻松跑或休息。',
+  }
+})
+const paceStability = computed(() => {
+  const paceValues = speedSeries.value
+    .map((point) => paceSecondsFromSpeed(point.speed_mps))
+    .filter(Number.isFinite)
+  if (paceValues.length < 3) return '--'
 
-const heartRateOption = computed(() => createLineOption('心率', 'bpm', '#ef4444', heartRateSeries.value, 'heart_rate_bpm'))
+  const average = paceValues.reduce((sum, value) => sum + value, 0) / paceValues.length
+  if (!Number.isFinite(average) || average <= 0) return '--'
+
+  const variance = paceValues.reduce((sum, value) => sum + ((value - average) ** 2), 0) / paceValues.length
+  const coefficient = Math.sqrt(variance) / average
+  const score = Math.max(55, Math.min(98, 100 - coefficient * 420))
+  return `${Math.round(score)}%`
+})
+const detailSplitRows = computed(() => {
+  const splitRows = laps.value.slice(0, 4).map((lap, index) => ({
+    label: `#${lap.lap_index || index + 1}`,
+    distance: formatDistance(lap.total_distance_m),
+    pace: formatPace(lap.avg_speed_mps),
+    heartRate: formatBpm(lap.avg_heart_rate_bpm),
+  }))
+
+  if (splitRows.length) return splitRows
+
+  return [{
+    label: '全程',
+    distance: formatDistance(activity.value?.total_distance_m),
+    pace: formatPace(activity.value?.avg_speed_mps),
+    heartRate: formatBpm(activity.value?.avg_heart_rate_bpm),
+  }]
+})
+
+const heartRateOption = computed(() => createLineOption('心率', '次/分', '#ef4444', heartRateSeries.value, 'heart_rate_bpm'))
 const paceOption = computed(() => {
   const paceValues = speedSeries.value
     .map((point) => paceSecondsFromSpeed(point.speed_mps))
@@ -275,7 +388,7 @@ const strideLengthOption = computed(() => createLineOption('步幅', 'm', '#14b8
     return Number((speedMps * 60 / (cadence * 2)).toFixed(2))
   },
 }))
-const powerOption = computed(() => createLineOption('功率', 'W', '#db2777', trackPoints.value, 'power_w'))
+const powerOption = computed(() => createLineOption('功率', '瓦', '#db2777', trackPoints.value, 'power_w'))
 
 function toTimestamp(value) {
   if (!value) return null
@@ -295,7 +408,12 @@ function formatElapsed(seconds) {
 
 function formatAscent(value) {
   const meters = Number(value)
-  return Number.isFinite(meters) ? `${Math.round(meters)} m` : '--'
+  return Number.isFinite(meters) ? `${Math.round(meters)} 米` : '--'
+}
+
+function formatBpm(value) {
+  const bpm = Number(value)
+  return Number.isFinite(bpm) && bpm > 0 ? `${Math.round(bpm)} 次/分` : '--'
 }
 
 function formatTrainingLoad(value) {
@@ -509,9 +627,7 @@ async function saveMeta() {
 }
 
 function photoUrl(path) {
-  if (!path) return ''
-  const base = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8089/api'
-  return base.replace(/\/api$/, '') + path
+  return resolveMediaUrl(path)
 }
 
 async function uploadPhoto(e) {
@@ -564,6 +680,59 @@ watch(() => route.params.id, loadActivity, { immediate: true })
 </script>
 
 <style scoped>
+.detail-action-bar {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  width: 100%;
+  margin-top: 16px;
+}
+
+.detail-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0 10px;
+  border: 1px solid color-mix(in srgb, var(--sport-color) 28%, var(--border));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--sport-color) 10%, var(--panel));
+  color: var(--app-green-dark);
+  font-weight: 900;
+  line-height: 1;
+  text-decoration: none;
+  box-shadow: var(--shadow-sm);
+}
+
+.detail-action svg {
+  flex: 0 0 auto;
+}
+
+.detail-action span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.detail-action--edit {
+  background: var(--panel);
+  color: var(--text);
+}
+
+.detail-action--danger {
+  border-color: color-mix(in srgb, var(--red) 36%, transparent);
+  background: color-mix(in srgb, var(--red) 9%, var(--panel));
+  color: var(--red);
+}
+
+.detail-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.64;
+}
+
 .shoe-bind { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 8px 0; }
 .shoe-bind select { flex: 1 1 180px; min-width: 0; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--panel-soft); color: var(--text); }
 .shoe-bind-info { font-size: 13px; color: var(--muted); }
@@ -584,6 +753,14 @@ watch(() => route.params.id, loadActivity, { immediate: true })
 .weather-source { font-size: 11px; color: var(--muted); margin: 4px 0 0; }
 
 @container phone-frame (max-width: 374px) {
+  .detail-action-bar {
+    gap: 8px;
+  }
+
+  .detail-action {
+    padding: 0 8px;
+  }
+
   .edit-form-actions { width: 100%; }
   .edit-form-actions .primary-link { width: 100%; justify-content: center; }
 }

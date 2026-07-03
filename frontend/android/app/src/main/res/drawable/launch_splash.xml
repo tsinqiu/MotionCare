@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="320dp"
+    android:height="320dp"
+    android:viewportWidth="320"
+    android:viewportHeight="320">
+    <!-- MotionCare launch mark -->
+    <path
+        android:fillColor="#15b66a"
+        android:pathData="M0,0h320v320h-320z" />
+    <path
+        android:fillColor="#ffffff"
+        android:fillAlpha="0.16"
+        android:pathData="M60,214c30,-26 66,-40 108,-40c38,0 68,10 92,30v54c-28,-20 -58,-30 -92,-30c-42,0 -78,14 -108,42z" />
+    <path
+        android:fillColor="#ffffff"
+        android:pathData="M158,62a28,28 0,1 1,0.1 0M143,116c15,-11 34,-13 52,-6l34,13c10,4 15,15 11,25c-4,10 -15,15 -25,11l-22,-8l-19,28l23,28c7,8 6,20 -2,27c-8,7 -20,6 -27,-2l-30,-36c-6,-7 -7,-17 -2,-25l16,-26l-24,10l-18,30c-5,9 -17,13 -26,8c-9,-5 -13,-17 -8,-26l22,-38c3,-5 7,-9 12,-11z" />
+    <path
+        android:fillColor="#f6d34d"
+        android:pathData="M108,228h92c9,0 16,7 16,16s-7,16 -16,16h-92c-9,0 -16,-7 -16,-16s7,-16 16,-16z" />
+</vector>

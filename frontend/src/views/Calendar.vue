@@ -3,12 +3,9 @@
     <section class="dark-panel">
       <div class="section-heading">
         <div>
+          <p class="overline">训练日历</p>
           <h2>运动日历</h2>
         </div>
-        <RouterLink class="primary-link" to="/record">
-          <CirclePlus :size="17" />
-          记录运动
-        </RouterLink>
       </div>
       <div class="date-stepper">
         <button type="button" @click="stepMonth(-1)">‹</button>
@@ -21,6 +18,30 @@
     <StateBlock v-else-if="error" title="日历加载失败" :message="error" action-label="重试" tone="danger" @action="load" />
 
     <template v-else>
+      <section class="calendar-rq-panel">
+        <div class="section-heading">
+          <div>
+            <p class="overline">本月训练</p>
+            <h2>{{ monthLabel }}</h2>
+          </div>
+          <span class="status-chip">{{ monthlyActivityCount }} 次</span>
+        </div>
+        <div class="calendar-summary-grid">
+          <span>
+            <small>月跑量</small>
+            <b>{{ monthlyDistanceText }}</b>
+          </span>
+          <span>
+            <small>训练连续性</small>
+            <b>{{ trainingContinuityText }}</b>
+          </span>
+          <span>
+            <small>训练天数</small>
+            <b>{{ monthlyTrainingDays }} 天</b>
+          </span>
+        </div>
+      </section>
+
       <section class="calendar-grid-panel">
         <div class="calendar-week">
           <span v-for="day in weekDays" :key="day">{{ day }}</span>
@@ -52,9 +73,7 @@
         <StateBlock
           v-if="selectedActivities.length === 0"
           title="当天暂无运动"
-          message="这一天还没有运动记录，可以同步或手工补充。"
-          action-label="记录运动"
-          @action="router.push('/record')"
+          message="这一天还没有运动记录。"
         />
         <div v-else class="activity-card-grid">
           <ActivityCard
@@ -73,11 +92,11 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { CirclePlus } from '@lucide/vue'
 
 import ActivityCard from '@/components/ActivityCard.vue'
 import StateBlock from '@/components/StateBlock.vue'
 import { getCalendarStats } from '@/services/stats'
+import { formatDistance } from '@/utils/formatters'
 
 const router = useRouter()
 const weekDays = ['日', '一', '二', '三', '四', '五', '六']
@@ -93,6 +112,21 @@ const leadingBlanks = computed(() => new Date(`${month.value}-01T00:00:00`).getD
 const selectedActivities = computed(() =>
   (calendar.value.days || []).find((day) => day.date === selectedDate.value)?.activities || [],
 )
+const monthlyActivities = computed(() => (calendar.value.days || []).flatMap((day) => day.activities || []))
+const monthlyActivityCount = computed(() => monthlyActivities.value.length)
+const monthlyTrainingDays = computed(() => (calendar.value.days || [])
+  .filter((day) => (day.activities || []).length > 0).length)
+const monthlyDistanceText = computed(() => {
+  const distance = monthlyActivities.value.reduce((sum, activity) => sum + Number(activity.total_distance_m || 0), 0)
+  return distance > 0 ? formatDistance(distance) : '--'
+})
+const trainingContinuityText = computed(() => {
+  const days = monthlyTrainingDays.value
+  if (!days) return '--'
+  const calendarDays = Math.max((calendar.value.days || []).length, 1)
+  const ratio = Math.round((days / calendarDays) * 100)
+  return `${ratio}%`
+})
 
 function iconClass(type) {
   if (String(type).includes('cycling')) return 'ride'

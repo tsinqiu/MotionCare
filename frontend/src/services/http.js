@@ -1,10 +1,37 @@
 import axios from 'axios'
+import { Capacitor } from '@capacitor/core'
 
 const TOKEN_STORAGE_KEY = 'motion-analysis-token'
+const LOCAL_API_BASE_URL = import.meta.env.DEV ? 'http://localhost:8089/api' : '/api'
 let authFailureHandler = null
 
+export function resolveApiBaseUrl() {
+  if (Capacitor.isNativePlatform()) {
+    return import.meta.env.VITE_NATIVE_API_BASE_URL
+      || import.meta.env.VITE_API_BASE_URL
+      || LOCAL_API_BASE_URL
+  }
+
+  return import.meta.env.VITE_API_BASE_URL || LOCAL_API_BASE_URL
+}
+
+export function resolveMediaUrl(value) {
+  if (!value || typeof value !== 'string') return ''
+  if (/^https?:\/\//i.test(value) || value.startsWith('blob:') || value.startsWith('data:')) return value
+  if (!value.startsWith('/')) return value
+
+  const baseUrl = resolveApiBaseUrl()
+  if (!baseUrl || baseUrl.startsWith('/')) return value
+
+  try {
+    return `${new URL(baseUrl).origin}${value}`
+  } catch {
+    return value
+  }
+}
+
 export const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8089/api',
+  baseURL: resolveApiBaseUrl(),
   timeout: 8000,
 })
 

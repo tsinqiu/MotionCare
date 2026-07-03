@@ -1,6 +1,6 @@
 <template>
   <article
-    class="activity-card"
+    class="activity-card rq-activity-card"
     :class="sportClass"
     :style="{ '--sport-color': sportColor }"
     role="button"
@@ -43,6 +43,10 @@
         <small>卡路里</small>
         <b>{{ formatCalories(activity.total_calories) }}</b>
       </span>
+      <span v-if="trainingLoadValue !== '--'">
+        <small>训练负荷</small>
+        <b>{{ trainingLoadValue }}</b>
+      </span>
       <span v-if="activity.perceived_effort">
         <small>体感</small>
         <b>{{ activity.perceived_effort }}/10</b>
@@ -71,6 +75,7 @@ import {
   formatPace,
   formatSpeed,
 } from '@/utils/formatters'
+import { resolveMediaUrl } from '@/services/http'
 
 const props = defineProps({
   activity: {
@@ -110,6 +115,12 @@ const speedLabel = computed(() => (sportClass.value === 'ride' ? '速度' : '配
 const speedValue = computed(() => (sportClass.value === 'ride'
   ? formatSpeed(props.activity.avg_speed_mps)
   : formatPace(props.activity.avg_speed_mps)))
+const trainingLoadValue = computed(() => {
+  const load = props.activity.activity_training_load
+  if (load === null || load === undefined || load === '') return '--'
+  const numeric = Number(load)
+  return Number.isFinite(numeric) ? `${Math.round(numeric)}` : '--'
+})
 
 const weatherText = computed(() => {
   const condition = props.activity.weather_condition || '--'
@@ -118,9 +129,7 @@ const weatherText = computed(() => {
 })
 
 function photoUrl(path) {
-  if (!path) return ''
-  const base = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8089/api'
-  return base.replace(/\/api$/, '') + path
+  return resolveMediaUrl(path)
 }
 </script>
 

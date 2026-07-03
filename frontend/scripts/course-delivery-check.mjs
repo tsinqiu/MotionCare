@@ -38,8 +38,10 @@ assert.match(router, /path:\s*['"]\/schema['"][\s\S]*redirect:\s*['"]\/today['"]
 assert.doesNotMatch(shell, /to:\s*['"]\/schema['"]/)
 assert.match(shell, /MotionCare/)
 assert.doesNotMatch(shell, /数据库系统|GarSync Motion/)
-assert.match(productConstants, /label:\s*['"]今日['"][\s\S]*label:\s*['"]运动['"][\s\S]*label:\s*['"]状态['"][\s\S]*label:\s*['"]教练['"][\s\S]*label:\s*['"]我的['"]/)
-assert.doesNotMatch(recordActivity, /services\/workouts|\/workouts|StartWorkout/)
+assert.match(productConstants, /label:\s*['"]今日['"][\s\S]*label:\s*['"]运动['"][\s\S]*label:\s*['"]记录['"][\s\S]*to:\s*['"]\/record['"][\s\S]*label:\s*['"]状态['"][\s\S]*label:\s*['"]教练['"][\s\S]*label:\s*['"]我的['"]/)
+assert.match(recordActivity, /StartWorkout/)
+assert.match(recordActivity, /实时记录/)
+assert.doesNotMatch(recordActivity, /<RouterLink/)
 
 for (const legacyView of ['StartWorkout', 'Community', 'Explore', 'Assistant', 'Analytics', 'Trends']) {
   await access(new URL(`../src/views/${legacyView}.vue`, import.meta.url))
@@ -95,7 +97,8 @@ for (const redirect of [
 
 assert.doesNotMatch(router, /component:\s*(StartWorkout|Community|Explore|Assistant|Analytics|Trends)/)
 assert.doesNotMatch(shell, /label:\s*['"](健康|运动统计|训练负荷|跑鞋|同步|AI 助手|探索|运动圈|设置)['"]/)
-assert.match(shell, /记录运动/)
+assert.match(shell, /<van-nav-bar class="app-navbar" title="MotionCare"\s*\/>/)
+assert.doesNotMatch(shell, /app-navbar-action|记录运动/)
 
 const forbiddenCopy = /数据库系统|数据库记录|原始字段|智能干预|浏览器模拟运动|AI Brief|Local AI|Manual activity/
 for (const [index, viewSource] of activeViewSources.entries()) {

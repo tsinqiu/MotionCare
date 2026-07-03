@@ -4,11 +4,64 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="MotionCare 个人运动与健康管理" />
-    <link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="12" fill="%2321d47b"/><text x="12" y="40" font-size="24" font-family="Arial" font-weight="700" fill="%2306130d">GS</text></svg>' />
+    <meta name="theme-color" content="#15b66a" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="MotionCare" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" href="/icons/motioncare-icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/icons/motioncare-maskable.svg" />
+    <style>
+      .boot-splash {
+        position: fixed;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        background: #15b66a;
+        color: #fff;
+        font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+      .boot-splash__inner {
+        display: grid;
+        justify-items: center;
+        gap: 14px;
+      }
+      .boot-splash__mark {
+        width: 72px;
+        height: 72px;
+        display: grid;
+        place-items: center;
+        border-radius: 50%;
+        background: #fff;
+        color: #15b66a;
+        font-size: 30px;
+        font-weight: 900;
+        box-shadow: 0 18px 42px rgb(16 37 26 / 0.28);
+      }
+      .boot-splash__title {
+        font-size: 24px;
+        font-weight: 900;
+        letter-spacing: 0;
+      }
+      .boot-splash__subtitle {
+        color: rgb(255 255 255 / 0.78);
+        font-size: 13px;
+        font-weight: 700;
+      }
+    </style>
     <title>MotionCare</title>
   </head>
   <body>
-    <div id="app"></div>
+    <div id="app">
+      <div class="boot-splash" aria-label="MotionCare 启动中">
+        <div class="boot-splash__inner">
+          <div class="boot-splash__mark">M</div>
+          <div class="boot-splash__title">MotionCare</div>
+          <div class="boot-splash__subtitle">训练数据正在准备</div>
+        </div>
+      </div>
+    </div>
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>

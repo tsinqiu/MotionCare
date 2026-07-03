@@ -15,10 +15,41 @@
       </div>
 
       <div class="auth-heading">
-        <p class="overline">创建账号</p>
-        <h1>注册访问账号</h1>
-        <p>新账号注册后会自动登录，可立即查看个人运动、健康与训练建议。</p>
+        <p class="overline">建立跑者档案</p>
+        <h1>注册 MotionCare</h1>
+        <p>从第一天开始记录跑力、恢复和训练目标。</p>
       </div>
+
+      <ServerHealthBadge />
+
+      <a class="android-download-link" href="/downloads/motioncare-release.apk" download>
+        <span>
+          <small>移动应用</small>
+          <strong>下载安卓应用</strong>
+        </span>
+        <Download :size="18" />
+      </a>
+
+      <section class="auth-setup-panel">
+        <div class="auth-setup-panel__title">
+          <span>建立跑者档案</span>
+          <strong>3 步</strong>
+        </div>
+        <div class="auth-setup-grid">
+          <span>
+            <small>数据源</small>
+            <b>Garmin / 手动</b>
+          </span>
+          <span>
+            <small>训练目标</small>
+            <b>5K 到全马</b>
+          </span>
+          <span>
+            <small>恢复追踪</small>
+            <b>睡眠 / 压力</b>
+          </span>
+        </div>
+      </section>
 
       <form class="auth-form" @submit.prevent="submit">
         <label>
@@ -82,8 +113,9 @@
 <script setup>
 import { reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Eye, EyeOff, LockKeyhole, Mail, Moon, Sun, UserRound } from '@lucide/vue'
+import { Download, Eye, EyeOff, LockKeyhole, Mail, Moon, Sun, UserRound } from '@lucide/vue'
 
+import ServerHealthBadge from '@/components/ServerHealthBadge.vue'
 import { useThemeMode } from '@/composables/useThemeMode'
 import { authSession, normalizeRedirect, signUp } from '@/stores/authStore'
 

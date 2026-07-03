@@ -7,10 +7,7 @@ const { ApiError } = require('../errors');
 const statsCache = require('../cache/statsCache');
 
 const PROVIDERS = [
-  { provider: 'garmin', name: 'Garmin Connect' },
-  { provider: 'strava', name: 'Strava' },
-  { provider: 'coros', name: 'COROS' },
-  { provider: 'apple_health', name: 'Apple Health' }
+  { provider: 'garmin', name: 'Garmin Connect' }
 ];
 
 const DEFAULT_PROVIDER_STATE = {
@@ -31,13 +28,12 @@ function assertProvider(provider) {
 }
 
 function normalizeConnection(provider, row) {
-  const adapterStatus = provider === 'garmin' ? 'configured' : DEFAULT_PROVIDER_STATE.adapterStatus;
   return {
     status: row?.status || DEFAULT_PROVIDER_STATE.status,
     autoSync: Boolean(row?.autoSync),
     syncDirection: row?.syncDirection || DEFAULT_PROVIDER_STATE.syncDirection,
     lastSyncAt: row?.lastSyncAt || null,
-    adapterStatus,
+    adapterStatus: 'configured',
     authorizationUrl: null
   };
 }
@@ -285,47 +281,6 @@ async function getJobById(jobId) {
     [jobId]
   );
   return toJob(rows[0]);
-}
-
-async function createSkippedJob(payload, user, message) {
-  return db.transaction(async (connection) => {
-    const [jobResult] = await connection.query(
-      `
-        INSERT INTO SyncJobs (user_id, provider, job_type, status, requested_at, started_at, finished_at, activity_count, error_message)
-        VALUES (?, ?, ?, 'skipped', NOW(3), NOW(3), NOW(3), 0, ?)
-      `,
-      [user.id, payload.provider, payload.jobType || 'manual_sync', message]
-    );
-    const jobId = jobResult.insertId;
-
-    await connection.query(
-      `
-        INSERT INTO SyncLogs (job_id, user_id, provider, level, message)
-        VALUES (?, ?, ?, 'warn', ?)
-      `,
-      [jobId, user.id, payload.provider, message]
-    );
-
-    const [rows] = await connection.query(
-      `
-        SELECT
-          id,
-          provider,
-          job_type AS jobType,
-          status,
-          requested_at AS requestedAt,
-          started_at AS startedAt,
-          finished_at AS finishedAt,
-          activity_count AS activityCount,
-          error_message AS errorMessage
-        FROM SyncJobs
-        WHERE id = ?
-      `,
-      [jobId]
-    );
-
-    return toJob(rows[0]);
-  });
 }
 
 async function getExistingGarminIds(startDate) {
@@ -705,9 +660,6 @@ async function disconnectProvider(provider, user) {
 
 async function createJob(payload, user) {
   assertProvider(payload.provider);
-  if (payload.provider !== 'garmin') {
-    return createSkippedJob(payload, user, 'sync adapter is not configured; no activity was imported');
-  }
 
   const result = await db.query(
     `

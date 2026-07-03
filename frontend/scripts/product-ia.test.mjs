@@ -16,14 +16,19 @@ try {
   // The first RED run intentionally reaches the export assertions below.
 }
 
-test('product navigation exposes exactly five ordered entries', () => {
+test('product navigation exposes realtime workout recording as a primary entry', () => {
   assert.deepEqual(product.primaryNavigation?.map(({ label, to }) => ({ label, to })), [
     { label: '今日', to: '/today' },
     { label: '运动', to: '/activities' },
+    { label: '记录', to: '/record' },
     { label: '状态', to: '/status' },
     { label: '教练', to: '/coach' },
     { label: '我的', to: '/me' },
   ])
+})
+
+test('product constants do not ship hard-coded user race goals', () => {
+  assert.equal(product.targetRace, undefined)
 })
 
 test('deriveStatusBadge prioritizes recovery signals and handles load ranges', () => {

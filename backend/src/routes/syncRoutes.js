@@ -6,13 +6,16 @@ const { asyncHandler, parseEnum, parsePage, parsePageSize, parsePositiveId } = r
 const { authenticate } = require('../middleware/authMiddleware');
 const { sendCreated, sendData } = require('../response');
 
-const PROVIDERS = ['garmin', 'strava', 'coros', 'apple_health'];
+const PROVIDERS = ['garmin'];
 const SYNC_DIRECTIONS = ['import', 'export', 'two_way'];
 const JOB_TYPES = ['manual_sync', 'scheduled_sync', 'backfill'];
 const JOB_STATUSES = ['queued', 'running', 'success', 'failed', 'skipped'];
 
 function parseProvider(value) {
-  return parseEnum(value, PROVIDERS, 'provider');
+  if (!PROVIDERS.includes(value)) {
+    throw new ApiError(400, 'provider is invalid; Garmin Connect is the only implemented sync provider', 'VALIDATION_ERROR');
+  }
+  return value;
 }
 
 function parseBoolean(value, name) {

@@ -75,6 +75,15 @@ database/sql/02_import_data.sql
 backend/uploads/
 backend/ml/models/
 
+# Android / Capacitor generated artifacts
+frontend/android/.gradle/
+frontend/android/build/
+frontend/android/app/build/
+frontend/android/capacitor-cordova-android-plugins/build/
+frontend/android/app/src/main/assets/
+frontend/android/local.properties
+frontend/android/replay_pid*.log
+
 # Shared demo seed data is intentionally committed so collaborators do not
 # repeatedly crawl Garmin.
 !database/shared/

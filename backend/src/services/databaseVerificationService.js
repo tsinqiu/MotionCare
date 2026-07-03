@@ -3,9 +3,23 @@ const config = require('../config');
 
 const REQUIRED_SCHEMA = Object.freeze({
   Users: { columns: ['id', 'role', 'status'] },
-  Activities: { columns: ['id', 'owner_user_id', 'data_source', 'is_manual'] },
+  Activities: { columns: ['id', 'owner_user_id', 'data_source', 'is_manual', 'raw_json'] },
   ActivitySummaries: { columns: ['activity_id', 'activity_training_load'] },
   TrackPoints: { columns: ['activity_id', 'sample_index', 'sample_time_utc'] },
+  Shoes: {
+    columns: [
+      'id',
+      'user_id',
+      'name',
+      'photo_path',
+      'photo_original_name',
+      'photo_mime_type',
+      'photo_size_bytes',
+      'target_distance_km',
+      'initial_distance_km',
+      'price'
+    ]
+  },
   DailyHealthSummaries: { columns: ['user_id', 'summary_date'] },
   SleepSummaries: { columns: ['user_id', 'sleep_date'] },
   TrainingStatusSnapshots: { columns: ['user_id', 'snapshot_date'] },

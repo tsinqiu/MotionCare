@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="MotionCare">
+  <title>MotionCare</title>
+  <rect width="512" height="512" fill="#15b66a"/>
+  <circle cx="256" cy="256" r="214" fill="#15b66a"/>
+  <path fill="#eef8f2" d="M136 344c35-82 80-136 133-163 39-19 78-21 116-9l-22 60c-26-8-51-5-75 9-37 22-68 64-92 126h-60z"/>
+  <path fill="#10251a" d="M202 299h132c22 0 40 18 40 40v9H176v-23c0-14 12-26 26-26z"/>
+  <circle cx="351" cy="137" r="42" fill="#10251a"/>
+  <path fill="#eef8f2" d="M175 390h174c25 0 45 20 45 45v6H126v-3c0-27 22-48 49-48z"/>
+  <path fill="#10251a" d="M112 158h130v44H112z"/>
+  <path fill="#10251a" d="M112 224h82v44h-82z"/>
+</svg>

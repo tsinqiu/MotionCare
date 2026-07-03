@@ -15,10 +15,48 @@
       </div>
 
       <div class="auth-heading">
-        <p class="overline">安全访问</p>
+        <p class="overline">跑者工作台</p>
         <h1>登录 MotionCare</h1>
-        <p>登录后可查看 Garmin 运动数据、管理手动活动并访问统计分析。</p>
+        <p>跑力、恢复与训练负荷汇总成今天的训练判断。</p>
       </div>
+
+      <ServerHealthBadge />
+
+      <a class="android-download-link" href="/downloads/motioncare-release.apk" download>
+        <span>
+          <small>移动应用</small>
+          <strong>下载安卓应用</strong>
+        </span>
+        <Download :size="18" />
+      </a>
+
+      <section class="auth-rq-panel">
+        <div class="auth-rq-panel__score">
+          <span>今日跑力</span>
+          <strong>68</strong>
+        </div>
+        <div class="score-band" style="--score-position: 68%">
+          <span class="score-band__segment score-band__segment--base">基础</span>
+          <span class="score-band__segment score-band__segment--steady">稳定</span>
+          <span class="score-band__segment score-band__segment--strong">强化</span>
+          <span class="score-band__segment score-band__segment--peak">冲刺</span>
+          <i class="score-band__marker" />
+        </div>
+        <div class="auth-runner-grid">
+          <span>
+            <small>恢复</small>
+            <b>良好</b>
+          </span>
+          <span>
+            <small>训练负荷</small>
+            <b>适中</b>
+          </span>
+          <span>
+            <small>今日建议</small>
+            <b>轻松跑</b>
+          </span>
+        </div>
+      </section>
 
       <form class="auth-form" @submit.prevent="submit">
         <label>
@@ -66,8 +104,9 @@
 <script setup>
 import { reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Eye, EyeOff, LockKeyhole, LogIn, Mail, Moon, Sun } from '@lucide/vue'
+import { Download, Eye, EyeOff, LockKeyhole, LogIn, Mail, Moon, Sun } from '@lucide/vue'
 
+import ServerHealthBadge from '@/components/ServerHealthBadge.vue'
 import { useThemeMode } from '@/composables/useThemeMode'
 import { authSession, normalizeRedirect, signIn } from '@/stores/authStore'
 

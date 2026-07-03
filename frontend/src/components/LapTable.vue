@@ -2,7 +2,7 @@
   <section class="panel lap-panel wide">
     <div class="panel-heading">
       <div>
-        <p class="overline">Laps</p>
+        <p class="overline">分段</p>
         <h2>分段数据</h2>
       </div>
       <div v-if="isRunning" class="lap-mode-toggle" aria-label="分段距离">
@@ -23,11 +23,11 @@
         <thead>
           <tr>
             <th>分段</th>
-            <th>距离 km</th>
+            <th>距离（公里）</th>
             <th>用时</th>
-            <th>速度 m/s</th>
-            <th>心率 bpm</th>
-            <th>功率 W</th>
+            <th>速度（米/秒）</th>
+            <th>心率（次/分）</th>
+            <th>功率（瓦）</th>
           </tr>
         </thead>
         <tbody>
@@ -61,7 +61,7 @@ const props = defineProps({
 
 const modeOptions = [
   { value: 'lap', label: '原始分段' },
-  { value: '5k', label: '5 km' },
+  { value: '5k', label: '5公里' },
 ]
 const lapMode = ref('lap')
 
@@ -134,7 +134,7 @@ function buildDistanceGroups(sourceLaps, targetDistanceM) {
 function createDistanceGroup(groupLaps, index, distanceM) {
   const durationS = groupLaps.reduce((sum, lap) => sum + (positiveNumber(lap.total_timer_time_s) || 0), 0)
   return {
-    lap_index: `${index * 5}-${index * 5 + Math.round(distanceM / 1000)} km`,
+    lap_index: `${index * 5}-${index * 5 + Math.round(distanceM / 1000)} 公里`,
     total_distance_m: distanceM,
     total_timer_time_s: durationS,
     avg_speed_mps: durationS > 0 ? distanceM / durationS : null,

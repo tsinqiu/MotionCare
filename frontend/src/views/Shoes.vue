@@ -1,5 +1,20 @@
 <template>
   <div class="page-stack">
+    <section class="shoe-rq-panel">
+      <div class="section-heading">
+        <div>
+          <p class="overline">装备看板</p>
+          <h2>跑鞋里程</h2>
+        </div>
+        <button type="button" class="primary-link" @click="openCreate">添加跑鞋</button>
+      </div>
+      <div class="shoe-mileage-grid">
+        <span><small>总里程</small><b>{{ totalShoeDistanceText }}</b></span>
+        <span><small>服役跑鞋</small><b>{{ activeShoeCount }} 双</b></span>
+        <span><small>已退役</small><b>{{ retiredShoeCount }} 双</b></span>
+      </div>
+    </section>
+
     <section class="dark-panel">
       <div class="section-heading">
         <div><h2>我的跑鞋</h2></div>
@@ -26,7 +41,33 @@
 
       <StateBlock v-if="loading" title="正在加载跑鞋" message="正在读取跑鞋和累计里程。" />
       <StateBlock v-else-if="error" title="跑鞋加载失败" :message="error" action-label="重试" tone="danger" @action="load" />
-      <StateBlock v-else-if="!shoes.length" title="还没有跑鞋" message="添加常用跑鞋后，可以跟踪里程和使用状态。" action-label="添加跑鞋" @action="openCreate" />
+      <div v-else-if="!shoes.length" class="shoe-empty-stage">
+        <div class="shoe-empty-head">
+          <span class="shoe-empty-icon" aria-hidden="true"><Footprints :size="24" /></span>
+          <div>
+            <p class="overline">装备健康</p>
+            <h3>当前还没有绑定跑鞋</h3>
+            <p>添加常用跑鞋后，MotionCare 会按训练记录追踪里程、磨损和使用状态。</p>
+          </div>
+        </div>
+        <div class="shoe-empty-track">
+          <div>
+            <span>装备档案</span>
+            <strong>待绑定首双跑鞋</strong>
+          </div>
+          <span class="shoe-empty-track__bar" aria-hidden="true"><i></i></span>
+        </div>
+        <div class="shoe-empty-grid">
+          <span><small>磨损预警</small><b>600 km 提醒</b></span>
+          <span><small>下一双跑鞋</small><b>从常用鞋开始</b></span>
+        </div>
+        <div class="shoe-empty-actions">
+          <button type="button" class="primary-link shoe-empty-action" @click="openCreate">
+            <FilePlus2 :size="16" aria-hidden="true" />
+            添加跑鞋
+          </button>
+        </div>
+      </div>
       <div v-else class="shoe-list">
         <div
           v-for="s in shoes"
@@ -102,9 +143,10 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { apiClient } from '@/services/http'
+import { FilePlus2, Footprints } from '@lucide/vue'
+import { apiClient, resolveMediaUrl } from '@/services/http'
 import { normalizeActivity } from '@/services/activities'
 import ActivityCard from '@/components/ActivityCard.vue'
 import StateBlock from '@/components/StateBlock.vue'
@@ -125,6 +167,15 @@ const editPhotoPreview = ref('')
 const isSavingEdit = ref(false)
 const loading = ref(false)
 const error = ref('')
+const activeShoeCount = computed(() => shoes.value.filter((shoe) => !shoe.isRetired).length)
+const retiredShoeCount = computed(() => shoes.value.filter((shoe) => shoe.isRetired).length)
+const totalShoeDistanceText = computed(() => {
+  const total = shoes.value.reduce((sum, shoe) => {
+    const distance = Number(shoe.boundDistanceKm ?? shoe.distanceKm ?? 0)
+    return sum + (Number.isFinite(distance) ? distance : 0)
+  }, 0)
+  return total > 0 ? `${total.toFixed(0)} km` : '--'
+})
 
 async function load() {
   loading.value = true
@@ -141,9 +192,7 @@ async function load() {
 }
 
 function photoUrl(path) {
-  if (!path) return ''
-  const base = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8089/api'
-  return base.replace(/\/api$/, '') + path
+  return resolveMediaUrl(path)
 }
 
 function displayKm(s) {
@@ -332,6 +381,23 @@ onMounted(load)
 .shoe-actions button { padding: 6px 12px; border-radius: var(--radius-pill); border: 1px solid var(--border); background: var(--panel); color: var(--text); cursor: pointer; white-space: nowrap; }
 .empty-state { padding: 32px; text-align: center; color: var(--muted); }
 .shoe-activities-list { display: flex; flex-direction: column; gap: 8px; }
+.shoe-empty-stage { display: grid; gap: 14px; padding: 16px; border: 1px solid color-mix(in srgb, var(--app-green) 18%, var(--border)); border-top: 4px solid var(--app-green); border-radius: var(--radius-lg); background: linear-gradient(180deg, color-mix(in srgb, var(--app-green) 8%, var(--panel)) 0%, var(--panel-soft) 100%); box-shadow: 0 18px 40px rgb(15 109 74 / 0.08); }
+.shoe-empty-head { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 12px; align-items: start; }
+.shoe-empty-head h3 { margin: 2px 0 6px; font-size: clamp(20px, 7cqi, 26px); line-height: 1.08; color: var(--text); }
+.shoe-empty-head p:not(.overline) { margin: 0; color: var(--muted); line-height: 1.55; overflow-wrap: anywhere; }
+.shoe-empty-icon { display: inline-grid; width: 48px; height: 48px; place-items: center; border-radius: 16px; color: var(--app-green-dark); background: color-mix(in srgb, var(--app-green) 14%, white); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--app-green) 24%, transparent); }
+.shoe-empty-track { display: grid; gap: 8px; padding: 12px; border-radius: 16px; background: rgb(255 255 255 / 0.72); border: 1px solid color-mix(in srgb, var(--app-green) 12%, var(--border)); }
+.shoe-empty-track div { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 0; }
+.shoe-empty-track span { color: var(--muted); font-size: 12px; font-weight: 700; }
+.shoe-empty-track strong { min-width: 0; color: var(--text); font-size: 14px; overflow-wrap: anywhere; text-align: right; }
+.shoe-empty-track__bar { display: block; height: 9px; overflow: hidden; border-radius: var(--radius-pill); background: color-mix(in srgb, var(--text) 10%, transparent); }
+.shoe-empty-track__bar i { display: block; width: 42%; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #38bdf8, var(--app-green) 66%, var(--app-lime)); }
+.shoe-empty-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.shoe-empty-grid span { min-width: 0; padding: 12px; border-radius: 14px; background: color-mix(in srgb, var(--app-green) 7%, white); border: 1px solid color-mix(in srgb, var(--app-green) 12%, var(--border)); }
+.shoe-empty-grid small { display: block; margin-bottom: 6px; color: var(--muted); font-size: 12px; font-weight: 700; }
+.shoe-empty-grid b { display: block; color: var(--text); font-size: 14px; line-height: 1.25; overflow-wrap: anywhere; }
+.shoe-empty-actions { display: grid; grid-template-columns: 1fr; gap: 8px; }
+.shoe-empty-action { min-width: 0; display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; white-space: nowrap; }
 
 .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.45); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 16px; }
 .modal-content { background: var(--panel); border-radius: var(--radius-lg); padding: 24px; width: 100%; max-width: 100%; max-height: calc(100% - 24px); overflow-y: auto; box-shadow: var(--shadow-lg); }
@@ -345,6 +411,13 @@ onMounted(load)
   .shoe-card { align-items: flex-start; }
   .shoe-actions { width: 100%; }
   .shoe-actions button { flex: 1 1 0; }
+  .shoe-empty-stage { padding: 14px; }
+  .shoe-empty-head { grid-template-columns: 1fr; }
+  .shoe-empty-icon { width: 44px; height: 44px; }
+  .shoe-empty-grid,
+  .shoe-empty-actions { grid-template-columns: 1fr; }
+  .shoe-empty-track div { align-items: flex-start; flex-direction: column; gap: 4px; }
+  .shoe-empty-track strong { text-align: left; }
   .modal-content { padding: 16px; }
 }
 </style>

@@ -34,3 +34,7 @@ const app = createApp(App)
 ].forEach((component) => app.use(component))
 
 app.use(router).mount('#app')
+
+void import('@capacitor/splash-screen')
+  .then(({ SplashScreen }) => SplashScreen.hide({ fadeOutDuration: 280 }))
+  .catch(() => {})

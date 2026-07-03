@@ -285,9 +285,9 @@ Returns recent activities, monthly summary, yearly summary, recent training load
 
 ## Extension Modules
 
-These modules persist real backend state. Garmin Connect sync is implemented;
-Strava, COROS, and Apple Health remain placeholder providers and return
-`adapterStatus="not_configured"`.
+These modules persist real backend state. Garmin Connect is the only sync
+provider currently exposed by the API; unimplemented providers are rejected
+instead of appearing as placeholder integrations.
 
 Sync APIs require login:
 

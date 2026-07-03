@@ -1,8 +1,8 @@
 <template>
   <div class="page-stack">
     <section class="activities-head">
-      <p class="overline">我最近完成了什么</p>
-      <h2>最近运动</h2>
+      <p class="overline">训练记录</p>
+      <h2>运动记录</h2>
     </section>
 
     <div class="feed-toolbar">
@@ -32,12 +32,23 @@
     <StateBlock
       v-else-if="activities.length === 0"
       title="没有找到运动"
-      message="当前筛选条件没有匹配记录，也可以同步或手工添加一次运动。"
-      action-label="记录运动"
-      @action="router.push('/record')"
+      message="当前筛选条件没有匹配记录。"
     />
 
     <section v-else class="activity-list-section">
+      <article v-if="latestActivity" class="latest-training-panel">
+        <div>
+          <p class="overline">最后一笔训练</p>
+          <h3>{{ latestActivityTitle }}</h3>
+          <small>{{ latestActivity.local_start_time || '--' }}</small>
+        </div>
+        <div class="latest-training-panel__metrics">
+          <span><small>距离</small><b>{{ formatDistance(latestActivity.total_distance_m) }}</b></span>
+          <span><small>时长</small><b>{{ formatClockDuration(latestActivity.total_timer_time_s) }}</b></span>
+          <span><small>负荷</small><b>{{ latestTrainingLoad }}</b></span>
+        </div>
+      </article>
+
       <div class="list-meta">
         <span>{{ meta.total || activities.length }} 条记录</span>
         <span>第 {{ meta.page || 1 }} / {{ meta.totalPages || 1 }} 页</span>
@@ -126,6 +137,7 @@ import StateBlock from '@/components/StateBlock.vue'
 import { sportFilters } from '@/constants/sports'
 import { deleteManualActivity, getActivityPage, updateManualActivity } from '@/services/activities'
 import { authSession, hasAuthToken, normalizeRedirect } from '@/stores/authStore'
+import { formatClockDuration, formatDistance } from '@/utils/formatters'
 
 const router = useRouter()
 const activities = ref([])
@@ -136,6 +148,18 @@ const modalOpen = ref(false)
 const editingActivity = ref(null)
 const filterOpen = ref(false)
 const isAdmin = computed(() => authSession.user?.role === 'admin')
+const latestActivity = computed(() => activities.value[0] || null)
+const latestActivityTitle = computed(() => (
+  latestActivity.value?.activity_name
+  || latestActivity.value?.location_name
+  || latestActivity.value?.activity_type
+  || '最近训练'
+))
+const latestTrainingLoad = computed(() => {
+  const load = latestActivity.value?.activity_training_load
+  const numeric = Number(load)
+  return Number.isFinite(numeric) ? Math.round(numeric) : '--'
+})
 
 const filters = reactive({
   page: 1,
@@ -240,9 +264,59 @@ watch(
 </script>
 
 <style scoped>
-.activities-head { display: flex; flex-direction: column; gap: 2px; }
+.activities-head {
+  display: grid;
+  gap: 3px;
+  padding: var(--space-5);
+  border: 1px solid color-mix(in srgb, var(--app-green) 14%, var(--border));
+  border-radius: var(--radius-xl);
+  background: var(--panel);
+  box-shadow: var(--shadow-sm);
+}
 .activities-head .overline { margin: 0; }
-.activities-head h2 { margin: 0; }
+.activities-head h2 {
+  margin: 0;
+  font-size: 24px;
+  line-height: 1.15;
+}
+
+.latest-training-panel {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 12px;
+  padding: 16px;
+  border: 1px solid color-mix(in srgb, var(--app-green) 16%, var(--border));
+  border-top: 4px solid var(--app-green);
+  border-radius: 12px;
+  background: var(--panel);
+  box-shadow: var(--shadow-sm);
+}
+.latest-training-panel h3 {
+  margin: 4px 0 2px;
+  font-size: 22px;
+  line-height: 1.15;
+}
+.latest-training-panel small {
+  color: var(--muted);
+  font-size: 12px;
+}
+.latest-training-panel__metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.latest-training-panel__metrics span {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 10px;
+  border-radius: 10px;
+  background: var(--panel-soft);
+}
+.latest-training-panel__metrics b {
+  font-size: 15px;
+  overflow-wrap: anywhere;
+}
 
 .feed-toolbar {
   position: sticky;

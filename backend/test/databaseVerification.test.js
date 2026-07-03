@@ -47,6 +47,25 @@ test('database verification accepts the required application schema', async () =
   assert.ok(result.checkedTables >= 8);
 });
 
+test('database verification requires raw activity JSON used by manual and live activity writes', () => {
+  assert.ok(REQUIRED_SCHEMA.Activities.columns.includes('raw_json'));
+});
+
+test('database verification requires shoe columns used by equipment flows', () => {
+  assert.deepEqual(
+    [
+      'photo_path',
+      'photo_original_name',
+      'photo_mime_type',
+      'photo_size_bytes',
+      'target_distance_km',
+      'initial_distance_km',
+      'price'
+    ].every((column) => REQUIRED_SCHEMA.Shoes.columns.includes(column)),
+    true
+  );
+});
+
 test('database verification accepts lowercase table metadata from Windows MySQL', async () => {
   const rows = completeRows();
   rows.columns = rows.columns.map((row) => ({ ...row, tableName: row.tableName.toLowerCase() }));

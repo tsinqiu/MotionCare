@@ -2,7 +2,7 @@
   <section class="panel zone-panel wide">
     <div class="panel-heading">
       <div>
-        <p class="overline">Zones</p>
+        <p class="overline">训练区间</p>
         <h2>区间分布</h2>
       </div>
     </div>
@@ -59,18 +59,18 @@ const props = defineProps({
 
 const ZONE_COLORS = ['#94a3b8', '#33b5ff', '#21d47b', '#ff9d19', '#ef4444']
 const HEART_RATE_ZONES = [
-  { label: '132-148 bpm', min: 132, max: 148 },
-  { label: '149-170 bpm', min: 149, max: 170 },
-  { label: '171-176 bpm', min: 171, max: 176 },
-  { label: '177-186 bpm', min: 177, max: 186 },
-  { label: '186+ bpm', min: 186, max: Infinity },
+  { label: '132-148 次/分', min: 132, max: 148 },
+  { label: '149-170 次/分', min: 149, max: 170 },
+  { label: '171-176 次/分', min: 171, max: 176 },
+  { label: '177-186 次/分', min: 177, max: 186 },
+  { label: '186+ 次/分', min: 186, max: Infinity },
 ]
 const POWER_ZONES = [
-  { label: '231-284 W', min: 231, max: 284 },
-  { label: '285-319 W', min: 285, max: 319 },
-  { label: '320-355 W', min: 320, max: 355 },
-  { label: '356-408 W', min: 356, max: 408 },
-  { label: '408+ W', min: 408, max: Infinity },
+  { label: '231-284 瓦', min: 231, max: 284 },
+  { label: '285-319 瓦', min: 285, max: 319 },
+  { label: '320-355 瓦', min: 320, max: 355 },
+  { label: '356-408 瓦', min: 356, max: 408 },
+  { label: '408+ 瓦', min: 408, max: Infinity },
 ]
 
 function toTimestamp(value) {

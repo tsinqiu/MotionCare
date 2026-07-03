@@ -124,7 +124,27 @@ function buildApp(overrides = {}) {
         },
         meta: { ai: { provider: 'rules', fallback: true } }
       };
-    }
+    },
+    submitFeedback: async (payload, user) => ({
+      data: {
+        id: 11,
+        saved: true,
+        suggestionType: payload.suggestionType,
+        feedback: payload.feedback,
+        userId: user.id
+      },
+      meta: {}
+    }),
+    submitMorningReadiness: async (payload, user) => ({
+      data: {
+        id: 12,
+        saved: true,
+        feedbackDate: payload.feedbackDate,
+        readinessScore: payload.readinessScore,
+        userId: user.id
+      },
+      meta: {}
+    })
   };
 
   const authService = overrides.authService || {
@@ -159,10 +179,7 @@ function buildApp(overrides = {}) {
 
   const syncService = overrides.syncService || {
     listProviders: async () => [
-      { provider: 'garmin', name: 'Garmin Connect', status: 'not_connected', adapterStatus: 'not_configured' },
-      { provider: 'strava', name: 'Strava', status: 'not_connected', adapterStatus: 'not_configured' },
-      { provider: 'coros', name: 'COROS', status: 'not_connected', adapterStatus: 'not_configured' },
-      { provider: 'apple_health', name: 'Apple Health', status: 'not_connected', adapterStatus: 'not_configured' }
+      { provider: 'garmin', name: 'Garmin Connect', status: 'not_connected', adapterStatus: 'configured' }
     ],
     updateProviderSettings: async (provider, payload) => ({ provider, ...payload }),
     getProviderAccount: async (provider) => ({ provider, exists: false, status: 'not_connected', email: null, lastSyncAt: null }),
@@ -177,9 +194,9 @@ function buildApp(overrides = {}) {
       id: 1,
       provider: payload.provider,
       jobType: payload.jobType,
-      status: 'skipped',
+      status: 'queued',
       activityCount: 0,
-      errorMessage: 'sync adapter is not configured'
+      errorMessage: ''
     }),
     listJobs: async (filters) => ({ items: [], page: filters.page, pageSize: filters.pageSize, total: 0, totalPages: 0 }),
     listLogs: async (filters) => ({ items: [], page: filters.page, pageSize: filters.pageSize, total: 0, totalPages: 0 })
@@ -306,6 +323,18 @@ test('GET /api/health returns service and database status', async () => {
   assert.equal(typeof response.body.data.cache.stats.size, 'number');
 });
 
+test('CORS preflight allows mobile app preview and Capacitor origins', async () => {
+  for (const origin of ['http://127.0.0.1:4173', 'http://127.0.0.1:5177', 'http://localhost:5178', 'https://localhost']) {
+    const response = await request(buildApp())
+      .options('/api/health')
+      .set('Origin', origin)
+      .set('Access-Control-Request-Method', 'GET');
+
+    assert.equal(response.status, 204, origin);
+    assert.equal(response.headers['access-control-allow-origin'], origin);
+  }
+});
+
 test('GET /api/ai/health requires login', async () => {
   const response = await request(buildApp()).get('/api/ai/health');
 
@@ -366,6 +395,42 @@ test('POST /api/ai/activity-analysis returns 404 for missing activity', async ()
 
   assert.equal(response.status, 404);
   assert.equal(response.body.error.code, 'ACTIVITY_NOT_FOUND');
+});
+
+test('POST /api/ai/feedback saves coach suggestion feedback', async () => {
+  const response = await request(buildApp())
+    .post('/api/ai/feedback')
+    .set('Authorization', 'Bearer valid-user-token')
+    .send({
+      suggestionType: 'daily_brief',
+      feedback: 'helpful',
+      suggestionDate: '2026-06-29',
+      modelVersion: 'coach-v1',
+      ml: { provider: 'rules', riskLevel: 'yellow', loadAction: 'maintain', weatherRisk: 'low' }
+    });
+
+  assert.equal(response.status, 200);
+  assert.equal(response.body.data.saved, true);
+  assert.equal(response.body.data.userId, 2);
+});
+
+test('POST /api/ai/morning-readiness saves subjective readiness', async () => {
+  const response = await request(buildApp())
+    .post('/api/ai/morning-readiness')
+    .set('Authorization', 'Bearer valid-user-token')
+    .send({
+      feedbackDate: '2026-06-30',
+      readinessScore: 3,
+      muscleSoreness: 'mild',
+      mentalState: 'normal',
+      trainingWillingness: 'easy',
+      note: '腿有点酸'
+    });
+
+  assert.equal(response.status, 200);
+  assert.equal(response.body.data.saved, true);
+  assert.equal(response.body.data.feedbackDate, '2026-06-30');
+  assert.equal(response.body.data.userId, 2);
 });
 
 test('GET /api/health reports degraded database state', async () => {
@@ -1316,14 +1381,14 @@ test('GET /api/sync/providers requires login', async () => {
   assert.equal(response.body.error.code, 'AUTH_REQUIRED');
 });
 
-test('GET /api/sync/providers returns fixed provider states', async () => {
+test('GET /api/sync/providers returns only implemented provider states', async () => {
   const response = await request(buildApp())
     .get('/api/sync/providers')
     .set('Authorization', 'Bearer valid-user-token');
 
   assert.equal(response.status, 200);
-  assert.deepEqual(response.body.data.map((item) => item.provider), ['garmin', 'strava', 'coros', 'apple_health']);
-  assert.equal(response.body.data[0].adapterStatus, 'not_configured');
+  assert.deepEqual(response.body.data.map((item) => item.provider), ['garmin']);
+  assert.equal(response.body.data[0].adapterStatus, 'configured');
 });
 
 test('GET /api/sync/providers/:provider/account returns current user Garmin binding state', async () => {
@@ -1390,40 +1455,15 @@ test('POST /api/sync/providers/:provider/authorize passes Garmin credentials for
   });
 });
 
-test('POST /api/sync/jobs creates skipped job when adapter is not configured', async () => {
-  let captured;
-  const app = buildApp({
-    syncService: {
-      listProviders: async () => [],
-      updateProviderSettings: async () => ({}),
-      authorizeProvider: async () => ({}),
-      disconnectProvider: async () => ({}),
-      createJob: async (payload, user) => {
-        captured = { payload, user };
-        return {
-          id: 5,
-          provider: payload.provider,
-          jobType: payload.jobType,
-          status: 'skipped',
-          activityCount: 0,
-          errorMessage: 'sync adapter is not configured'
-        };
-      },
-      listJobs: async () => ({ items: [], page: 1, pageSize: 20, total: 0, totalPages: 0 }),
-      listLogs: async () => ({ items: [{ id: 1, level: 'warn' }], page: 1, pageSize: 20, total: 1, totalPages: 1 })
-    }
-  });
-
-  const response = await request(app)
+test('POST /api/sync/jobs rejects unsupported providers instead of creating placeholder jobs', async () => {
+  const response = await request(buildApp())
     .post('/api/sync/jobs')
     .set('Authorization', 'Bearer valid-user-token')
     .send({ provider: 'strava' });
 
-  assert.equal(response.status, 201);
-  assert.equal(response.body.data.status, 'skipped');
-  assert.equal(response.body.data.activityCount, 0);
-  assert.equal(captured.payload.jobType, 'manual_sync');
-  assert.equal(captured.user.id, 2);
+  assert.equal(response.status, 400);
+  assert.equal(response.body.error.code, 'VALIDATION_ERROR');
+  assert.match(response.body.error.message, /provider is invalid/);
 });
 
 test('POST /api/sync/jobs requires login', async () => {
@@ -2104,6 +2144,25 @@ test('syncService Garmin incremental start falls back to latest local Garmin act
     const startDate = await syncServiceModule._private.getGarminIncrementalStartDate({ id: 2 });
 
     assert.equal(startDate, '2026-06-12');
+  } finally {
+    db.query = originalQuery;
+  }
+});
+
+test('syncService lists only implemented Garmin sync provider', async () => {
+  const originalQuery = db.query;
+  db.query = async (sql, params = []) => {
+    assert.match(sql, /FROM SyncProviderConnections/);
+    assert.deepEqual(params, [2]);
+    return [];
+  };
+
+  try {
+    const providers = await syncServiceModule.listProviders({ id: 2 });
+
+    assert.deepEqual(providers.map((item) => item.provider), ['garmin']);
+    assert.equal(providers[0].name, 'Garmin Connect');
+    assert.equal(providers[0].adapterStatus, 'configured');
   } finally {
     db.query = originalQuery;
   }

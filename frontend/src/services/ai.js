@@ -16,3 +16,11 @@ export function sendAiMessage(message) {
 export function analyzeActivity(activityId) {
   return mutateEnvelope('post', '/ai/activity-analysis', { activityId })
 }
+
+export function submitAiFeedback(payload) {
+  return mutateEnvelope('post', '/ai/feedback', payload)
+}
+
+export function submitMorningReadiness(payload) {
+  return mutateEnvelope('post', '/ai/morning-readiness', payload)
+}
