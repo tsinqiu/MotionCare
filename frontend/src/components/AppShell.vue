@@ -18,6 +18,7 @@
       </main>
 
       <van-tabbar
+        v-if="!hideTabbar"
         class="app-tabbar"
         :model-value="activeTab"
         :fixed="false"
@@ -59,7 +60,8 @@ const iconMap = {
   me: UserRound,
 }
 const navItems = primaryNavigation
-const showBack = computed(() => Boolean(route.meta.backTo))
+const showBack = computed(() => Boolean(route.meta.backTo || route.query.from === 'today'))
+const hideTabbar = computed(() => showBack.value)
 const navTitle = computed(() => (showBack.value ? route.meta.title || '返回' : 'MotionCare'))
 
 // Highlight the tab that owns the current route, including nested pages
@@ -75,6 +77,10 @@ function goTab(name) {
 }
 
 function goBack() {
+  if (route.query.from === 'today') {
+    router.push('/today')
+    return
+  }
   router.push(route.meta.backTo || '/today')
 }
 

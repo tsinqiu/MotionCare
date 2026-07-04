@@ -1131,11 +1131,12 @@ async function getPersonalBests(filters) {
 }
 
 async function getDashboardOverview(filters = {}) {
-  const today = await getLatestActivityDate(filters);
+  const { trainingLoadRange, ...activityFilters } = filters;
+  const today = await getLatestActivityDate(activityFilters);
   const month = today.slice(0, 7);
   const year = today.slice(0, 4);
   const recentActivities = await listActivities({
-    ...filters,
+    ...activityFilters,
     limit: 6,
     offset: 0,
     page: 1,
@@ -1144,27 +1145,27 @@ async function getDashboardOverview(filters = {}) {
     sortOrder: 'desc'
   });
   const monthlySummary = await getSummaryStats({
-    ...filters,
+    ...activityFilters,
     range: 'month',
     date: month
   });
   const yearlySummary = await getSummaryStats({
-    ...filters,
+    ...activityFilters,
     range: 'year',
     date: year
   });
   const trainingLoad = await getLoadBalance({
-    ...filters,
-    range: '3m',
+    ...activityFilters,
+    range: trainingLoadRange || '3m',
     endDate: today
   });
-  const personalBests = await getPersonalBests(filters);
+  const personalBests = await getPersonalBests(activityFilters);
 
   return {
     recentActivities: recentActivities.items,
     monthlySummary,
     yearlySummary,
-    trainingLoad: trainingLoad.slice(-30),
+    trainingLoad: trainingLoadRange ? trainingLoad : trainingLoad.slice(-30),
     personalBests
   };
 }

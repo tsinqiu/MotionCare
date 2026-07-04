@@ -1064,6 +1064,10 @@ html[data-theme="night"] {
     var(--panel);
 }
 
+.rq-activity-card .activity-metrics {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .detail-hero > div:first-child {
   width: 100%;
   min-width: 0;

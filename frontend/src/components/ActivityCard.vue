@@ -27,33 +27,9 @@
     </div>
 
     <div class="activity-metrics">
-      <span>
-        <small>距离</small>
-        <b>{{ formatDistance(activity.total_distance_m) }}</b>
-      </span>
-      <span>
-        <small>时长</small>
-        <b>{{ formatClockDuration(activity.total_timer_time_s) }}</b>
-      </span>
-      <span>
-        <small>{{ speedLabel }}</small>
-        <b>{{ speedValue }}</b>
-      </span>
-      <span>
-        <small>卡路里</small>
-        <b>{{ formatCalories(activity.total_calories) }}</b>
-      </span>
-      <span v-if="trainingLoadValue !== '--'">
-        <small>训练负荷</small>
-        <b>{{ trainingLoadValue }}</b>
-      </span>
-      <span v-if="activity.perceived_effort">
-        <small>体感</small>
-        <b>{{ activity.perceived_effort }}/10</b>
-      </span>
-      <span v-if="activity.weather_condition || activity.temperature_c != null">
-        <small>天气</small>
-        <b>{{ weatherText }}</b>
+      <span v-for="metric in metricItems" :key="metric.label">
+        <small>{{ metric.label }}</small>
+        <b>{{ metric.value }}</b>
       </span>
     </div>
 
@@ -127,6 +103,14 @@ const weatherText = computed(() => {
   const temp = props.activity.temperature_c
   return temp === null || temp === undefined ? condition : `${condition} ${Math.round(temp)}°C`
 })
+const metricItems = computed(() => [
+  { label: '距离', value: formatDistance(props.activity.total_distance_m) },
+  { label: '时长', value: formatClockDuration(props.activity.total_timer_time_s) },
+  { label: speedLabel.value, value: speedValue.value },
+  { label: '卡路里', value: formatCalories(props.activity.total_calories) },
+  { label: '训练负荷', value: trainingLoadValue.value },
+  { label: '天气', value: weatherText.value },
+])
 
 function photoUrl(path) {
   return resolveMediaUrl(path)

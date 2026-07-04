@@ -1,13 +1,5 @@
 <template>
-  <div class="page-stack">
-    <button type="button" class="android-download-link today-download-entry" aria-label="前往安卓版下载页" @click="goToDownload">
-      <span>
-        <small>手机安装包</small>
-        <strong>下载安卓版</strong>
-      </span>
-      <DownloadIcon :size="20" aria-hidden="true" />
-    </button>
-
+  <div class="page-stack today-home">
     <StateBlock v-if="loading" title="正在准备今日建议" message="正在读取身体状态、训练负荷和最近运动。" />
     <StateBlock
       v-else-if="!hasData && errors.length"
@@ -17,47 +9,67 @@
       tone="danger"
       @action="loadToday"
     />
-    <template v-else-if="!hasData">
-      <section class="today-empty-rq-panel">
-        <div class="today-empty-rq-panel__top">
-          <div>
-            <p class="overline">今日跑力</p>
-            <h2>新手跑力</h2>
-          </div>
-          <strong>--</strong>
-        </div>
-        <div class="score-band" aria-label="空数据跑力区间">
-          <span class="score-band__segment score-band__segment--base">基础</span>
-          <span class="score-band__segment score-band__segment--steady">稳定</span>
-          <span class="score-band__segment score-band__segment--strong">强化</span>
-          <span class="score-band__segment score-band__segment--peak">冲刺</span>
-          <i class="score-band__marker" aria-hidden="true"></i>
-        </div>
-        <div class="today-empty-rq-panel__stats">
-          <span><small>数据同步</small><b>待同步</b></span>
-          <span><small>训练负荷</small><b>待记录</b></span>
-          <span><small>今日建议</small><b>轻松跑</b></span>
-        </div>
-      </section>
-
-      <section class="today-empty-plan">
-        <div class="section-heading">
-          <div>
-            <p class="overline">训练节奏</p>
-            <h2>训练节奏</h2>
-          </div>
-          <span class="status-chip neutral">等待数据</span>
-        </div>
-        <div class="today-empty-bars" aria-label="空数据训练节奏">
-          <i v-for="bar in emptyLoadBars" :key="bar.key" :style="{ '--bar-height': bar.height }">
-            <span>{{ bar.label }}</span>
-          </i>
-        </div>
-      </section>
-    </template>
 
     <template v-else>
       <p v-if="errors.length" class="soft-note">部分内容暂时不可用，已用现有数据为你生成建议。</p>
+
+      <header class="today-date-nav" aria-label="日期切换">
+        <button type="button" aria-label="前一天" @click="shiftSelectedDate(-1)">
+          <ChevronLeft :size="24" />
+        </button>
+        <strong>{{ selectedDateLabel }}</strong>
+        <button type="button" aria-label="后一天" @click="shiftSelectedDate(1)">
+          <ChevronRight :size="24" />
+        </button>
+      </header>
+
+      <section class="today-weather-card">
+        <div class="today-weather-card__top">
+          <span class="weather-pin" aria-hidden="true">
+            <MapPin :size="24" />
+          </span>
+          <div class="weather-copy">
+            <h2>{{ weatherCard.location }}</h2>
+            <p>{{ weatherCard.message }}</p>
+          </div>
+          <div class="weather-temp" aria-label="当前温度">
+            <Sun :size="34" />
+            <strong>{{ weatherCard.temperature }}</strong>
+          </div>
+        </div>
+        <div class="today-weather-card__bottom">
+          <div>
+            <span>体感 {{ weatherCard.feelsLike }}</span>
+            <span>风力 {{ weatherCard.wind }}</span>
+          </div>
+          <button type="button" class="location-pill">
+            <Crosshair :size="18" />
+            开启定位
+          </button>
+        </div>
+      </section>
+
+      <nav class="today-action-grid" aria-label="今日快捷入口">
+        <RouterLink v-for="item in todayActions" :key="item.label" :to="item.to">
+          <component :is="item.icon" :size="32" :style="{ color: item.color }" aria-hidden="true" />
+          <span>{{ item.label }}</span>
+        </RouterLink>
+      </nav>
+
+      <section class="today-activity-section">
+        <ActivityCard
+          v-for="activity in selectedDateActivities"
+          :key="activity.id || activity.activity_key"
+          :activity="activity"
+          @select="openActivity"
+        />
+        <article v-if="!selectedDateActivities.length" class="today-no-activity-card">
+          <span aria-hidden="true">
+            <CalendarDays :size="34" />
+          </span>
+          <strong>今日无训练安排</strong>
+        </article>
+      </section>
 
       <section class="rq-overview-panel training-index-panel">
         <div class="rq-overview-panel__top">
@@ -106,23 +118,26 @@
         </div>
         <p>{{ weekSummary.message }}</p>
       </section>
-
-      <div class="metric-grid">
-        <MetricCard label="睡眠分数" :value="metricValue(health.sleepScore)" />
-        <MetricCard label="静息心率" :value="metricValue(health.restingHeartRateBpm, ' 次/分')" />
-        <MetricCard label="平均压力" :value="metricValue(health.avgStressLevel)" />
-        <MetricCard label="心率变异" :value="metricValue(health.avgHrv)" />
-      </div>
     </template>
   </div>
 </template>
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { Download as DownloadIcon } from '@lucide/vue'
+import {
+  CalendarDays,
+  ChevronLeft,
+  ChevronRight,
+  ClipboardList,
+  Crosshair,
+  HeartPulse,
+  MapPin,
+  Sun,
+  TrendingUp,
+} from '@lucide/vue'
 import { useRouter } from 'vue-router'
 
-import MetricCard from '@/components/MetricCard.vue'
+import ActivityCard from '@/components/ActivityCard.vue'
 import StateBlock from '@/components/StateBlock.vue'
 import { getDailyBrief } from '@/services/ai'
 import { getDashboardOverview, getTodayHealth } from '@/services/dashboard'
@@ -137,8 +152,12 @@ const performanceProfile = ref(null)
 const loading = ref(false)
 const errors = ref([])
 const briefAvailable = ref(false)
+const selectedDate = ref(startOfDay(new Date()))
 
 const recentActivities = computed(() => (overview.value.recentActivities || []).slice(0, 6))
+const selectedDateActivities = computed(() => recentActivities.value.filter((activity) => (
+  normalizeDateKey(activity.local_start_time || activity.start_time_utc) === formatDateKey(selectedDate.value)
+)))
 const currentLoad = computed(() => (overview.value.trainingLoad || []).at(-1) || {})
 const statusBadge = computed(() => deriveStatusBadge({
   sleepScore: health.value.sleepScore,
@@ -172,11 +191,35 @@ const trainingIndexTone = computed(() => {
 const trainingIndexStyle = computed(() => ({
   '--score-position': `${trainingIndexScore.value ?? 0}%`,
 }))
-const emptyLoadBars = computed(() => ['一', '二', '三', '四', '五', '六', '日'].map((label, index) => ({
-  key: `empty-${index}`,
-  label,
-  height: `${18 + (index % 4) * 10}%`,
-})))
+const selectedDateLabel = computed(() => {
+  const date = selectedDate.value
+  const week = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][date.getDay()]
+  return `${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')}，${week}`
+})
+const todayActions = [
+  { label: '运动日历', to: { path: '/status/calendar', query: { from: 'today' } }, icon: CalendarDays, color: '#2563eb' },
+  { label: '健康度', to: { path: '/status/health', query: { from: 'today' } }, icon: HeartPulse, color: '#f59e0b' },
+  { label: '趋势', to: { path: '/status/trends', query: { from: 'today' } }, icon: TrendingUp, color: '#0ea5e9' },
+  { label: '训练计划', to: { path: '/coach', query: { from: 'today' } }, icon: ClipboardList, color: '#16a34a' },
+]
+const latestWeatherActivity = computed(() => recentActivities.value.find((activity) => (
+  activity.weather_condition || activity.temperature_c != null || activity.feels_like_c != null || activity.humidity_percent != null
+)) || recentActivities.value[0] || null)
+const weatherCard = computed(() => {
+  const activity = latestWeatherActivity.value
+  const temperature = activity?.temperature_c
+  const feelsLike = activity?.feels_like_c ?? temperature
+  const humidity = activity?.humidity_percent
+  const location = activity?.location_name || '最近运动地点'
+  const hasWeather = activity && (activity.weather_condition || temperature != null || feelsLike != null || humidity != null)
+  return {
+    location,
+    message: hasWeather ? weatherMessage(temperature, humidity, activity.weather_condition) : '天气数据待同步，建议运动前确认天气。',
+    temperature: temperature == null ? '--°' : `${Math.round(temperature)}°`,
+    feelsLike: feelsLike == null ? '--°C' : `${Math.round(feelsLike)}°C`,
+    wind: '--级',
+  }
+})
 const weeklyLoadBars = computed(() => {
   const rows = buildWeekRows()
   const maxLoad = Math.max(...rows.map((row) => row.load), 1)
@@ -223,8 +266,24 @@ function metricValue(value, unit = '') {
   return value === null || value === undefined || value === '' ? '--' : `${value}${unit}`
 }
 
-function goToDownload() {
-  router.push('/download')
+function shiftSelectedDate(offset) {
+  const next = new Date(selectedDate.value)
+  next.setDate(next.getDate() + offset)
+  selectedDate.value = startOfDay(next)
+}
+
+function openActivity(activity) {
+  if (activity?.id) router.push(`/activities/${activity.id}`)
+}
+
+function weatherMessage(temperature, humidity, condition) {
+  const temp = Number(temperature)
+  const humid = Number(humidity)
+  const riskyCondition = /雨|雪|雷|storm|rain|snow/i.test(condition || '')
+  if (riskyCondition) return '天气不稳，户外运动注意安全。'
+  if (Number.isFinite(temp) && (temp < 3 || temp > 32)) return '气温不太理想，建议降低训练强度。'
+  if (Number.isFinite(humid) && humid >= 85) return '湿度偏高，运动时注意补水和降强度。'
+  return '天气适宜，适合户外运动。'
 }
 
 function buildWeekRows() {
@@ -309,11 +368,187 @@ onMounted(loadToday)
 </script>
 
 <style scoped>
-.today-download-entry {
-  width: 100%;
-  font: inherit;
-  text-align: left;
+.today-home {
+  gap: 16px;
+}
+
+.today-date-nav {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
+  align-items: center;
+  min-height: 56px;
+  border: 1px solid color-mix(in srgb, var(--app-green) 12%, var(--border));
+  border-radius: 14px;
+  background: var(--panel);
+  box-shadow: var(--shadow-sm);
+}
+
+.today-date-nav button {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  color: var(--text);
   cursor: pointer;
+}
+
+.today-date-nav strong {
+  min-width: 0;
+  color: var(--text);
+  font-size: 20px;
+  line-height: 1.2;
+  text-align: center;
+}
+
+.today-weather-card {
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+  border: 1px solid color-mix(in srgb, var(--app-green) 18%, var(--border));
+  border-radius: 18px;
+  background: var(--panel);
+  box-shadow: 0 14px 34px rgb(15 23 42 / 0.08);
+}
+
+.today-weather-card__top {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+}
+
+.weather-pin {
+  width: 54px;
+  height: 54px;
+  display: grid;
+  place-items: center;
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--app-green) 12%, var(--panel-soft));
+  color: var(--app-green);
+}
+
+.weather-copy {
+  min-width: 0;
+}
+
+.weather-copy h2 {
+  margin: 0;
+  color: var(--text);
+  font-size: 22px;
+  line-height: 1.2;
+}
+
+.weather-copy p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.weather-temp {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: #f59e0b;
+}
+
+.weather-temp strong {
+  color: var(--text);
+  font-size: 42px;
+  line-height: 1;
+}
+
+.today-weather-card__bottom {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  padding-top: 14px;
+  border-top: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+}
+
+.today-weather-card__bottom div {
+  display: grid;
+  gap: 4px;
+  color: var(--text);
+  line-height: 1.35;
+}
+
+.location-pill {
+  min-height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--app-green);
+  color: #fff;
+  font-weight: 900;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.today-action-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  padding: 2px 0;
+}
+
+.today-action-grid a {
+  display: grid;
+  justify-items: center;
+  gap: 9px;
+  min-width: 0;
+  padding: 10px 4px;
+  color: var(--text);
+  font-weight: 900;
+  line-height: 1.2;
+  text-align: center;
+  text-decoration: none;
+}
+
+.today-action-grid span {
+  min-width: 0;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+.today-activity-section {
+  display: grid;
+  gap: 12px;
+}
+
+.today-no-activity-card {
+  min-height: 92px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 16px;
+  padding: 18px;
+  border: 1px solid color-mix(in srgb, var(--border) 80%, var(--app-green));
+  border-radius: 18px;
+  background: var(--panel);
+  box-shadow: var(--shadow-sm);
+}
+
+.today-no-activity-card span {
+  width: 58px;
+  height: 58px;
+  display: grid;
+  place-items: center;
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--muted) 10%, var(--panel-soft));
+  color: var(--muted);
+}
+
+.today-no-activity-card strong {
+  color: var(--text);
+  font-size: 20px;
+  line-height: 1.25;
 }
 
 .soft-note {

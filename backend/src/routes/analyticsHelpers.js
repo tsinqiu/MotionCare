@@ -99,7 +99,14 @@ function parseTrendFilters(query, user) {
 }
 
 function parseDashboardFilters(query, user) {
-  return parseActivityFilters(query, user, { withDates: false });
+  const trainingLoadRange = query.training_load_range === undefined
+    ? undefined
+    : parseEnum(query.training_load_range, TRAINING_RANGES, 'training_load_range', '3m');
+
+  return {
+    ...parseActivityFilters(query, user, { withDates: false }),
+    ...(trainingLoadRange !== undefined ? { trainingLoadRange } : {})
+  };
 }
 
 function parseTrainingFilters(query, user) {
