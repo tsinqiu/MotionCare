@@ -2,13 +2,20 @@ from __future__ import annotations
 
 import argparse
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 
 import joblib
 import mysql.connector
 import numpy as np
 from sklearn.impute import SimpleImputer
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import (
+    accuracy_score,
+    balanced_accuracy_score,
+    classification_report,
+    confusion_matrix,
+    f1_score,
+)
 from sklearn.model_selection import train_test_split
 from sklearn.neural_network import MLPClassifier
 from sklearn.pipeline import Pipeline
@@ -95,6 +102,36 @@ def load_level(value: float, low_threshold: float, high_threshold: float) -> str
     return "high"
 
 
+def class_distribution(labels: np.ndarray) -> dict[str, int]:
+    values, counts = np.unique(labels, return_counts=True)
+    return {str(label): int(count) for label, count in zip(values, counts)}
+
+
+def evaluation_report(y_true: np.ndarray, y_pred: np.ndarray, classes: list[str]) -> dict[str, object]:
+    return {
+        "accuracy": float(accuracy_score(y_true, y_pred)),
+        "macroF1": float(f1_score(y_true, y_pred, average="macro", zero_division=0)),
+        "weightedF1": float(f1_score(y_true, y_pred, average="weighted", zero_division=0)),
+        "balancedAccuracy": float(balanced_accuracy_score(y_true, y_pred)),
+        "classificationReport": classification_report(y_true, y_pred, output_dict=True, zero_division=0),
+        "confusionMatrix": {
+            "labels": classes,
+            "matrix": confusion_matrix(y_true, y_pred, labels=classes).astype(int).tolist(),
+        },
+    }
+
+
+def data_warnings(distribution: dict[str, int]) -> list[str]:
+    warnings = []
+    if len(distribution) < 2:
+        warnings.append("only one class present; model cannot learn class boundaries")
+    if distribution and min(distribution.values()) < 5:
+        warnings.append("minority class has fewer than 5 samples")
+    if distribution and min(distribution.values()) < 20:
+        warnings.append("minority class has fewer than 20 samples; do not treat metrics as product-grade")
+    return warnings
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--env", default=str(Path(__file__).resolve().parents[1] / ".env"))
@@ -108,6 +145,7 @@ def main() -> None:
     loads = np.array([float(row["activityTrainingLoad"]) for row in rows], dtype=float)
     low_threshold, high_threshold = np.quantile(loads, [1 / 3, 2 / 3])
     labels = np.array([load_level(value, low_threshold, high_threshold) for value in loads])
+    distribution = class_distribution(labels)
     features = np.array(
         [[None if row[name] is None else float(row[name]) for name in FEATURE_NAMES] for row in rows],
         dtype=object,
@@ -133,6 +171,9 @@ def main() -> None:
 
     train_accuracy = None
     test_accuracy = None
+    train_report = None
+    test_report = None
+    warnings = data_warnings(distribution)
     if len(set(labels)) > 1 and min(np.bincount(np.unique(labels, return_inverse=True)[1])) >= 2:
         x_train, x_test, y_train, y_test = train_test_split(
             features,
@@ -142,10 +183,14 @@ def main() -> None:
             stratify=labels,
         )
         pipeline.fit(x_train, y_train)
-        train_accuracy = float(accuracy_score(y_train, pipeline.predict(x_train)))
-        test_accuracy = float(accuracy_score(y_test, pipeline.predict(x_test)))
+        classes = list(pipeline.named_steps["classifier"].classes_)
+        train_report = evaluation_report(y_train, pipeline.predict(x_train), classes)
+        test_report = evaluation_report(y_test, pipeline.predict(x_test), classes)
+        train_accuracy = train_report["accuracy"]
+        test_accuracy = test_report["accuracy"]
     else:
         pipeline.fit(features, labels)
+        warnings.append("not enough stratified samples for a held-out classification report")
 
     output_path = Path(args.out)
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -154,6 +199,7 @@ def main() -> None:
         "featureNames": FEATURE_NAMES,
         "pipeline": pipeline,
         "classes": list(pipeline.named_steps["classifier"].classes_),
+        "classDistribution": distribution,
         "thresholds": {
             "lowMax": float(low_threshold),
             "mediumMax": float(high_threshold),
@@ -161,12 +207,36 @@ def main() -> None:
         "sampleCount": len(rows),
         "trainAccuracy": train_accuracy,
         "testAccuracy": test_accuracy,
+        "trainReport": train_report,
+        "testReport": test_report,
+        "warnings": warnings,
+        "modelCard": {
+            "generatedAt": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
+            "modelVersion": MODEL_VERSION,
+            "dataSources": {
+                "primary": "local MotionAnalysis MySQL running activities with activity_training_load",
+                "externalReference": None,
+            },
+            "labelPolicy": "activity_training_load split into low/medium/high by local tertiles",
+            "sampleCount": len(rows),
+        },
     }
     joblib.dump(bundle, output_path)
 
     metadata = {key: value for key, value in bundle.items() if key != "pipeline"}
     metadata_path = output_path.with_name("running_model_metadata.json")
     metadata_path.write_text(json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8")
+    output_path.with_name("running_training_report.json").write_text(json.dumps({
+        "modelVersion": MODEL_VERSION,
+        "sampleCount": len(rows),
+        "featureNames": FEATURE_NAMES,
+        "classDistribution": distribution,
+        "thresholds": bundle["thresholds"],
+        "warnings": warnings,
+        "trainReport": train_report,
+        "testReport": test_report,
+        "modelCard": bundle["modelCard"],
+    }, ensure_ascii=False, indent=2), encoding="utf-8")
     print(json.dumps(metadata, ensure_ascii=False, indent=2))
 
 

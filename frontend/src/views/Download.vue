@@ -7,18 +7,15 @@
       </div>
 
       <div class="download-hero">
-        <p class="overline">安卓应用</p>
         <h1>下载 MotionCare</h1>
-        <p>在手机上记录运动、同步训练数据，并查看恢复状态。</p>
       </div>
 
-      <ServerHealthBadge />
+      <ServerHealthBadge compact :show-caption="false" :show-detail="false" />
 
       <a class="download-primary" href="/downloads/motioncare-release.apk" download>
         <DownloadIcon :size="20" />
         <span>
           <strong>下载安卓版 APK</strong>
-          <small>来自当前 MotionCare 服务器</small>
         </span>
       </a>
 
@@ -27,7 +24,7 @@
         <span>返回主页</span>
       </RouterLink>
 
-      <p class="download-note">请在安卓手机浏览器打开本页后下载并安装。</p>
+      <p class="download-note">如果无法安装，请检查是否允许安装未知来源应用。</p>
     </section>
   </main>
 </template>
@@ -39,6 +36,23 @@ import ServerHealthBadge from '@/components/ServerHealthBadge.vue'
 </script>
 
 <style scoped>
+.download-hero {
+  padding-top: 16px;
+}
+
+.download-primary {
+  min-height: 64px;
+}
+
+.download-primary span {
+  align-items: center;
+}
+
+.download-primary strong {
+  font-size: 17px;
+  line-height: 1.2;
+}
+
 .download-return {
   min-height: 44px;
   display: inline-flex;

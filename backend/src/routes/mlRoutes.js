@@ -3,6 +3,7 @@ const { spawn } = require('node:child_process');
 const express = require('express');
 const config = require('../config');
 const defaultAuthService = require('../services/authService');
+const performanceProfileService = require('../services/performanceProfileService');
 const { ApiError } = require('../errors');
 const { asyncHandler } = require('../http');
 const { authenticate } = require('../middleware/authMiddleware');
@@ -119,6 +120,15 @@ async function getHealth() {
   };
 }
 
+async function getMlHealth() {
+  const running = await getHealth();
+  const performanceProfile = await performanceProfileService.getHealth();
+  return {
+    ...running,
+    performanceProfile
+  };
+}
+
 function runPrediction(payload) {
   return new Promise((resolve, reject) => {
     if (!fs.existsSync(config.ml.modelPath)) {
@@ -177,7 +187,8 @@ function runPrediction(payload) {
 const defaultMlService = {
   FEATURE_NAMES,
   MODEL_VERSION,
-  getHealth,
+  getHealth: getMlHealth,
+  getPerformanceProfile: performanceProfileService.getPerformanceProfile,
   runPrediction
 };
 
@@ -200,6 +211,18 @@ function createMlRouter(mlService = defaultMlService, authService = defaultAuthS
       const features = parseRunningFeatures(req.body, mlService.FEATURE_NAMES);
       const prediction = await mlService.runPrediction(features);
       sendData(res, prediction);
+    })
+  );
+
+  router.get(
+    '/ml/performance-profile',
+    requireAuth,
+    asyncHandler(async (req, res) => {
+      if (typeof mlService.getPerformanceProfile !== 'function') {
+        throw new ApiError(503, 'performance profile is not available', 'MODEL_UNAVAILABLE');
+      }
+      const profile = await mlService.getPerformanceProfile(req.user);
+      sendData(res, profile);
     })
   );
 

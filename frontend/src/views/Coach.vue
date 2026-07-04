@@ -15,7 +15,7 @@
       <div class="section-heading">
         <div>
           <p class="overline">每日简报</p>
-          <h2>恢复建议</h2>
+          <h2>训练建议</h2>
         </div>
         <span class="status-chip">{{ modelStatus.label }}</span>
       </div>
@@ -47,7 +47,7 @@
 
       <div class="coach-ml-score">
         <span>
-          <small>准备度</small>
+          <small>训练指数</small>
           <strong>{{ readinessScoreDisplay }}</strong>
         </span>
         <div class="coach-ml-score__track" :style="{ '--score-position': `${readinessScoreValue}%` }">

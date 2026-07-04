@@ -24,7 +24,7 @@ database/shared/uploads.zip
 导入后登录：
 
 ```text
-demo@example.com / 123456
+name@motioncare.com / 123456
 ```
 
 注意：这个脚本会重建本地 `MotionAnalysis`。

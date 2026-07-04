@@ -16,17 +16,14 @@
 
       <div class="auth-heading auth-heading--center">
         <h1>欢迎回来</h1>
-        <p>登录后查看训练记录与恢复状态。</p>
       </div>
-
-      <ServerHealthBadge />
 
       <form class="auth-form" @submit.prevent="submit">
         <label>
           <span>邮箱</span>
           <div class="input-with-icon">
             <Mail :size="18" />
-            <input v-model.trim="form.email" type="email" autocomplete="email" placeholder="name@example.com" required />
+            <input v-model.trim="form.email" type="email" autocomplete="email" placeholder="name@motioncare.com" required />
           </div>
         </label>
 
@@ -59,6 +56,7 @@
       <p class="auth-switch">
         还没有账号？
         <RouterLink :to="{ name: 'register', query: route.query }">立即注册</RouterLink>
+        <RouterLink :to="{ name: 'download' }">下载APK</RouterLink>
       </p>
     </section>
   </main>
@@ -69,7 +67,6 @@ import { reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Eye, EyeOff, LockKeyhole, LogIn, Mail } from '@lucide/vue'
 
-import ServerHealthBadge from '@/components/ServerHealthBadge.vue'
 import { authSession, normalizeRedirect, signIn } from '@/stores/authStore'
 
 const route = useRoute()
@@ -106,3 +103,20 @@ async function submit() {
   }
 }
 </script>
+
+<style scoped>
+.auth-switch {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.auth-switch a + a::before {
+  content: "·";
+  margin-right: 8px;
+  color: var(--muted);
+  font-weight: 700;
+}
+</style>

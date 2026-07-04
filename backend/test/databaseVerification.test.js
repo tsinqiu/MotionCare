@@ -47,8 +47,8 @@ test('database verification accepts the required application schema', async () =
   assert.ok(result.checkedTables >= 8);
 });
 
-test('database verification requires raw activity JSON used by manual and live activity writes', () => {
-  assert.ok(REQUIRED_SCHEMA.Activities.columns.includes('raw_json'));
+test('database verification does not require removed raw activity JSON', () => {
+  assert.equal(REQUIRED_SCHEMA.Activities.columns.includes('raw_json'), false);
 });
 
 test('database verification requires shoe columns used by equipment flows', () => {
@@ -62,6 +62,19 @@ test('database verification requires shoe columns used by equipment flows', () =
       'initial_distance_km',
       'price'
     ].every((column) => REQUIRED_SCHEMA.Shoes.columns.includes(column)),
+    true
+  );
+});
+
+test('database verification requires track point quality columns used by activity detail', () => {
+  assert.deepEqual(
+    [
+      'accuracy_m',
+      'bearing_deg',
+      'provider',
+      'is_accepted',
+      'reject_reason'
+    ].every((column) => REQUIRED_SCHEMA.TrackPoints.columns.includes(column)),
     true
   );
 });
@@ -94,6 +107,7 @@ test('database verification reports missing security schema with migration guida
       assert.match(error.message, /LoginAttempts\.ip_address/);
       assert.match(error.message, /IX_SecurityEvents_type_time/);
       assert.match(error.message, /17_security_hardening\.sql/);
+      assert.match(error.message, /19_live_workout_location_quality\.sql/);
       return true;
     }
   );

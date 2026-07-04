@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const request = require('supertest');
 const createApp = require('../src/app');
+const config = require('../src/config');
 const db = require('../src/db');
 const statsCache = require('../src/cache/statsCache');
 const activityServiceModule = require('../src/services/activityService');
@@ -66,7 +67,37 @@ function buildApp(overrides = {}) {
       'avgStrideLengthCm',
       'normalizedPowerW'
     ],
-    getHealth: async () => ({ status: 'ok', modelVersion: 'running-v1' }),
+    getHealth: async () => ({
+      status: 'ok',
+      modelVersion: 'running-v1',
+      performanceProfile: { status: 'ok', modelVersion: 'performance-v1' }
+    }),
+    getPerformanceProfile: async (user) => ({
+      trainingIndex: {
+        score: 68,
+        level: 'steady',
+        label: '稳态训练',
+        recommendation: '适合中低强度有氧。',
+        factors: ['负荷整体可控']
+      },
+      runningPower: {
+        score: 72,
+        level: 'strong',
+        label: '强劲',
+        trend: 'stable',
+        factors: ['VO2max 较高']
+      },
+      fivePower: [
+        { key: 'endurance', label: '耐力', score: 74 },
+        { key: 'speed', label: '速度', score: 70 },
+        { key: 'technique', label: '技术', score: 62 },
+        { key: 'strength', label: '肌力', score: 65 },
+        { key: 'stability', label: '稳定', score: 58 }
+      ],
+      dataQuality: { score: 82, warnings: [] },
+      model: { modelVersion: 'performance-v1', provider: 'local_performance_model', confidence: 0.8 },
+      userId: user.id
+    }),
     runPrediction: async () => ({
       predictedTrainingLoadLevel: 'medium',
       fatigueRisk: 'medium',
@@ -933,6 +964,27 @@ test('GET /api/ml/health returns model status', async () => {
   assert.equal(response.status, 200);
   assert.equal(response.body.data.status, 'ok');
   assert.equal(response.body.data.modelVersion, 'running-v1');
+  assert.equal(response.body.data.performanceProfile.modelVersion, 'performance-v1');
+});
+
+test('GET /api/ml/performance-profile requires login', async () => {
+  const response = await request(buildApp()).get('/api/ml/performance-profile');
+
+  assert.equal(response.status, 401);
+  assert.equal(response.body.error.code, 'AUTH_REQUIRED');
+});
+
+test('GET /api/ml/performance-profile returns training index and running power for current user', async () => {
+  const response = await request(buildApp())
+    .get('/api/ml/performance-profile')
+    .set('Authorization', 'Bearer valid-user-token');
+
+  assert.equal(response.status, 200);
+  assert.equal(response.body.data.userId, 2);
+  assert.equal(response.body.data.trainingIndex.score, 68);
+  assert.equal(response.body.data.runningPower.score, 72);
+  assert.equal(response.body.data.fivePower.length, 5);
+  assert.equal(response.body.data.model.modelVersion, 'performance-v1');
 });
 
 test('POST /api/ml/running-prediction requires login', async () => {
@@ -1061,7 +1113,7 @@ test('POST /api/ml/running-prediction allows local API origin', async () => {
   const response = await request(buildApp())
     .post('/api/ml/running-prediction')
     .set('Authorization', 'Bearer valid-user-token')
-    .set('Origin', 'http://127.0.0.1:8089')
+    .set('Origin', `http://127.0.0.1:${config.server.port}`)
     .send(payload);
 
   assert.equal(response.status, 200);

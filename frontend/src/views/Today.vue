@@ -59,34 +59,30 @@
     <template v-else>
       <p v-if="errors.length" class="soft-note">部分内容暂时不可用，已用现有数据为你生成建议。</p>
 
-      <section class="rq-overview-panel">
+      <section class="rq-overview-panel training-index-panel">
         <div class="rq-overview-panel__top">
-          <p class="overline">训练总览</p>
-          <span class="status-chip" :class="statusBadge.tone">{{ statusBadge.label }}</span>
+          <p class="overline training-index-greeting">晚上好</p>
+          <span class="status-chip" :class="trainingIndexTone">{{ trainingIndexLabel }}</span>
         </div>
         <div class="rq-overview-panel__score">
-          <span>当前训练指数</span>
-          <strong>{{ currentTrainingIndexDisplay }}</strong>
+          <span>训练指数</span>
+          <strong>{{ trainingIndexDisplay }}</strong>
         </div>
-        <div class="score-band" :style="trainingIndexStyle" aria-label="当前训练指数">
-          <span class="score-band__segment score-band__segment--base">恢复</span>
-          <span class="score-band__segment score-band__segment--steady">建设</span>
-          <span class="score-band__segment score-band__segment--strong">推进</span>
-          <span class="score-band__segment score-band__segment--peak">风险</span>
+        <div class="performance-gradient-track" :style="trainingIndexStyle" aria-label="训练指数">
+          <span>恢复</span>
+          <span>稳态</span>
+          <span>训练</span>
           <i class="score-band__marker" aria-hidden="true"></i>
         </div>
-        <div class="rq-overview-panel__stats">
-          <span><small>体能储备</small><b>{{ metricValue(currentLoad.ctl) }}</b></span>
-          <span><small>疲劳负荷</small><b>{{ metricValue(currentLoad.atl) }}</b></span>
-          <span><small>状态余量</small><b>{{ metricValue(currentLoad.tsb) }}</b></span>
-          <span><small>最近训练</small><b>{{ recentActivities.length }}</b></span>
+        <div class="training-index-copy">
+          <h2>{{ recommendationHeadline }}</h2>
+          <p>{{ recommendationText }}</p>
         </div>
-      </section>
-
-      <section class="rq-daily-advice">
-        <p class="overline">每日建议 · {{ greeting }}</p>
-        <h2>{{ recommendationHeadline }}</h2>
-        <p>{{ recommendationText }}</p>
+        <div class="rq-overview-panel__stats">
+          <span><small>体能（CTL）</small><b>{{ metricValue(currentLoad.ctl) }}</b></span>
+          <span><small>疲劳（ATL）</small><b>{{ metricValue(currentLoad.atl) }}</b></span>
+          <span><small>状态（TSB）</small><b>{{ metricValue(currentLoad.tsb) }}</b></span>
+        </div>
       </section>
 
       <section class="microcycle-panel">
@@ -130,12 +126,14 @@ import MetricCard from '@/components/MetricCard.vue'
 import StateBlock from '@/components/StateBlock.vue'
 import { getDailyBrief } from '@/services/ai'
 import { getDashboardOverview, getTodayHealth } from '@/services/dashboard'
+import { getPerformanceProfile } from '@/services/performance'
 import { deriveStatusBadge } from '@/utils/productInsights'
 
 const router = useRouter()
 const overview = ref({ recentActivities: [], monthlySummary: {}, yearlySummary: {}, trainingLoad: [] })
 const health = ref({})
 const brief = ref(null)
+const performanceProfile = ref(null)
 const loading = ref(false)
 const errors = ref([])
 const briefAvailable = ref(false)
@@ -153,29 +151,26 @@ const hasData = computed(() => (
   || (overview.value.trainingLoad || []).length > 0
 ))
 const recommendationHeadline = computed(() => brief.value?.headline || statusBadge.value.label)
-const recommendationText = computed(() => brief.value?.recommendation || statusBadge.value.message)
-const greeting = computed(() => {
-  const hour = new Date().getHours()
-  if (hour < 6) return '凌晨好，注意休息'
-  if (hour < 11) return '早上好，今天适合怎么运动'
-  if (hour < 14) return '中午好，今天适合怎么运动'
-  if (hour < 18) return '下午好，今天适合怎么运动'
-  return '晚上好，回顾今天的状态'
+const recommendationText = computed(() => trainingIndex.value?.recommendation || brief.value?.recommendation || statusBadge.value.message)
+const trainingIndex = computed(() => performanceProfile.value?.trainingIndex || null)
+const trainingIndexScore = computed(() => {
+  const fromProfile = Number(trainingIndex.value?.score)
+  if (Number.isFinite(fromProfile)) return Math.max(0, Math.min(100, Math.round(fromProfile)))
+  const fromBrief = Number(brief.value?.ml?.trainingIndexScore ?? brief.value?.ml?.readinessScore)
+  return Number.isFinite(fromBrief) ? Math.max(0, Math.min(100, Math.round(fromBrief))) : null
 })
-const currentTrainingIndex = computed(() => {
-  const ctl = Number(currentLoad.value.ctl)
-  const atl = Number(currentLoad.value.atl)
-  const tsb = Number(currentLoad.value.tsb)
-  if (![ctl, atl, tsb].some(Number.isFinite)) return null
-
-  const fitness = Number.isFinite(ctl) ? ctl : 45
-  const fatigueControl = Number.isFinite(atl) ? Math.max(0, 100 - Math.min(atl, 100)) * 0.18 : 6
-  const freshness = Number.isFinite(tsb) ? Math.max(-12, Math.min(12, tsb)) * 0.45 : 0
-  return Math.round(Math.max(0, Math.min(100, fitness + fatigueControl + freshness)))
+const trainingIndexDisplay = computed(() => trainingIndexScore.value ?? '--')
+const trainingIndexLabel = computed(() => trainingIndex.value?.label || brief.value?.ml?.trainingIndexLabel || statusBadge.value.label)
+const trainingIndexTone = computed(() => {
+  const score = trainingIndexScore.value
+  if (score === null) return statusBadge.value.tone
+  if (score < 45) return 'danger'
+  if (score < 65) return 'warning'
+  if (score < 80) return 'steady'
+  return 'good'
 })
-const currentTrainingIndexDisplay = computed(() => currentTrainingIndex.value ?? '--')
 const trainingIndexStyle = computed(() => ({
-  '--score-position': `${currentTrainingIndex.value ?? 0}%`,
+  '--score-position': `${trainingIndexScore.value ?? 0}%`,
 }))
 const emptyLoadBars = computed(() => ['一', '二', '三', '四', '五', '六', '日'].map((label, index) => ({
   key: `empty-${index}`,
@@ -281,6 +276,7 @@ async function loadToday() {
     getDashboardOverview(),
     getTodayHealth(),
     getDailyBrief(),
+    getPerformanceProfile(),
   ])
 
   if (results[0].status === 'fulfilled') overview.value = results[0].value
@@ -299,6 +295,12 @@ async function loadToday() {
   } else {
     brief.value = null
     errors.value.push('个性化建议暂时不可用')
+  }
+  if (results[3].status === 'fulfilled') {
+    performanceProfile.value = results[3].value
+  } else {
+    performanceProfile.value = null
+    errors.value.push('训练指数模型暂时不可用')
   }
   loading.value = false
 }
@@ -347,6 +349,139 @@ onMounted(loadToday)
 .rq-daily-advice small {
   color: var(--faint);
   font-size: 12px;
+}
+
+.training-index-panel {
+  gap: 16px;
+  padding: 20px 18px 22px;
+}
+
+.training-index-panel .rq-overview-panel__top {
+  align-items: center;
+}
+
+.training-index-panel .status-chip {
+  padding-inline: 15px;
+}
+
+.training-index-greeting {
+  margin: 0;
+  color: var(--app-green);
+  font-size: 17px;
+  font-weight: 900;
+  letter-spacing: 0;
+}
+
+.training-index-panel .rq-overview-panel__score {
+  align-items: end;
+  margin-top: 2px;
+}
+
+.training-index-panel .rq-overview-panel__score span {
+  color: var(--muted);
+  font-size: 16px;
+  font-weight: 900;
+}
+
+.training-index-panel .rq-overview-panel__score strong {
+  letter-spacing: 0;
+  line-height: 0.9;
+}
+
+.performance-gradient-track {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: center;
+  min-height: 40px;
+  overflow: visible;
+  border-radius: 999px;
+  background:
+    linear-gradient(90deg, rgb(255 255 255 / 0.2), rgb(255 255 255 / 0)),
+    linear-gradient(90deg, #38bdf8 0%, #16c784 47%, #f59e0b 76%, #ef4444 100%);
+  box-shadow:
+    inset 0 0 0 1px rgb(255 255 255 / 0.2),
+    0 8px 18px rgb(16 185 129 / 0.14);
+}
+
+.performance-gradient-track span {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 900;
+  text-align: center;
+  text-shadow: 0 1px 2px rgb(0 0 0 / 0.18);
+}
+
+.performance-gradient-track .score-band__marker {
+  top: 50%;
+  left: var(--score-position);
+  width: 18px;
+  height: 18px;
+  border: 3px solid #fff;
+  border-radius: 999px;
+  background: var(--app-green-dark);
+  box-shadow:
+    0 0 0 3px rgb(16 185 129 / 0.16),
+    0 6px 14px rgb(15 23 42 / 0.24);
+  transform: translate(-50%, -50%);
+}
+
+.performance-gradient-track .score-band__marker::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -8px;
+  width: 3px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--app-green-dark);
+  transform: translateX(-50%);
+}
+
+.training-index-copy {
+  display: grid;
+  gap: 6px;
+  padding-top: 2px;
+}
+
+.training-index-copy h2 {
+  margin: 0;
+  font-size: 27px;
+  line-height: 1.18;
+}
+
+.training-index-copy p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1.55;
+}
+
+.training-index-panel .rq-overview-panel__stats {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 2px;
+}
+
+.training-index-panel .rq-overview-panel__stats span {
+  padding: 13px 12px;
+  border: 1px solid color-mix(in srgb, var(--app-green) 10%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--app-green) 7%, var(--panel-soft));
+}
+
+.training-index-panel .rq-overview-panel__stats small {
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.training-index-panel .rq-overview-panel__stats b {
+  color: var(--text);
+  font-size: 17px;
+  line-height: 1.15;
 }
 
 .today-empty-rq-panel,

@@ -71,7 +71,7 @@ GARMIN_NON_INTERACTIVE=0
 导入后演示账号：
 
 ```text
-demo@example.com / 123456
+name@motioncare.com / 123456
 ```
 
 ## 启动服务

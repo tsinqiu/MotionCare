@@ -10,6 +10,7 @@ import Download from '@/views/Download.vue'
 import HealthDetail from '@/views/HealthDetail.vue'
 import Login from '@/views/Login.vue'
 import Me from '@/views/Me.vue'
+import PerformanceDetail from '@/views/PerformanceDetail.vue'
 import RecordActivity from '@/views/RecordActivity.vue'
 import Records from '@/views/Records.vue'
 import Register from '@/views/Register.vue'
@@ -92,6 +93,12 @@ const routes = [
     name: 'status-health',
     component: HealthDetail,
     meta: { title: '健康详情', requiresAuth: true, backTo: '/status' },
+  },
+  {
+    path: '/status/performance',
+    name: 'status-performance',
+    component: PerformanceDetail,
+    meta: { title: '跑力详情', requiresAuth: true, backTo: '/status' },
   },
   {
     path: '/status/training-load',
