@@ -403,7 +403,12 @@ POST /api/workouts/:id/finish
 POST /api/workouts/:id/cancel
 ```
 
-`finish` creates a real activity with `data_source="live_workout"`, writes summaries, and copies collected workout points into `TrackPoints`. Finishing a workout clears the stats cache.
+Track point batches may include `accuracyM`, `bearingDeg`, `provider`,
+`isAccepted`, and `rejectReason` in addition to coordinates, distance, speed, and
+sensor fields. `finish` creates a real activity with `data_source="live_workout"`,
+recomputes canonical distance from accepted GPS points, writes summaries, and
+copies collected workout points into `TrackPoints`. Finishing a workout clears
+the stats cache.
 
 ## ML Running Prediction
 
@@ -514,3 +519,13 @@ source database/sql/06_extension_modules.sql;
 ```
 
 The extension migration uses `CREATE TABLE IF NOT EXISTS` and can be re-run safely.
+
+Apply the live workout location-quality migration before using native APK workout
+recording:
+
+```sql
+source database/sql/19_live_workout_location_quality.sql;
+```
+
+The migration is idempotent and adds GPS quality metadata used for filtering,
+debugging, and route display.

@@ -174,6 +174,11 @@ CREATE TABLE TrackPoints (
     altitude_m DOUBLE NULL,
     distance_m DOUBLE NULL,
     speed_mps DOUBLE NULL,
+    accuracy_m DOUBLE NULL,
+    bearing_deg DOUBLE NULL,
+    provider VARCHAR(40) NULL,
+    is_accepted BOOLEAN NULL,
+    reject_reason VARCHAR(80) NULL,
     heart_rate_bpm INT NULL,
     cadence DOUBLE NULL,
     power_w INT NULL,
@@ -257,4 +262,3 @@ CREATE INDEX IX_TrackPoints_activity_time ON TrackPoints(activity_id, sample_tim
 CREATE INDEX IX_TrackPoints_activity_distance ON TrackPoints(activity_id, distance_m);
 CREATE INDEX IX_DailyHealthSummaries_user_date ON DailyHealthSummaries(user_id, summary_date);
 CREATE INDEX IX_SleepSummaries_user_date ON SleepSummaries(user_id, sleep_date);
-

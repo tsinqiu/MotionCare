@@ -1671,6 +1671,49 @@ test('POST /api/workouts/:id/track-points accepts batch points', async () => {
   assert.equal(captured.user.id, 2);
 });
 
+test('POST /api/workouts/:id/track-points accepts location quality metadata', async () => {
+  let captured;
+  const app = buildApp({
+    workoutService: {
+      createWorkout: async () => ({}),
+      getWorkout: async () => ({}),
+      appendTrackPoints: async (id, points, user) => {
+        captured = { id, points, user };
+        return { workoutId: id, inserted: points.length };
+      },
+      pauseWorkout: async () => ({}),
+      resumeWorkout: async () => ({}),
+      finishWorkout: async () => ({}),
+      cancelWorkout: async () => ({})
+    }
+  });
+
+  const response = await request(app)
+    .post('/api/workouts/8/track-points')
+    .set('Authorization', 'Bearer valid-user-token')
+    .send({
+      trackPoints: [
+        {
+          sampleTimeUtc: '2026-06-12 08:00:00.000',
+          latitude: 31.2,
+          longitude: 121.4,
+          accuracyM: 8.5,
+          bearingDeg: 92,
+          provider: 'native-fused',
+          isAccepted: false,
+          rejectReason: 'gps_drift'
+        }
+      ]
+    });
+
+  assert.equal(response.status, 201);
+  assert.equal(captured.points[0].accuracyM, 8.5);
+  assert.equal(captured.points[0].bearingDeg, 92);
+  assert.equal(captured.points[0].provider, 'native-fused');
+  assert.equal(captured.points[0].isAccepted, false);
+  assert.equal(captured.points[0].rejectReason, 'gps_drift');
+});
+
 test('POST /api/workouts/:id/track-points rejects empty batch', async () => {
   const response = await request(buildApp())
     .post('/api/workouts/8/track-points')
@@ -2101,6 +2144,96 @@ test('workoutService finish writes activity summary and track points', async () 
     assert.ok(writes.some((entry) => entry.sql.includes('INSERT INTO ActivitySummaries')));
     assert.ok(writes.some((entry) => entry.sql.includes('INSERT INTO TrackPoints')));
     assert.ok(writes.some((entry) => entry.sql.includes("data_source, is_manual, match_status")));
+  } finally {
+    db.transaction = originalTransaction;
+    db.query = originalQuery;
+  }
+});
+
+test('workoutService finish recomputes distance from accepted points instead of trusting payload', async () => {
+  const originalTransaction = db.transaction;
+  const originalQuery = db.query;
+  const writes = [];
+
+  db.transaction = async (handler) => {
+    const connection = {
+      query: async (sql, params = []) => {
+        writes.push({ sql, params });
+        if (sql.includes('FROM WorkoutSessions')) {
+          return [[{
+            id: 7,
+            userId: 2,
+            activityType: 'running',
+            status: 'active',
+            startedAt: '2026-06-12 08:00:00.000',
+            pausedDurationS: 0
+          }]];
+        }
+        if (sql.includes('FROM WorkoutTrackPoints')) {
+          return [[
+            {
+              sampleIndex: 0,
+              sampleTimeUtc: '2026-06-12 08:00:00.000',
+              latitude: 31.2,
+              longitude: 121.4,
+              accuracyM: 8,
+              distanceM: 0,
+              speedMps: 2.5,
+              isAccepted: true
+            },
+            {
+              sampleIndex: 1,
+              sampleTimeUtc: '2026-06-12 08:00:04.000',
+              latitude: 32.2,
+              longitude: 122.4,
+              accuracyM: 120,
+              distanceM: 5000,
+              speedMps: 30,
+              isAccepted: false,
+              rejectReason: 'gps_jump'
+            },
+            {
+              sampleIndex: 2,
+              sampleTimeUtc: '2026-06-12 08:00:10.000',
+              latitude: 31.2001,
+              longitude: 121.4001,
+              accuracyM: 9,
+              distanceM: 5005,
+              speedMps: 2.6,
+              isAccepted: true
+            }
+          ]];
+        }
+        if (sql.includes('INSERT INTO Activities')) {
+          return [{ insertId: 99 }];
+        }
+        return [{}];
+      }
+    };
+    return handler(connection);
+  };
+  db.query = async () => [{
+    id: 7,
+    userId: 2,
+    activityType: 'running',
+    status: 'finished',
+    startedAt: '2026-06-12 08:00:00.000',
+    pausedDurationS: 0,
+    finishedAt: '2026-06-12 08:00:10.000',
+    activityId: 99
+  }];
+
+  try {
+    await workoutServiceModule.finishWorkout(
+      7,
+      { activityName: 'Live Run', distanceM: 5000, durationS: 10 },
+      { id: 2, role: 'user' }
+    );
+
+    const summaryWrite = writes.find((entry) => entry.sql.includes('INSERT INTO ActivitySummaries'));
+    assert.ok(summaryWrite);
+    assert.ok(summaryWrite.params[4] > 10);
+    assert.ok(summaryWrite.params[4] < 30);
   } finally {
     db.transaction = originalTransaction;
     db.query = originalQuery;

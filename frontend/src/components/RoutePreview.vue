@@ -37,6 +37,8 @@ let markerLayer = null
 
 const EARTH_RADIUS_M = 6371000
 const FALLBACK_ROUTE_COLOR = '#21d47b'
+const MAP_PROVIDER = import.meta.env.VITE_MAP_PROVIDER || 'amap'
+const MAP_TILE_URL = import.meta.env.VITE_MAP_TILE_URL
 const SPEED_COLOR_STOPS = [
   { at: 0, color: [37, 99, 235] },
   { at: 0.25, color: [6, 182, 212] },
@@ -44,6 +46,24 @@ const SPEED_COLOR_STOPS = [
   { at: 0.75, color: [245, 158, 11] },
   { at: 1, color: [239, 68, 68] },
 ]
+
+const TILE_CONFIGS = {
+  amap: {
+    url: MAP_TILE_URL || 'https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}',
+    options: {
+      subdomains: ['1', '2', '3', '4'],
+      maxZoom: 19,
+      attribution: '&copy; AMap',
+    },
+  },
+  osm: {
+    url: MAP_TILE_URL || 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    options: {
+      maxZoom: 19,
+      attribution: '&copy; OpenStreetMap contributors',
+    },
+  },
+}
 
 function toCoordinate(value) {
   if (value === null || value === undefined || value === '') return null
@@ -67,6 +87,12 @@ function toTimestamp(value) {
   if (!value) return null
   const timestamp = Date.parse(value)
   return Number.isFinite(timestamp) ? timestamp : null
+}
+
+function toBoolean(value) {
+  if (value === true || value === 1 || value === '1' || value === 'true') return true
+  if (value === false || value === 0 || value === '0' || value === 'false') return false
+  return null
 }
 
 function toRadians(value) {
@@ -132,14 +158,52 @@ function distanceBetween(a, b) {
 function interpolatePoint(before, after, targetDistanceM) {
   const span = after.distanceM - before.distanceM
   if (span <= 0) {
-    return { latitude: after.latitude, longitude: after.longitude }
+    return { latitude: after.displayLatitude, longitude: after.displayLongitude }
   }
 
   const ratio = Math.min(Math.max((targetDistanceM - before.distanceM) / span, 0), 1)
   return {
-    latitude: before.latitude + (after.latitude - before.latitude) * ratio,
-    longitude: before.longitude + (after.longitude - before.longitude) * ratio,
+    latitude: before.displayLatitude + (after.displayLatitude - before.displayLatitude) * ratio,
+    longitude: before.displayLongitude + (after.displayLongitude - before.displayLongitude) * ratio,
   }
+}
+
+function isInChina(latitude, longitude) {
+  return longitude >= 72.004 && longitude <= 137.8347 && latitude >= 0.8293 && latitude <= 55.8271
+}
+
+function transformLat(x, y) {
+  let value = -100 + 2 * x + 3 * y + 0.2 * y * y + 0.1 * x * y + 0.2 * Math.sqrt(Math.abs(x))
+  value += ((20 * Math.sin(6 * x * Math.PI) + 20 * Math.sin(2 * x * Math.PI)) * 2) / 3
+  value += ((20 * Math.sin(y * Math.PI) + 40 * Math.sin((y / 3) * Math.PI)) * 2) / 3
+  value += ((160 * Math.sin((y / 12) * Math.PI) + 320 * Math.sin((y * Math.PI) / 30)) * 2) / 3
+  return value
+}
+
+function transformLon(x, y) {
+  let value = 300 + x + 2 * y + 0.1 * x * x + 0.1 * x * y + 0.1 * Math.sqrt(Math.abs(x))
+  value += ((20 * Math.sin(6 * x * Math.PI) + 20 * Math.sin(2 * x * Math.PI)) * 2) / 3
+  value += ((20 * Math.sin(x * Math.PI) + 40 * Math.sin((x / 3) * Math.PI)) * 2) / 3
+  value += ((150 * Math.sin((x / 12) * Math.PI) + 300 * Math.sin((x / 30) * Math.PI)) * 2) / 3
+  return value
+}
+
+function toDisplayCoordinate(latitude, longitude) {
+  if (MAP_PROVIDER !== 'amap' || !isInChina(latitude, longitude)) {
+    return { latitude, longitude }
+  }
+
+  const axis = 6378245
+  const offset = 0.006693421622965943
+  let dLat = transformLat(longitude - 105, latitude - 35)
+  let dLon = transformLon(longitude - 105, latitude - 35)
+  const radLat = (latitude / 180) * Math.PI
+  let magic = Math.sin(radLat)
+  magic = 1 - offset * magic * magic
+  const sqrtMagic = Math.sqrt(magic)
+  dLat = (dLat * 180) / (((axis * (1 - offset)) / (magic * sqrtMagic)) * Math.PI)
+  dLon = (dLon * 180) / ((axis / sqrtMagic) * Math.cos(radLat) * Math.PI)
+  return { latitude: latitude + dLat, longitude: longitude + dLon }
 }
 
 const validPoints = computed(() =>
@@ -150,7 +214,8 @@ const validPoints = computed(() =>
       const sourceDistanceM = toDistance(point.distance_m ?? point.distanceM)
       const speedMps = toPositiveNumber(point.speed_mps ?? point.speedMps)
       const timestampMs = toTimestamp(point.sample_time_utc ?? point.sampleTimeUtc)
-      return { latitude, longitude, sourceDistanceM, speedMps, timestampMs }
+      const isAccepted = toBoolean(point.is_accepted ?? point.isAccepted)
+      return { latitude, longitude, sourceDistanceM, speedMps, timestampMs, isAccepted }
     })
     .filter((point) =>
       point.latitude !== null
@@ -159,6 +224,7 @@ const validPoints = computed(() =>
       && point.latitude <= 90
       && point.longitude >= -180
       && point.longitude <= 180
+      && point.isAccepted !== false
     )
     .reduce((points, point, index) => {
       const previous = points.at(-1)
@@ -173,9 +239,12 @@ const validPoints = computed(() =>
         ? point.sourceDistanceM
         : fallbackDistanceM
 
+      const display = toDisplayCoordinate(point.latitude, point.longitude)
       points.push({
         latitude: point.latitude,
         longitude: point.longitude,
+        displayLatitude: display.latitude,
+        displayLongitude: display.longitude,
         distanceM: index === 0 ? 0 : distanceM,
         speedMps: point.speedMps,
         timestampMs: point.timestampMs,
@@ -184,7 +253,7 @@ const validPoints = computed(() =>
     }, []),
 )
 
-const latLngs = computed(() => validPoints.value.map((point) => [point.latitude, point.longitude]))
+const latLngs = computed(() => validPoints.value.map((point) => [point.displayLatitude, point.displayLongitude]))
 
 const routeSegments = computed(() => {
   if (validPoints.value.length < 2) return []
@@ -202,8 +271,8 @@ const routeSegments = computed(() => {
 
     return {
       latLngs: [
-        [previous.latitude, previous.longitude],
-        [point.latitude, point.longitude],
+        [previous.displayLatitude, previous.displayLongitude],
+        [point.displayLatitude, point.displayLongitude],
       ],
       speedMps,
     }
@@ -284,10 +353,8 @@ function ensureMap() {
     zoomControl: true,
   })
 
-  tileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 19,
-    attribution: '&copy; OpenStreetMap contributors',
-  }).addTo(map)
+  const tileConfig = TILE_CONFIGS[MAP_PROVIDER] || TILE_CONFIGS.osm
+  tileLayer = L.tileLayer(tileConfig.url, tileConfig.options).addTo(map)
 }
 
 function clearLayers() {
