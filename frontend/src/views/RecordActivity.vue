@@ -19,7 +19,6 @@
             <h2>记录运动</h2>
           </div>
         </div>
-        <p>用手机定位实时记录户外训练，也可以手工补记已经完成的运动。</p>
         <div class="record-action-grid">
           <span>
             <small>实时记录</small>
@@ -42,7 +41,6 @@
           <div>
             <p class="overline">实时记录</p>
             <h2>手机定位记录</h2>
-            <p>允许定位后，按 GPS 采样保存运动轨迹。</p>
           </div>
           <button class="primary-link" type="button" @click="scrollToLiveRecorder">开始记录</button>
         </section>
@@ -51,7 +49,6 @@
           <div>
             <p class="overline">补记训练</p>
             <h2>手动添加运动</h2>
-            <p>填写类型、时间、距离和心率。</p>
           </div>
           <button class="primary-link" type="button" @click="showManualModal = true">填写运动</button>
         </section>
@@ -99,11 +96,13 @@ function handleSaved(activity) {
 </script>
 
 <style scoped>
-.record-choice-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.record-choice-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: stretch; gap: 10px; }
 .record-choice {
   display: grid;
-  align-content: start;
-  gap: 10px;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  align-content: stretch;
+  gap: 14px;
+  min-height: 156px;
   min-width: 0;
   padding: 16px;
   border-top: 4px solid var(--app-green);
@@ -125,13 +124,8 @@ function handleSaved(activity) {
   font-size: 18px;
   line-height: 1.18;
 }
-.record-choice p:not(.overline) {
-  margin: 8px 0 0;
-  color: var(--muted);
-  font-size: 13px;
-  line-height: 1.45;
-}
 .record-choice :is(.primary-link, .secondary-chip) {
+  align-self: end;
   justify-self: stretch;
   width: 100%;
 }

@@ -11,7 +11,7 @@
     "android:sync": "powershell -ExecutionPolicy Bypass -File scripts/sync-android-server.ps1",
     "android:debug": "powershell -ExecutionPolicy Bypass -File scripts/build-android-debug.ps1",
     "android:release": "powershell -ExecutionPolicy Bypass -File scripts/build-android-release.ps1",
-    "check:course": "node --test scripts/product-ia.test.mjs scripts/responsive-layout.test.mjs scripts/shoes-page-ui.test.mjs scripts/pwa-app.test.mjs scripts/capacitor-app.test.mjs scripts/launch-experience.test.mjs scripts/android-branding.test.mjs scripts/server-integration.test.mjs scripts/server-health-ui.test.mjs scripts/coach-feedback-ui.test.mjs scripts/ui-smoke-script.test.mjs && node scripts/course-delivery-check.mjs",
+    "check:course": "node --test scripts/product-ia.test.mjs scripts/responsive-layout.test.mjs scripts/navigation-cleanup.test.mjs scripts/shoes-page-ui.test.mjs scripts/pwa-app.test.mjs scripts/capacitor-app.test.mjs scripts/launch-experience.test.mjs scripts/android-branding.test.mjs scripts/server-integration.test.mjs scripts/server-health-ui.test.mjs scripts/coach-feedback-ui.test.mjs scripts/ui-smoke-script.test.mjs && node scripts/course-delivery-check.mjs",
     "test:product": "node --test scripts/product-ia.test.mjs",
     "ui:smoke": "node scripts/ui-smoke.mjs",
     "ui:smoke:auth": "node scripts/ui-smoke.mjs --register",

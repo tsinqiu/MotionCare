@@ -1,7 +1,13 @@
 <template>
   <div class="app-viewport">
     <div class="phone-frame">
-      <van-nav-bar class="app-navbar" title="MotionCare" />
+      <van-nav-bar
+        class="app-navbar"
+        :title="navTitle"
+        :left-arrow="showBack"
+        :left-text="showBack ? '返回' : ''"
+        @click-left="goBack"
+      />
 
       <main ref="scrollEl" class="page-frame">
         <RouterView v-slot="{ Component }">
@@ -53,6 +59,8 @@ const iconMap = {
   me: UserRound,
 }
 const navItems = primaryNavigation
+const showBack = computed(() => Boolean(route.meta.backTo))
+const navTitle = computed(() => (showBack.value ? route.meta.title || '返回' : 'MotionCare'))
 
 // Highlight the tab that owns the current route, including nested pages
 // (e.g. /status/health lights up 状态, /me/sync lights up 我的).
@@ -64,6 +72,10 @@ const activeTab = computed(() => {
 function goTab(name) {
   const target = navItems.find((item) => item.icon === name)
   if (target && route.path !== target.to) router.push(target.to)
+}
+
+function goBack() {
+  router.push(route.meta.backTo || '/today')
 }
 
 // The scroll container is the phone frame's body, not the window, so reset it

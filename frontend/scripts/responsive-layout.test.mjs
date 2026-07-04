@@ -135,8 +135,11 @@ test('mobile shell follows a green runner-analytics app direction', () => {
   assert.match(appCss, /\.app-tabbar\.van-tabbar\s*\{[\s\S]*?border-top:\s*1px solid color-mix\(in srgb, var\(--app-green\) 18%, transparent\)/)
 })
 
-test('global top bar stays brand-only without cross-page action links', () => {
-  assert.match(appShell, /<van-nav-bar class="app-navbar" title="MotionCare"\s*\/>/)
+test('global top bar stays brand-led while nested pages get a scoped back action', () => {
+  assert.match(appShell, /:title="navTitle"/)
+  assert.match(appShell, /:left-arrow="showBack"/)
+  assert.match(appShell, /:left-text="showBack \? '返回' : ''"/)
+  assert.match(appShell, /const navTitle = computed\(\(\) => \(showBack\.value \? route\.meta\.title \|\| '返回' : 'MotionCare'\)\)/)
   assert.doesNotMatch(appShell, /<template\s+#right/)
   assert.doesNotMatch(appShell, /app-navbar-action/)
   assert.doesNotMatch(appShell, /CirclePlus/)

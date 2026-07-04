@@ -97,7 +97,10 @@ for (const redirect of [
 
 assert.doesNotMatch(router, /component:\s*(StartWorkout|Community|Explore|Assistant|Analytics|Trends)/)
 assert.doesNotMatch(shell, /label:\s*['"](健康|运动统计|训练负荷|跑鞋|同步|AI 助手|探索|运动圈|设置)['"]/)
-assert.match(shell, /<van-nav-bar class="app-navbar" title="MotionCare"\s*\/>/)
+assert.match(shell, /:title="navTitle"/)
+assert.match(shell, /:left-arrow="showBack"/)
+assert.match(shell, /:left-text="showBack \? '返回' : ''"/)
+assert.match(shell, /const navTitle = computed\(\(\) => \(showBack\.value \? route\.meta\.title \|\| '返回' : 'MotionCare'\)\)/)
 assert.doesNotMatch(shell, /app-navbar-action|记录运动/)
 
 const forbiddenCopy = /数据库系统|数据库记录|原始字段|智能干预|浏览器模拟运动|AI Brief|Local AI|Manual activity/

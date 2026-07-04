@@ -48,7 +48,6 @@
           取消
         </button>
       </div>
-      <p class="muted-copy">APK 会优先使用原生定位服务持续记录；浏览器环境会退回前台 GPS 采样。</p>
       <p v-if="error" class="form-error">{{ error }}</p>
       <p v-if="saved" class="success-copy">运动已保存，可在“运动记录”查看。</p>
     </section>

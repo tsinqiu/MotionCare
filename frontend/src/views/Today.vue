@@ -87,9 +87,6 @@
         <p class="overline">每日建议 · {{ greeting }}</p>
         <h2>{{ recommendationHeadline }}</h2>
         <p>{{ recommendationText }}</p>
-        <small>
-          {{ briefAvailable ? '建议已结合你的近期运动生成' : '基于身体状态与训练负荷生成' }}
-        </small>
       </section>
 
       <section class="microcycle-panel">

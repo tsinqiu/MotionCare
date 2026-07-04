@@ -572,6 +572,21 @@ html[data-theme="night"] {
   font-weight: 800;
   letter-spacing: 0;
 }
+.app-navbar .van-nav-bar__left,
+.app-navbar .van-nav-bar__text,
+.app-navbar .van-nav-bar__arrow {
+  color: #fff;
+  font-weight: 800;
+}
+.app-navbar .van-nav-bar__left {
+  min-width: 72px;
+}
+.app-navbar .van-nav-bar__left:empty {
+  min-width: 0;
+}
+.app-navbar .van-nav-bar__arrow {
+  margin-right: 2px;
+}
 
 /* the real scroll container (reuses legacy .page-frame class) */
 .phone-frame .page-frame {
