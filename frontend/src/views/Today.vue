@@ -1,5 +1,13 @@
 <template>
   <div class="page-stack">
+    <button type="button" class="android-download-link today-download-entry" aria-label="前往安卓版下载页" @click="goToDownload">
+      <span>
+        <small>手机安装包</small>
+        <strong>下载安卓版</strong>
+      </span>
+      <DownloadIcon :size="20" aria-hidden="true" />
+    </button>
+
     <StateBlock v-if="loading" title="正在准备今日建议" message="正在读取身体状态、训练负荷和最近运动。" />
     <StateBlock
       v-else-if="!hasData && errors.length"
@@ -118,6 +126,8 @@
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
+import { Download as DownloadIcon } from '@lucide/vue'
+import { useRouter } from 'vue-router'
 
 import MetricCard from '@/components/MetricCard.vue'
 import StateBlock from '@/components/StateBlock.vue'
@@ -125,6 +135,7 @@ import { getDailyBrief } from '@/services/ai'
 import { getDashboardOverview, getTodayHealth } from '@/services/dashboard'
 import { deriveStatusBadge } from '@/utils/productInsights'
 
+const router = useRouter()
 const overview = ref({ recentActivities: [], monthlySummary: {}, yearlySummary: {}, trainingLoad: [] })
 const health = ref({})
 const brief = ref(null)
@@ -220,6 +231,10 @@ function metricValue(value, unit = '') {
   return value === null || value === undefined || value === '' ? '--' : `${value}${unit}`
 }
 
+function goToDownload() {
+  router.push('/download')
+}
+
 function buildWeekRows() {
   const today = startOfDay(new Date())
   const monday = new Date(today)
@@ -295,6 +310,13 @@ onMounted(loadToday)
 </script>
 
 <style scoped>
+.today-download-entry {
+  width: 100%;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
 .soft-note {
   margin: 0;
   padding: 10px 14px;

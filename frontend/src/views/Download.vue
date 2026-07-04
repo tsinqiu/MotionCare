@@ -22,13 +22,35 @@
         </span>
       </a>
 
+      <RouterLink class="download-return" to="/today">
+        <ArrowLeft :size="16" aria-hidden="true" />
+        <span>返回主页</span>
+      </RouterLink>
+
       <p class="download-note">请在安卓手机浏览器打开本页后下载并安装。</p>
     </section>
   </main>
 </template>
 
 <script setup>
-import { Download as DownloadIcon } from '@lucide/vue'
+import { ArrowLeft, Download as DownloadIcon } from '@lucide/vue'
 
 import ServerHealthBadge from '@/components/ServerHealthBadge.vue'
 </script>
+
+<style scoped>
+.download-return {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 14px;
+  border: 1px solid color-mix(in srgb, var(--download-green) 18%, var(--border));
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--download-green) 7%, var(--panel));
+  color: var(--download-green);
+  font-weight: 800;
+  text-decoration: none;
+}
+</style>
