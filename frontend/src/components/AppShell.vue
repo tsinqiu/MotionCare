@@ -7,7 +7,13 @@
         :left-arrow="showBack"
         :left-text="showBack ? '返回' : ''"
         @click-left="goBack"
-      />
+      >
+        <template v-if="showProfileShortcut" #right>
+          <button class="app-navbar-action" type="button" aria-label="进入我的" @click="goProfile">
+            <UserRound :size="21" aria-hidden="true" />
+          </button>
+        </template>
+      </van-nav-bar>
 
       <main ref="scrollEl" class="page-frame">
         <RouterView v-slot="{ Component }">
@@ -41,8 +47,8 @@
 </template>
 
 <script setup>
-import { computed, nextTick, ref, watch } from 'vue'
-import { Activity, Bot, Gauge, HeartPulse, MapPin, UserRound } from '@lucide/vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { Activity, Compass, HeartPulse, MapPin, UserRound, UsersRound } from '@lucide/vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { primaryNavigation } from '@/constants/product'
@@ -50,19 +56,25 @@ import { primaryNavigation } from '@/constants/product'
 const route = useRoute()
 const router = useRouter()
 const scrollEl = ref(null)
+const pageTitleOverride = ref('')
 
 const iconMap = {
   today: HeartPulse,
   activities: Activity,
   record: MapPin,
-  status: Gauge,
-  coach: Bot,
-  me: UserRound,
+  explore: Compass,
+  community: UsersRound,
 }
 const navItems = primaryNavigation
-const showBack = computed(() => Boolean(route.meta.backTo || route.query.from === 'today'))
+const returnTargets = {
+  today: '/today',
+  explore: '/explore',
+}
+const returnTarget = computed(() => returnTargets[route.query.from] || '')
+const showBack = computed(() => Boolean(route.meta.backTo || returnTarget.value))
 const hideTabbar = computed(() => showBack.value)
-const navTitle = computed(() => (showBack.value ? route.meta.title || '返回' : 'MotionCare'))
+const navTitle = computed(() => (showBack.value ? pageTitleOverride.value || route.meta.title || '返回' : route.meta.navTitle || 'MotionCare'))
+const showProfileShortcut = computed(() => !route.meta.authLayout && route.path !== '/me')
 
 // Highlight the tab that owns the current route, including nested pages
 // (e.g. /status/health lights up 状态, /me/sync lights up 我的).
@@ -77,11 +89,19 @@ function goTab(name) {
 }
 
 function goBack() {
-  if (route.query.from === 'today') {
-    router.push('/today')
+  if (returnTarget.value) {
+    router.push(returnTarget.value)
     return
   }
   router.push(route.meta.backTo || '/today')
+}
+
+function goProfile() {
+  if (route.path !== '/me') router.push('/me')
+}
+
+function handlePageTitle(event) {
+  pageTitleOverride.value = event.detail?.title || ''
 }
 
 // The scroll container is the phone frame's body, not the window, so reset it
@@ -89,9 +109,18 @@ function goBack() {
 watch(
   () => route.path,
   () => {
+    pageTitleOverride.value = ''
     nextTick(() => {
       if (scrollEl.value) scrollEl.value.scrollTop = 0
     })
   },
 )
+
+onMounted(() => {
+  window.addEventListener('motioncare:nav-title', handlePageTitle)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('motioncare:nav-title', handlePageTitle)
+})
 </script>

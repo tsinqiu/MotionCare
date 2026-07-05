@@ -587,6 +587,24 @@ html[data-theme="night"] {
 .app-navbar .van-nav-bar__arrow {
   margin-right: 2px;
 }
+.app-navbar .van-nav-bar__right {
+  min-width: 48px;
+  padding-right: 14px;
+}
+.app-navbar-action {
+  width: 36px;
+  height: 36px;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid rgb(255 255 255 / 0.28);
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.14);
+  color: #fff;
+  box-shadow: 0 8px 18px rgb(6 19 13 / 0.16);
+}
+.app-navbar-action:active {
+  transform: translateY(1px);
+}
 
 /* the real scroll container (reuses legacy .page-frame class) */
 .phone-frame .page-frame {
@@ -1737,7 +1755,6 @@ html[data-theme="night"] {
   .primary-link,
   .secondary-link,
   .danger-link,
-  .filter-btn,
   .quick-prompts button,
   .pagination-row button,
   .date-stepper button,

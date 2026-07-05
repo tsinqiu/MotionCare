@@ -18,7 +18,7 @@
           <ChevronLeft :size="24" />
         </button>
         <strong>{{ selectedDateLabel }}</strong>
-        <button type="button" aria-label="后一天" @click="shiftSelectedDate(1)">
+        <button type="button" aria-label="后一天" :disabled="!canShiftNextDate" @click="shiftSelectedDate(1)">
           <ChevronRight :size="24" />
         </button>
       </header>
@@ -73,11 +73,10 @@
 
       <section class="rq-overview-panel training-index-panel">
         <div class="rq-overview-panel__top">
-          <p class="overline training-index-greeting">晚上好</p>
-          <span class="status-chip" :class="trainingIndexTone">{{ trainingIndexLabel }}</span>
+          <h2 class="training-index-title">训练指数</h2>
         </div>
-        <div class="rq-overview-panel__score">
-          <span>训练指数</span>
+        <div class="rq-overview-panel__score training-index-score">
+          <span class="training-index-advice">{{ compactTrainingAdvice }}</span>
           <strong>{{ trainingIndexDisplay }}</strong>
         </div>
         <div class="performance-gradient-track" :style="trainingIndexStyle" aria-label="训练指数">
@@ -85,10 +84,6 @@
           <span>稳态</span>
           <span>训练</span>
           <i class="score-band__marker" aria-hidden="true"></i>
-        </div>
-        <div class="training-index-copy">
-          <h2>{{ recommendationHeadline }}</h2>
-          <p>{{ recommendationText }}</p>
         </div>
         <div class="rq-overview-panel__stats">
           <span><small>体能（CTL）</small><b>{{ metricValue(currentLoad.ctl) }}</b></span>
@@ -100,8 +95,7 @@
       <section class="microcycle-panel">
         <div class="section-heading">
           <div>
-            <p class="overline">训练节奏</p>
-            <h2>本周训练节奏</h2>
+            <h2>本周负荷</h2>
           </div>
           <span class="status-chip" :class="weekSummary.tone">{{ weekSummary.label }}</span>
         </div>
@@ -111,12 +105,17 @@
           <span><small>完成度</small><b>{{ weekSummary.completion }}</b></span>
         </div>
         <div class="microcycle-bars" aria-label="本周训练负荷">
-          <span v-for="bar in weeklyLoadBars" :key="bar.key" :class="{ today: bar.isToday, active: bar.hasLoad }">
+          <span
+            v-for="bar in weeklyLoadBars"
+            :key="bar.key"
+            :class="{ today: bar.isToday, active: bar.hasLoad }"
+            :title="bar.tooltip"
+            :aria-label="bar.tooltip"
+          >
             <i :style="{ '--bar-height': bar.height }" aria-hidden="true"></i>
             <small>{{ bar.label }}</small>
           </span>
         </div>
-        <p>{{ weekSummary.message }}</p>
       </section>
     </template>
   </div>
@@ -169,8 +168,6 @@ const hasData = computed(() => (
   || recentActivities.value.length > 0
   || (overview.value.trainingLoad || []).length > 0
 ))
-const recommendationHeadline = computed(() => brief.value?.headline || statusBadge.value.label)
-const recommendationText = computed(() => trainingIndex.value?.recommendation || brief.value?.recommendation || statusBadge.value.message)
 const trainingIndex = computed(() => performanceProfile.value?.trainingIndex || null)
 const trainingIndexScore = computed(() => {
   const fromProfile = Number(trainingIndex.value?.score)
@@ -188,6 +185,14 @@ const trainingIndexTone = computed(() => {
   if (score < 80) return 'steady'
   return 'good'
 })
+const compactTrainingAdvice = computed(() => {
+  const text = trainingIndex.value?.recommendation || brief.value?.recommendation || statusBadge.value.message || ''
+  const advice = text.replace(/[。.!！]$/, '')
+  const label = trainingIndexLabel.value || ''
+  if (!label) return advice
+  if (!advice) return label
+  return advice.startsWith(label) ? advice : `${label}，${advice}`
+})
 const trainingIndexStyle = computed(() => ({
   '--score-position': `${trainingIndexScore.value ?? 0}%`,
 }))
@@ -196,6 +201,7 @@ const selectedDateLabel = computed(() => {
   const week = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][date.getDay()]
   return `${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')}，${week}`
 })
+const canShiftNextDate = computed(() => formatDateKey(selectedDate.value) < formatDateKey(startOfDay(new Date())))
 const todayActions = [
   { label: '运动日历', to: { path: '/status/calendar', query: { from: 'today' } }, icon: CalendarDays, color: '#2563eb' },
   { label: '健康度', to: { path: '/status/health', query: { from: 'today' } }, icon: HeartPulse, color: '#f59e0b' },
@@ -227,6 +233,7 @@ const weeklyLoadBars = computed(() => {
     ...row,
     hasLoad: row.load > 0,
     height: `${Math.max(10, Math.min(100, Math.round((row.load / maxLoad) * 100)))}%`,
+    tooltip: `${row.label}：训练负荷 ${Math.round(row.load)}`,
   }))
 })
 const weekSummary = computed(() => {
@@ -269,7 +276,9 @@ function metricValue(value, unit = '') {
 function shiftSelectedDate(offset) {
   const next = new Date(selectedDate.value)
   next.setDate(next.getDate() + offset)
-  selectedDate.value = startOfDay(next)
+  const normalized = startOfDay(next)
+  const today = startOfDay(new Date())
+  selectedDate.value = normalized > today ? today : normalized
 }
 
 function openActivity(activity) {
@@ -392,6 +401,12 @@ onMounted(loadToday)
   background: transparent;
   color: var(--text);
   cursor: pointer;
+}
+
+.today-date-nav button:disabled {
+  color: color-mix(in srgb, var(--muted) 48%, transparent);
+  cursor: not-allowed;
+  opacity: 0.42;
 }
 
 .today-date-nav strong {
@@ -587,40 +602,53 @@ onMounted(loadToday)
 }
 
 .training-index-panel {
-  gap: 16px;
-  padding: 20px 18px 22px;
+  gap: 12px;
+  padding: 18px;
 }
 
 .training-index-panel .rq-overview-panel__top {
-  align-items: center;
+  display: block;
+  margin-bottom: -2px;
 }
 
-.training-index-panel .status-chip {
-  padding-inline: 15px;
-}
-
-.training-index-greeting {
+.training-index-title {
   margin: 0;
-  color: var(--app-green);
-  font-size: 17px;
+  color: var(--text);
+  font-size: 24px;
+  line-height: 1.12;
   font-weight: 900;
   letter-spacing: 0;
 }
 
 .training-index-panel .rq-overview-panel__score {
-  align-items: end;
-  margin-top: 2px;
+  align-items: start;
+  margin-top: -12px;
 }
 
 .training-index-panel .rq-overview-panel__score span {
   color: var(--muted);
   font-size: 16px;
-  font-weight: 900;
+  font-weight: 400;
 }
 
 .training-index-panel .rq-overview-panel__score strong {
   letter-spacing: 0;
-  line-height: 0.9;
+  line-height: 0.82;
+  transform: translateY(-18px);
+}
+
+.training-index-score {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 16px;
+  min-height: 62px;
+}
+
+.training-index-advice {
+  max-width: 250px;
+  padding-top: 20px;
+  color: var(--muted);
+  line-height: 1.5;
 }
 
 .performance-gradient-track {
@@ -676,29 +704,10 @@ onMounted(loadToday)
   transform: translateX(-50%);
 }
 
-.training-index-copy {
-  display: grid;
-  gap: 6px;
-  padding-top: 2px;
-}
-
-.training-index-copy h2 {
-  margin: 0;
-  font-size: 27px;
-  line-height: 1.18;
-}
-
-.training-index-copy p {
-  margin: 0;
-  color: var(--muted);
-  font-size: 16px;
-  line-height: 1.55;
-}
-
 .training-index-panel .rq-overview-panel__stats {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
-  margin-top: 2px;
+  margin-top: 0;
 }
 
 .training-index-panel .rq-overview-panel__stats span {
@@ -812,7 +821,7 @@ onMounted(loadToday)
 }
 .microcycle-panel {
   display: grid;
-  gap: 14px;
+  gap: 16px;
   padding: var(--space-5);
   border: 1px solid color-mix(in srgb, var(--app-green) 14%, var(--border));
   border-top: 4px solid var(--app-green);
@@ -826,25 +835,25 @@ onMounted(loadToday)
   margin: 0;
 }
 .microcycle-panel h2 {
-  margin-top: 3px;
-  font-size: var(--fs-h2);
-  line-height: 1.18;
+  font-size: 25px;
+  line-height: 1.14;
 }
-.microcycle-panel > p {
-  color: var(--muted);
-  line-height: 1.5;
+
+.microcycle-panel .status-chip {
+  font-size: 15px;
+  font-weight: 500;
 }
 .microcycle-summary {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
+  gap: 10px;
 }
 .microcycle-summary span {
   display: grid;
   gap: 4px;
   min-width: 0;
-  padding: 10px;
-  border-radius: 10px;
+  padding: 12px 11px;
+  border-radius: 12px;
   background: color-mix(in srgb, var(--app-green) 8%, var(--panel-soft));
 }
 .microcycle-summary small {
@@ -863,9 +872,9 @@ onMounted(loadToday)
   grid-template-columns: repeat(7, minmax(0, 1fr));
   align-items: end;
   gap: 6px;
-  height: 86px;
-  padding: 10px 6px 0;
-  border-radius: 12px;
+  height: 108px;
+  padding: 12px 10px 0;
+  border-radius: 14px;
   background: color-mix(in srgb, var(--app-green) 7%, var(--panel-soft));
 }
 .microcycle-bars span {
@@ -875,6 +884,7 @@ onMounted(loadToday)
   gap: 6px;
   min-width: 0;
   height: 100%;
+  cursor: default;
 }
 .microcycle-bars i {
   justify-self: center;

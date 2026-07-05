@@ -1,10 +1,5 @@
 <template>
   <div class="page-stack">
-    <section class="activities-head">
-      <p class="overline">训练记录</p>
-      <h2>运动记录</h2>
-    </section>
-
     <div class="feed-toolbar">
       <div class="feed-toolbar__tabs">
         <SportTabs v-model="filters.activity_type" :items="sportFilters" />
@@ -36,19 +31,6 @@
     />
 
     <section v-else class="activity-list-section">
-      <article v-if="latestActivity" class="latest-training-panel">
-        <div>
-          <p class="overline">最后一笔训练</p>
-          <h3>{{ latestActivityTitle }}</h3>
-          <small>{{ latestActivity.local_start_time || '--' }}</small>
-        </div>
-        <div class="latest-training-panel__metrics">
-          <span><small>距离</small><b>{{ formatDistance(latestActivity.total_distance_m) }}</b></span>
-          <span><small>时长</small><b>{{ formatClockDuration(latestActivity.total_timer_time_s) }}</b></span>
-          <span><small>负荷</small><b>{{ latestTrainingLoad }}</b></span>
-        </div>
-      </article>
-
       <div class="list-meta">
         <span>{{ meta.total || activities.length }} 条记录</span>
         <span>第 {{ meta.page || 1 }} / {{ meta.totalPages || 1 }} 页</span>
@@ -137,7 +119,6 @@ import StateBlock from '@/components/StateBlock.vue'
 import { sportFilters } from '@/constants/sports'
 import { deleteManualActivity, getActivityPage, updateManualActivity } from '@/services/activities'
 import { authSession, hasAuthToken, normalizeRedirect } from '@/stores/authStore'
-import { formatClockDuration, formatDistance } from '@/utils/formatters'
 
 const router = useRouter()
 const activities = ref([])
@@ -148,18 +129,6 @@ const modalOpen = ref(false)
 const editingActivity = ref(null)
 const filterOpen = ref(false)
 const isAdmin = computed(() => authSession.user?.role === 'admin')
-const latestActivity = computed(() => activities.value[0] || null)
-const latestActivityTitle = computed(() => (
-  latestActivity.value?.activity_name
-  || latestActivity.value?.location_name
-  || latestActivity.value?.activity_type
-  || '最近训练'
-))
-const latestTrainingLoad = computed(() => {
-  const load = latestActivity.value?.activity_training_load
-  const numeric = Number(load)
-  return Number.isFinite(numeric) ? Math.round(numeric) : '--'
-})
 
 const filters = reactive({
   page: 1,
@@ -264,85 +233,70 @@ watch(
 </script>
 
 <style scoped>
-.activities-head {
-  display: grid;
-  gap: 3px;
-  padding: var(--space-5);
-  border: 1px solid color-mix(in srgb, var(--app-green) 14%, var(--border));
-  border-radius: var(--radius-xl);
-  background: var(--panel);
-  box-shadow: var(--shadow-sm);
-}
-.activities-head .overline { margin: 0; }
-.activities-head h2 {
-  margin: 0;
-  font-size: 24px;
-  line-height: 1.15;
-}
-
-.latest-training-panel {
-  display: grid;
-  gap: 14px;
-  margin-bottom: 12px;
-  padding: 16px;
-  border: 1px solid color-mix(in srgb, var(--app-green) 16%, var(--border));
-  border-top: 4px solid var(--app-green);
-  border-radius: 12px;
-  background: var(--panel);
-  box-shadow: var(--shadow-sm);
-}
-.latest-training-panel h3 {
-  margin: 4px 0 2px;
-  font-size: 22px;
-  line-height: 1.15;
-}
-.latest-training-panel small {
-  color: var(--muted);
-  font-size: 12px;
-}
-.latest-training-panel__metrics {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-}
-.latest-training-panel__metrics span {
-  display: grid;
-  gap: 4px;
-  min-width: 0;
-  padding: 10px;
-  border-radius: 10px;
-  background: var(--panel-soft);
-}
-.latest-training-panel__metrics b {
-  font-size: 15px;
-  overflow-wrap: anywhere;
-}
-
 .feed-toolbar {
+  --activity-page-gutter: var(--space-4);
+
   position: sticky;
-  top: -1px;
+  top: calc(28px - var(--activity-page-gutter));
   z-index: 5;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 12px;
+  width: calc(100% + (var(--activity-page-gutter) * 2));
+  max-width: none !important;
+  margin: 0 calc(var(--activity-page-gutter) * -1);
+  padding: 12px var(--activity-page-gutter) 14px;
   background: var(--bg);
+  box-shadow: 0 14px 24px rgb(15 23 42 / 0.08);
 }
-.feed-toolbar__tabs { flex: 1 1 auto; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+
+.feed-toolbar::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -28px;
+  height: 28px;
+  background: var(--app-top-green);
+  pointer-events: none;
+}
+
+@container phone-frame (min-width: 410px) {
+  .feed-toolbar {
+    --activity-page-gutter: 18px;
+  }
+}
+
+.feed-toolbar__tabs {
+  min-width: 0;
+  padding: 0;
+  overflow: visible;
+}
+
 .feed-toolbar__tabs::-webkit-scrollbar { display: none; }
 
 .filter-btn {
   flex: 0 0 auto;
+  box-sizing: border-box;
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 14px;
+  height: 38px;
+  min-height: 38px;
+  padding: 0 16px;
   border-radius: var(--radius-pill);
-  border: 1px solid var(--border);
+  border: 1px solid color-mix(in srgb, var(--app-green) 18%, var(--border));
   background: var(--panel);
   color: var(--text);
-  font-weight: 600;
-  font-size: 13px;
+  font-weight: 500;
+  font-size: 14px;
+  box-shadow: var(--shadow-sm);
+}
+
+:deep(.filter-btn) {
+  height: 38px;
+  min-height: 38px;
 }
 .filter-btn.active { border-color: var(--green); color: var(--green-strong); }
 .filter-badge {
@@ -362,7 +316,7 @@ watch(
   justify-content: space-between;
   color: var(--muted);
   font-size: 13px;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 }
 .activity-card-grid { display: grid; gap: 12px; }
 .pagination-row { display: flex; gap: 12px; margin-top: 16px; }

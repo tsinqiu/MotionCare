@@ -14,7 +14,7 @@
 - 所有用户（包括管理员）的个人页面默认使用 `mine`；管理员仅在明确管理场景中可显式使用 `all` 或 `admin`。
 - 活动不存在或不属于当前普通用户时统一返回 `404 ACTIVITY_NOT_FOUND`，避免泄露资源是否存在。
 - 登录用户可以管理自己的手工活动，管理员可以管理全部手工活动；不存在和越权均返回统一 404。
-- `/api/ml/running-prediction` 要求 Bearer token，`/api/ml/health` 保持公开。
+- `/api/ml/running-prediction` 和 `/api/ml/performance-profile` 要求 Bearer token，`/api/ml/health` 保持公开。
 - Helmet 启用常规安全响应头，CSP 暂时关闭，`Cross-Origin-Resource-Policy` 为 `cross-origin`，以兼容现有地图、图表和 `/uploads` 图片。
 - `/api` 使用全局 IP 限流；`/api/auth/login` 另有更严格的 IP 限流，成功登录不计入登录限流额度。
 - JSON 请求体默认最多 1 MB，超限返回 `413 PAYLOAD_TOO_LARGE`。

@@ -133,6 +133,46 @@ cd backend
 npm test
 ```
 
+## ML 本地模型
+
+ML 训练脚本在 `backend/ml/`，当前包含三类输出：
+
+- `running-v1`：单次跑步训练负荷等级、疲劳风险预测。
+- `coach-v1`：训练指数/恢复建议模型，缺少本地模型产物时自动回退到规则。
+- `performance-v1`：跑力、五力、训练指数画像服务，不需要 `.joblib`，可读取 FitRec 聚合参考报告做校准。
+
+首次训练先安装 Python 依赖：
+
+```powershell
+cd backend
+python -m pip install -r ml\requirements.txt
+```
+
+生成本地模型产物：
+
+```powershell
+python ml\train_running_model.py
+python ml\train_coach_model.py
+```
+
+模型产物会写到 `backend/ml/models/`，不要提交 `.joblib` 或本地模型元数据。演示环境需要模型时，在本机重新运行训练脚本即可。
+
+如果本机有 FitRec/Endomondo HR 原始文件，可以生成小型聚合参考报告：
+
+```powershell
+python ml\analyze_fitrec_reference.py --input ..\database\data\FitRec\endomondoHR.json.gz
+```
+
+只提交 `backend/ml/reference/fitrec_reference_report.json` 这类聚合报告；不要提交 `database/data/` 下的原始数据。
+
+ML 相关接口见：
+
+```text
+GET  /api/ml/health
+POST /api/ml/running-prediction
+GET  /api/ml/performance-profile
+```
+
 ## 文档
 
 ```text

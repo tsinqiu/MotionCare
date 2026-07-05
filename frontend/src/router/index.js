@@ -6,7 +6,9 @@ import Activities from '@/views/Activities.vue'
 import ActivityDetail from '@/views/ActivityDetail.vue'
 import Calendar from '@/views/Calendar.vue'
 import Coach from '@/views/Coach.vue'
+import Community from '@/views/Community.vue'
 import Download from '@/views/Download.vue'
+import Explore from '@/views/Explore.vue'
 import HealthDetail from '@/views/HealthDetail.vue'
 import Login from '@/views/Login.vue'
 import Me from '@/views/Me.vue'
@@ -131,6 +133,12 @@ const routes = [
     meta: { title: '教练', requiresAuth: true },
   },
   {
+    path: '/explore',
+    name: 'explore',
+    component: Explore,
+    meta: { title: '探索', requiresAuth: true },
+  },
+  {
     path: '/me',
     name: 'me',
     component: Me,
@@ -175,12 +183,16 @@ const routes = [
   { path: '/trends', redirect: '/status/trends' },
   { path: '/analytics', redirect: '/status/trends' },
   { path: '/assistant', redirect: '/coach' },
-  { path: '/explore', redirect: '/coach' },
   { path: '/sync', redirect: '/me/sync' },
   { path: '/shoes', redirect: '/me/shoes' },
   { path: '/settings', redirect: '/me/settings' },
   { path: '/admin', redirect: '/me/admin' },
-  { path: '/community', redirect: '/today' },
+  {
+    path: '/community',
+    name: 'community',
+    component: Community,
+    meta: { title: '运动圈', navTitle: '运动圈', requiresAuth: true },
+  },
   {
     path: '/schema',
     redirect: '/today',

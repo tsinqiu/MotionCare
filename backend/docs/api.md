@@ -146,6 +146,28 @@ responses keep the same shape and include fallback metadata:
 }
 ```
 
+`GET /api/ai/daily-brief` returns rule/AI advice plus the coach model signal under `data.ml`.
+The frontend treats `trainingIndexScore` and `trainingIndexLabel` as the user-facing training index while keeping `readinessScore` for backwards compatibility:
+
+```json
+{
+  "data": {
+    "ml": {
+      "readinessScore": 38,
+      "trainingIndexScore": 38,
+      "trainingIndexLabel": "恢复优先",
+      "readinessLevel": "low",
+      "riskLevel": "orange",
+      "loadAction": "reduce",
+      "modelVersion": "coach-v1",
+      "provider": "rules",
+      "fallback": true
+    }
+  },
+  "meta": {}
+}
+```
+
 AI output is for training reference only and is not a medical diagnosis. Chat
 history, prompts, and model responses are not persisted in MySQL.
 
@@ -283,6 +305,8 @@ GET /api/dashboard/overview
 
 Returns recent activities, monthly summary, yearly summary, recent training load, and personal best summaries for the first screen.
 
+`GET /api/dashboard/overview?training_load_range=3m` may request a longer training-load series for chart pages. Supported values are `42d`, `3m`, `6m`, `1y`, and `2y`. If this parameter is omitted, the endpoint keeps the compact first-screen behavior and returns only the latest 30 training-load points.
+
 ## Extension Modules
 
 These modules persist real backend state. Garmin Connect is the only sync
@@ -410,15 +434,64 @@ recomputes canonical distance from accepted GPS points, writes summaries, and
 copies collected workout points into `TrackPoints`. Finishing a workout clears
 the stats cache.
 
-## ML Running Prediction
+## ML Models
 
 ```text
 GET  /api/ml/health
 POST /api/ml/running-prediction
+GET  /api/ml/performance-profile
 ```
 
+MotionCare currently has three local ML/modelized outputs:
+
+- `running-v1`: Python `joblib` model for single-run training-load level and fatigue-risk prediction.
+- `coach-v1`: coach readiness model with rule fallback, personal percentile features, weather/recovery safety constraints, and optional local `coach_model.joblib`.
+- `performance-v1`: explainable performance profile service for training index, running power, and five-power scores. It does not require a trained artifact and may use the offline FitRec aggregate reference report when present.
+
+`GET /api/ml/health` is public. `POST /api/ml/running-prediction` and `GET /api/ml/performance-profile` require `Authorization: Bearer <token>`.
+
+Health response includes running-model status and the performance-profile status:
+
+```json
+{
+  "data": {
+    "status": "ok",
+    "modelAvailable": true,
+    "scriptAvailable": true,
+    "modelVersion": "running-v1",
+    "supportedActivityType": "running",
+    "featureNames": [
+      "distanceM",
+      "durationS",
+      "movingDurationS",
+      "elapsedDurationS",
+      "avgSpeedMps",
+      "maxSpeedMps",
+      "avgHeartRateBpm",
+      "maxHeartRateBpm",
+      "avgCadenceSpm",
+      "maxCadenceSpm",
+      "elevationGainM",
+      "elevationLossM",
+      "avgStrideLengthCm",
+      "normalizedPowerW"
+    ],
+    "performanceProfile": {
+      "status": "ok",
+      "modelVersion": "performance-v1",
+      "provider": "local_performance_model",
+      "supportedOutputs": ["trainingIndex", "runningPower", "fivePower"],
+      "requiresTrainingArtifact": false,
+      "referenceAvailable": true
+    }
+  },
+  "meta": {}
+}
+```
+
+### Running Prediction
+
 Prediction is intentionally separate from upload. The frontend should show a separate button after upload if the user wants analysis.
-`GET /api/ml/health` is public. `POST /api/ml/running-prediction` requires `Authorization: Bearer <token>`.
 
 `POST /api/ml/running-prediction` accepts numeric running metrics:
 
@@ -457,6 +530,99 @@ It returns:
   "meta": {}
 }
 ```
+
+### Performance Profile
+
+`GET /api/ml/performance-profile` returns the user-level modelized profile used by the Today and Status pages:
+
+```json
+{
+  "data": {
+    "trainingIndex": {
+      "score": 38,
+      "level": "recovery",
+      "label": "恢复优先",
+      "recommendation": "建议今天以恢复、拉伸或轻松有氧为主。",
+      "factors": ["TSB 显著偏低", "睡眠评分偏低"]
+    },
+    "runningPower": {
+      "score": 72,
+      "level": "strong",
+      "label": "强劲",
+      "trend": "stable",
+      "factors": ["近期配速表现较好", "长距离能力较稳定"],
+      "components": {
+        "vo2max": 71.4,
+        "bestPace": 66.2,
+        "heartRatePaceEfficiency": 73.1,
+        "endurance": 80.0,
+        "volume28d": 54.5,
+        "load28d": 68.0,
+        "externalReference": 62.4
+      }
+    },
+    "fivePower": [
+      { "key": "endurance", "label": "耐力", "score": 80, "detail": "长期负荷、跑量和长距离能力" },
+      { "key": "speed", "label": "速度", "score": 74, "detail": "配速表现、VO2max 和训练刺激" },
+      { "key": "technique", "label": "技术", "score": 62, "detail": "配速稳定、步频、功率和动作线索" },
+      { "key": "strength", "label": "肌力", "score": 70, "detail": "负荷承受、功率、爬升和力量基础" },
+      { "key": "stability", "label": "稳定", "score": 48, "detail": "睡眠、HRV、压力和状态余量" }
+    ],
+    "dataQuality": {
+      "score": 86,
+      "warnings": [],
+      "coverage": {
+        "runningActivities28d": 12,
+        "heartRateRuns": 12,
+        "vo2maxDays": 3,
+        "cadenceRuns": 10,
+        "powerRuns": 6,
+        "sleepDays14d": 9,
+        "hrvDays14d": 8,
+        "fitrecReference": true
+      }
+    },
+    "keyMetrics": {
+      "ctl": 238.91,
+      "atl": 305.61,
+      "tsb": -66.7,
+      "vo2max": 58.2,
+      "totalDistance28d": 120.5,
+      "longestDistanceKm": 21.1
+    },
+    "model": {
+      "modelVersion": "performance-v1",
+      "provider": "local_performance_model",
+      "confidence": 0.78
+    }
+  },
+  "meta": {}
+}
+```
+
+`trainingIndex` reuses the coach readiness score semantics: higher means more suitable for training, lower means recovery should be prioritized. Rule safety still caps risky situations such as red/orange risk, high heat/humidity, and poor recovery.
+
+`runningPower` is not CTL clamped to 100. It combines VO2max, best pace, heart-rate/pace efficiency, long-distance ability, 28-day volume/load, optional FitRec reference calibration, and a fatigue penalty when TSB is very low.
+
+### Training Scripts And Artifacts
+
+Python dependencies live in `backend/ml/requirements.txt`. Train locally from `backend`:
+
+```powershell
+python -m pip install -r ml\requirements.txt
+python ml\train_running_model.py
+python ml\train_coach_model.py
+```
+
+The scripts write `.joblib` artifacts and metadata JSON under `backend/ml/models/`. Model artifacts are local runtime outputs and must not be committed.
+
+FitRec/Endomondo HR is used only as an offline aggregate reference. Do not commit the original `database/data/FitRec/endomondoHR.json.gz`; generate or refresh the small reference report instead:
+
+```powershell
+python ml\analyze_fitrec_reference.py --input ..\database\data\FitRec\endomondoHR.json.gz
+```
+
+Training reports include classification report, macro-F1, weighted-F1, balanced accuracy, confusion matrix, class distribution, label-source summary, and warnings for low-sample classes. Single-class targets are marked `not_trainable`.
 
 ## Response Style
 

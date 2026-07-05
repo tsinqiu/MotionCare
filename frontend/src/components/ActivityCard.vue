@@ -9,6 +9,7 @@
     @keydown.enter="$emit('select', activity)"
     @keydown.space.prevent="$emit('select', activity)"
   >
+    <time class="activity-card-time">{{ formattedCardTime }}</time>
     <div class="activity-card-main">
       <span class="activity-accent" aria-hidden="true"></span>
       <span class="activity-icon" aria-hidden="true">
@@ -18,7 +19,6 @@
       <span class="activity-copy">
         <span class="activity-title">
           <strong>{{ displayTitle }}</strong>
-          <time>{{ formatDateTime(activity.local_start_time) }}</time>
         </span>
         <span class="activity-subtitle">
           {{ activity.activity_type }}
@@ -86,6 +86,7 @@ const sportIcon = computed(() => ({
 const displayTitle = computed(() => (
   props.activity.activity_name || props.activity.location_name || props.activity.activity_type
 ))
+const formattedCardTime = computed(() => formatCardDateTime(props.activity.local_start_time))
 
 const speedLabel = computed(() => (sportClass.value === 'ride' ? '速度' : '配速'))
 const speedValue = computed(() => (sportClass.value === 'ride'
@@ -114,6 +115,17 @@ const metricItems = computed(() => [
 
 function photoUrl(path) {
   return resolveMediaUrl(path)
+}
+
+function formatCardDateTime(value) {
+  if (!value) return '--'
+  const normalized = typeof value === 'string' ? value.replace(' ', 'T') : value
+  const date = new Date(normalized)
+  if (Number.isNaN(date.getTime())) return formatDateTime(value)
+  const week = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][date.getDay()]
+  const dateText = `${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')}`
+  const timeText = `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+  return `${dateText}（${week}） ${timeText}`
 }
 </script>
 
