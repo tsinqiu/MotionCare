@@ -400,6 +400,62 @@ DELETE /api/community/posts/:id/like
 POST   /api/community/posts/:id/share
 ```
 
+`GET /api/community/posts` returns paged posts. When a post is linked to an
+activity, the response also includes the activity summary used by the MotionCare
+feed:
+
+```json
+{
+  "data": {
+    "items": [
+      {
+        "id": 1,
+        "username": "demo",
+        "content": "分享了一次运动",
+        "activityId": 234,
+        "activityName": "无锡市 跑步",
+        "activityType": "running",
+        "activityLocalStartTime": "2026-07-01 16:01:00",
+        "activityLocationName": "无锡市",
+        "distanceM": 14020,
+        "durationS": 3825,
+        "elevationGainM": 64,
+        "activityTrainingLoad": 239,
+        "weatherCondition": "多云",
+        "temperatureC": 28,
+        "imageUrl": "",
+        "likeCount": 0,
+        "commentCount": 0,
+        "shareCount": 0,
+        "likedByMe": false,
+        "followedByMe": false,
+        "createdAt": "2026-07-05 17:00:00"
+      }
+    ],
+    "page": 1,
+    "pageSize": 20,
+    "total": 1,
+    "totalPages": 1
+  },
+  "meta": {}
+}
+```
+
+`POST /api/community/posts` accepts `multipart/form-data`:
+
+```text
+content      required, max 2000 chars
+visibility   private | followers | public, defaults to public
+activityId   optional activity id owned by the current user
+image        optional image file
+```
+
+Activity-detail sharing uses `content="分享了一次运动"` plus `activityId`. The
+frontend treats this as an automatic activity share: it hides the repeated
+content line, shows distance, computed pace and duration, and renders the
+activity map when no uploaded image is present. Training load is still returned
+by the API for compatibility, but it is not shown on the feed card.
+
 Explore article APIs are public:
 
 ```text
