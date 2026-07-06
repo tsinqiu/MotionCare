@@ -26,27 +26,51 @@
       </div>
     </section>
 
-    <section class="community-composer panel">
+    <section v-if="!composerOpen" class="community-compose-entry panel">
+      <button type="button" class="community-compose-entry__button" @click="openComposer">
+        <span class="community-avatar community-compose-entry__avatar">
+          {{ authSession.user?.username?.slice(0, 1)?.toUpperCase() || 'M' }}
+        </span>
+        <span class="community-compose-entry__text">
+          <strong>发布动态</strong>
+          <small>分享运动感受、照片或关联一次训练</small>
+        </span>
+        <span class="community-compose-entry__action">
+          <Plus :size="18" aria-hidden="true" />
+        </span>
+      </button>
+      <p v-if="notice" class="success-copy">{{ notice }}</p>
+      <p v-if="actionError" class="form-error">{{ actionError }}</p>
+    </section>
+
+    <section v-else class="community-composer panel">
       <div class="community-composer__head">
+        <button class="community-compose-back" type="button" @click="closeComposer">
+          <X :size="18" aria-hidden="true" />
+        </button>
         <div>
-          <p class="overline">发布动态</p>
           <h2>分享今天的运动</h2>
         </div>
-        <span class="status-chip good">图片 / 运动数据</span>
+        <button class="community-compose-submit" type="submit" form="community-publish-form" :disabled="posting || !draft.content">
+          <Send :size="16" />
+          {{ posting ? '发布中' : '发布' }}
+        </button>
       </div>
-      <form class="community-form community-form--feed" @submit.prevent="publish">
+
+      <form id="community-publish-form" class="community-form community-form--feed" @submit.prevent="publish">
         <textarea v-model.trim="draft.content" maxlength="2000" placeholder="写下运动感受、训练目标或恢复状态" />
-        <div class="community-options community-options--feed">
-          <label>
+
+        <div class="community-compose-tools">
+          <label class="community-compose-field">
             <span>关联运动</span>
             <select v-model="draft.activityId">
-              <option value="">不关联</option>
+              <option value="">不关联运动</option>
               <option v-for="activity in activityOptions" :key="activity.id" :value="activity.id">
                 {{ formatActivityOption(activity) }}
               </option>
             </select>
           </label>
-          <label>
+          <label class="community-compose-field">
             <span>可见范围</span>
             <select v-model="draft.visibility">
               <option value="public">公开</option>
@@ -54,20 +78,21 @@
               <option value="private">私密</option>
             </select>
           </label>
-          <label class="upload-drop community-upload">
-            <span>运动图片</span>
-            <input :key="imageInputKey" type="file" accept="image/*" @change="handleImageChange" />
-            <small><Upload :size="14" aria-hidden="true" /> {{ imageLabel }}</small>
-          </label>
         </div>
-        <div class="community-submit-row">
+
+        <label class="community-compose-upload">
+          <Upload :size="20" aria-hidden="true" />
+          <span>{{ imageLabel }}</span>
+          <small>支持 JPG / PNG，最大 10MB</small>
+          <input :key="imageInputKey" type="file" accept="image/*" @change="handleImageChange" />
+        </label>
+
+        <div class="community-compose-footer">
           <p v-if="activityLoadError" class="muted-copy">{{ activityLoadError }}</p>
-          <button class="primary-link" type="submit" :disabled="posting || !draft.content">
-            <Send :size="16" />
-            {{ posting ? '发布中' : '发布动态' }}
-          </button>
+          <button class="secondary-link" type="button" @click="resetDraft">清空</button>
         </div>
       </form>
+
       <p v-if="notice" class="success-copy">{{ notice }}</p>
       <p v-if="actionError" class="form-error">{{ actionError }}</p>
     </section>
@@ -206,11 +231,13 @@ import {
   Heart,
   MapPin,
   MessageCircle,
+  Plus,
   Send,
   Share2,
   Upload,
   UserRound,
   UsersRound,
+  X,
 } from '@lucide/vue'
 import { showToast } from 'vant'
 
@@ -242,6 +269,7 @@ const previewImage = ref({ url: '', alt: '' })
 const activePostId = ref('')
 const feedScope = ref('friends')
 const activeTab = ref('latest')
+const composerOpen = ref(false)
 const loading = ref(false)
 const commentsLoading = ref(false)
 const posting = ref(false)
@@ -461,6 +489,26 @@ function handlePreviewKeydown(event) {
   if (event.key === 'Escape') closeImagePreview()
 }
 
+function openComposer() {
+  notice.value = ''
+  actionError.value = ''
+  composerOpen.value = true
+}
+
+function closeComposer() {
+  composerOpen.value = false
+}
+
+function resetDraft() {
+  draft.content = ''
+  draft.activityId = ''
+  draft.visibility = 'public'
+  imageFile.value = null
+  imageInputKey.value += 1
+  notice.value = ''
+  actionError.value = ''
+}
+
 async function publish() {
   posting.value = true
   actionError.value = ''
@@ -472,10 +520,8 @@ async function publish() {
       activityId: draft.activityId,
       image: imageFile.value,
     })
-    draft.content = ''
-    draft.activityId = ''
-    imageFile.value = null
-    imageInputKey.value += 1
+    resetDraft()
+    composerOpen.value = false
     notice.value = '动态已发布。'
     showToast('动态已发布')
     await load()
@@ -568,6 +614,210 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+.community-compose-entry {
+  padding: 10px 14px;
+}
+
+.community-compose-entry__button {
+  width: 100%;
+  min-height: 68px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+
+.community-compose-entry__avatar {
+  width: 44px;
+  height: 44px;
+  font-size: 18px;
+}
+
+.community-compose-entry__text {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.community-compose-entry__text strong {
+  color: var(--text);
+  font-size: 18px;
+  line-height: 1.2;
+}
+
+.community-compose-entry__text small {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.community-compose-entry__action {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--green);
+  color: #fff;
+  box-shadow: 0 10px 20px rgb(33 212 123 / 0.24);
+}
+
+.community-composer {
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at 88% 8%, rgb(33 212 123 / 0.12), transparent 30%),
+    #fff;
+}
+
+.community-composer__head {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+}
+
+.community-composer__head .overline {
+  margin: 0;
+}
+
+.community-composer__head h2 {
+  margin: 2px 0 0;
+  color: var(--text);
+  font-size: 22px;
+  line-height: 1.15;
+}
+
+.community-compose-back {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--text);
+}
+
+.community-compose-submit {
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--green);
+  color: #fff;
+  font-weight: 900;
+}
+
+.community-form--feed {
+  display: grid;
+  gap: 14px;
+  margin: 0;
+}
+
+.community-form--feed textarea {
+  min-height: 148px;
+  padding: 16px;
+  border: 1px solid color-mix(in srgb, var(--green) 18%, var(--border));
+  border-radius: 18px;
+  background: #f8fafc;
+  color: var(--text);
+  font-size: 16px;
+  line-height: 1.7;
+  resize: vertical;
+}
+
+.community-compose-tools {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.community-compose-field,
+.community-compose-upload {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.community-compose-field span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.community-compose-field select {
+  width: 100%;
+  min-height: 46px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: #fff;
+  color: var(--text);
+  font-weight: 700;
+}
+
+.community-compose-upload {
+  position: relative;
+  min-height: 92px;
+  place-items: center;
+  padding: 16px;
+  border: 1.5px dashed color-mix(in srgb, var(--green) 38%, var(--border));
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--green) 7%, #fff);
+  color: var(--green);
+  text-align: center;
+  cursor: pointer;
+}
+
+.community-compose-upload span {
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--text);
+  font-weight: 900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.community-compose-upload small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.community-compose-upload input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.community-compose-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.community-compose-footer:has(.muted-copy) {
+  justify-content: space-between;
+}
+
+.community-compose-footer .muted-copy {
+  margin: 0;
+}
+
 .community-route-preview {
   padding: 0;
   overflow: hidden;
@@ -581,5 +831,19 @@ onUnmounted(() => {
   min-height: 228px;
   border: 0;
   border-radius: 0;
+}
+
+@container phone-frame (max-width: 390px) {
+  .community-compose-tools {
+    grid-template-columns: 1fr;
+  }
+
+  .community-composer__head {
+    grid-template-columns: 38px minmax(0, 1fr) auto;
+  }
+
+  .community-compose-submit {
+    padding: 0 10px;
+  }
 }
 </style>

@@ -11,125 +11,18 @@
     />
     <StateBlock v-else-if="!authSession.user" title="请先登录" message="登录后可以实时或手工记录运动。" action-label="去登录" @action="router.push('/login')" />
 
-    <template v-else>
-      <section class="record-rq-panel" v-if="!liveRecording">
-        <div class="section-heading">
-          <div>
-            <p class="overline">训练入口</p>
-            <h2>记录运动</h2>
-          </div>
-        </div>
-        <div class="record-action-grid">
-          <span>
-            <small>实时记录</small>
-            <b>定位 / 计时 / 距离</b>
-          </span>
-          <span>
-            <small>补记训练</small>
-            <b>距离 / 时长 / 心率</b>
-          </span>
-          <span>
-            <small>训练分析</small>
-            <b>负荷 / 配速 / 跑力</b>
-          </span>
-        </div>
-      </section>
-
-      <div class="record-choice-grid" v-if="!liveRecording">
-        <section class="dark-panel record-choice record-choice--live">
-          <span class="record-choice__icon"><MapPin :size="20" aria-hidden="true" /></span>
-          <div>
-            <p class="overline">实时记录</p>
-            <h2>手机定位记录</h2>
-          </div>
-          <button class="primary-link" type="button" @click="scrollToLiveRecorder">开始记录</button>
-        </section>
-        <section class="dark-panel record-choice">
-          <span class="record-choice__icon"><FilePlus2 :size="20" aria-hidden="true" /></span>
-          <div>
-            <p class="overline">补记训练</p>
-            <h2>手动添加运动</h2>
-          </div>
-          <button class="primary-link" type="button" @click="showManualModal = true">填写运动</button>
-        </section>
-      </div>
-
-      <div ref="liveRecorderRef" class="live-recorder-anchor">
-        <StartWorkout @recording-state-change="liveRecording = $event" />
-      </div>
-    </template>
-
-    <ManualActivityModal
-      v-if="showManualModal"
-      :save="createManualActivity"
-      @close="showManualModal = false"
-      @saved="handleSaved"
-    />
+    <StartWorkout v-else @recording-state-change="liveRecording = $event" />
   </div>
 </template>
 
 <script setup>
 import { ref } from 'vue'
-import { FilePlus2, MapPin } from '@lucide/vue'
 import { useRouter } from 'vue-router'
 
-import ManualActivityModal from '@/components/ManualActivityModal.vue'
 import StateBlock from '@/components/StateBlock.vue'
-import { createManualActivity } from '@/services/activities'
 import { authSession, initAuthSession } from '@/stores/authStore'
 import StartWorkout from '@/views/StartWorkout.vue'
 
 const router = useRouter()
-const showManualModal = ref(false)
 const liveRecording = ref(false)
-const liveRecorderRef = ref(null)
-
-function scrollToLiveRecorder() {
-  liveRecorderRef.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-}
-
-function handleSaved(activity) {
-  showManualModal.value = false
-  if (activity?.id) router.push(`/activities/${activity.id}`)
-  else router.push('/activities')
-}
 </script>
-
-<style scoped>
-.record-choice-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: stretch; gap: 10px; }
-.record-choice {
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
-  align-content: stretch;
-  gap: 14px;
-  min-height: 156px;
-  min-width: 0;
-  padding: 16px;
-  border-top: 4px solid var(--app-green);
-}
-.record-choice--live {
-  border-top-color: #16a34a;
-}
-.record-choice__icon {
-  width: 38px;
-  height: 38px;
-  display: grid;
-  place-items: center;
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--app-green) 12%, var(--panel-soft));
-  color: var(--app-green-dark);
-}
-.record-choice h2 {
-  margin: 3px 0 0;
-  font-size: 18px;
-  line-height: 1.18;
-}
-.record-choice :is(.primary-link, .secondary-chip) {
-  align-self: end;
-  justify-self: stretch;
-  width: 100%;
-}
-.live-recorder-anchor {
-  scroll-margin-top: 76px;
-}
-</style>

@@ -9,6 +9,9 @@ import Coach from '@/views/Coach.vue'
 import Community from '@/views/Community.vue'
 import Download from '@/views/Download.vue'
 import Explore from '@/views/Explore.vue'
+import ExploreCourses from '@/views/ExploreCourses.vue'
+import ExploreEvents from '@/views/ExploreEvents.vue'
+import ExploreRoutes from '@/views/ExploreRoutes.vue'
 import HealthDetail from '@/views/HealthDetail.vue'
 import Login from '@/views/Login.vue'
 import Me from '@/views/Me.vue'
@@ -137,6 +140,24 @@ const routes = [
     name: 'explore',
     component: Explore,
     meta: { title: '探索', requiresAuth: true },
+  },
+  {
+    path: '/explore/events',
+    name: 'explore-events',
+    component: ExploreEvents,
+    meta: { title: '热门赛事', requiresAuth: true, backTo: '/explore' },
+  },
+  {
+    path: '/explore/courses',
+    name: 'explore-courses',
+    component: ExploreCourses,
+    meta: { title: '常用课程', requiresAuth: true, backTo: '/explore' },
+  },
+  {
+    path: '/explore/routes',
+    name: 'explore-routes',
+    component: ExploreRoutes,
+    meta: { title: '运动路线', requiresAuth: true, backTo: '/explore' },
   },
   {
     path: '/me',

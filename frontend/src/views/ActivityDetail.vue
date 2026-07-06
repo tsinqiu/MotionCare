@@ -60,7 +60,7 @@
             <Sparkles :size="18" aria-hidden="true" />
             AI 教练
           </button>
-          <button type="button" @click="placeholderAction('海报功能建设中')">
+          <button type="button" @click="showPoster = true">
             <Image :size="18" aria-hidden="true" />
             海报
           </button>
@@ -124,12 +124,15 @@
         <section v-if="isRunningActivity" class="detail-info-group">
           <h2>跑鞋</h2>
           <div class="shoe-bind">
-            <select v-model="selectedShoeId" @change="bindShoe">
-              <option :value="null">不绑定</option>
-              <option v-for="s in shoes" :key="s.id" :value="s.id" :disabled="s.isRetired">
-                {{ s.name }} {{ s.isRetired ? '(已退役)' : '' }}
-              </option>
-            </select>
+            <label class="shoe-select-card">
+              <span>绑定跑鞋</span>
+              <select v-model="selectedShoeId" @change="bindShoe">
+                <option :value="null">不绑定</option>
+                <option v-for="s in shoes" :key="s.id" :value="s.id" :disabled="s.isRetired">
+                  {{ s.name }} {{ s.isRetired ? '(已退役)' : '' }}
+                </option>
+              </select>
+            </label>
             <span v-if="activity.shoe_name || activity.shoeName" class="shoe-bind-info">
               当前：{{ activity.shoe_name || activity.shoeName }}
             </span>
@@ -143,7 +146,6 @@
         <section class="training-analysis-card">
           <div class="section-heading compact-heading">
             <div>
-              <p class="overline">训练分析</p>
               <h2>{{ trainingLoadLevel.title }}</h2>
             </div>
             <span class="status-chip">{{ trainingLoadLevel.label }}</span>
@@ -157,53 +159,64 @@
           </div>
         </section>
 
-        <section class="analysis-result-card">
-          <div class="section-heading compact-heading">
-            <div>
-              <p class="overline">AI 教练</p>
-              <h2>运动智能分析</h2>
-            </div>
-            <button class="primary-link" type="button" :disabled="analysisLoading" @click="runAnalysis">
-              {{ analysisLoading ? '分析中' : '运行分析' }}
-            </button>
-          </div>
-          <StateBlock
-            v-if="analysisError"
-            title="智能分析失败"
-            :message="analysisError"
-            tone="danger"
-          />
-          <template v-else-if="analysis">
-            <div class="analysis-insights">
-              <span
-                v-for="insight in analysisInsights"
-                :key="insight.label"
-                :class="insight.tone"
-              >
-                <small>{{ insight.label }}</small>
-                <b>{{ insight.value }}</b>
-              </span>
-            </div>
-            <p>{{ analysis.summary }}</p>
-            <ul>
-              <li v-for="suggestion in analysisSuggestions" :key="suggestion">{{ suggestion }}</li>
-            </ul>
-          </template>
-          <p v-else class="detail-analysis-summary">点击运行分析，根据当前运动记录生成表现分析、恢复提示和下次训练建议。</p>
-        </section>
-
         <section v-if="canEditActivity" class="detail-info-group activity-feedback-card">
-          <h2>活动反馈</h2>
-          <div class="edit-form edit-form--single">
-            <label>
-              <span>反馈体感</span>
-              <input v-model.number="editForm.effort" type="number" min="1" max="10" placeholder="1-10" />
+          <div class="self-review-heading">
+            <h2>自评量化表</h2>
+          </div>
+          <div class="self-review-row">
+            <span>安静心率</span>
+            <label class="compact-number-input">
+              <input v-model.number="selfReview.restingHeartRate" type="number" min="30" max="220" placeholder="输入心率值" />
+              <b>bpm</b>
             </label>
-            <div class="edit-form-actions">
-              <button type="button" class="primary-link" :disabled="isSavingMeta" @click="saveMeta">
-                {{ isSavingMeta ? '保存中' : '保存' }}
+          </div>
+          <div class="self-review-row">
+            <span>体重记录</span>
+            <label class="weight-inputs">
+              <input v-model.number="selfReview.weightBefore" type="number" min="20" max="250" placeholder="训练前" />
+              <em>/</em>
+              <input v-model.number="selfReview.weightAfter" type="number" min="20" max="250" placeholder="训练后" />
+              <b>kg</b>
+            </label>
+          </div>
+          <div class="self-review-row self-review-row--slider">
+            <span>疲劳</span>
+            <div class="fatigue-range-shell">
+              <input
+                v-model.number="selfReview.fatigue"
+                class="fatigue-range"
+                type="range"
+                min="1"
+                max="10"
+                step="1"
+                aria-label="疲劳程度"
+              />
+            </div>
+            <b>{{ fatigueLabel }}</b>
+          </div>
+          <div class="self-review-row self-review-row--feel">
+            <span>训练感受</span>
+            <div class="feel-picker">
+              <button
+                v-for="option in feelOptions"
+                :key="option.value"
+                type="button"
+                :class="{ active: selfReview.feeling === option.value }"
+                @click="selfReview.feeling = option.value"
+              >
+                {{ option.label }}
               </button>
             </div>
+          </div>
+          <label class="self-review-textarea">
+            <span>训练心得</span>
+            <textarea v-model.trim="selfReview.note" rows="3" placeholder="没有写任何内容哦~" />
+          </label>
+          <div class="self-review-actions">
+            <button type="button" class="primary-link" :disabled="isSavingMeta" @click="saveSelfReview">
+              {{ isSavingMeta ? '保存中' : '保存自评' }}
+            </button>
+            <span v-if="selfReviewSaved">已保存</span>
           </div>
           <div v-if="canManageManual" class="detail-action-bar">
             <button class="detail-action detail-action--edit" type="button" @click="modalOpen = true">
@@ -218,10 +231,16 @@
         </section>
 
         <section v-if="canEditActivity" class="detail-info-group activity-photo-card">
-          <h2>活动照片</h2>
+          <div class="photo-card-heading">
+            <div>
+              <h2>活动照片</h2>
+            </div>
+          </div>
           <div class="photo-section">
             <label class="photo-upload-label">
-              <span>上传活动照片</span>
+              <Image :size="22" aria-hidden="true" />
+              <span>{{ isUploadingPhoto ? '上传中...' : '上传活动照片' }}</span>
+              <small>选择一张照片作为运动记录封面</small>
               <input type="file" accept="image/*" @change="uploadPhoto" :disabled="isUploadingPhoto" />
             </label>
             <span v-if="isUploadingPhoto" class="upload-status">上传中...</span>
@@ -270,12 +289,45 @@
         @close="modalOpen = false"
         @saved="handleSaved"
       />
+
+      <section v-if="showPoster" class="poster-overlay" aria-label="分享海报预览">
+        <div class="poster-sheet">
+          <header>
+            <button type="button" @click="showPoster = false">返回</button>
+            <h2>分享海报</h2>
+            <button type="button" @click="shareActivityToCommunity">分享</button>
+          </header>
+          <article class="activity-poster">
+            <RoutePreview v-if="trackPoints.length" class="poster-map-preview" :points="trackPoints" />
+            <div v-if="trackPoints.length" class="poster-map-fade" aria-hidden="true"></div>
+            <div class="poster-title">
+              <h3>{{ activityTitle }}</h3>
+              <p>{{ formatPosterDate(activity.local_start_time) }}</p>
+            </div>
+            <div v-if="!trackPoints.length" class="poster-route">
+              <svg v-if="posterPolyline" viewBox="0 0 320 360" aria-hidden="true">
+                <polyline :points="posterPolyline" />
+              </svg>
+              <span>暂无轨迹</span>
+            </div>
+            <div class="poster-metrics">
+              <span><small>距离</small><b>{{ formatDistance(activity.total_distance_m) }}</b></span>
+              <span><small>时间</small><b>{{ formatActivityDuration(activity.total_timer_time_s) }}</b></span>
+              <span><small>配速</small><b>{{ formatPacePretty(activity.avg_speed_mps) }}</b></span>
+            </div>
+            <footer>
+              <span>{{ authSession.user?.username || 'MotionCare' }}</span>
+              <b>MotionCare</b>
+            </footer>
+          </article>
+        </div>
+      </section>
     </template>
   </div>
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { showToast } from 'vant'
 import { Activity, Image, Pencil, Share2, Sparkles, Trash2 } from '@lucide/vue'
@@ -284,7 +336,6 @@ import ChartPanel from '@/components/ChartPanel.vue'
 import ManualActivityModal from '@/components/ManualActivityModal.vue'
 import RoutePreview from '@/components/RoutePreview.vue'
 import StateBlock from '@/components/StateBlock.vue'
-import { analyzeActivity } from '@/services/ai'
 import { createCommunityPost } from '@/services/community'
 import {
   deleteManualActivity,
@@ -309,9 +360,6 @@ const error = ref('')
 const loading = ref(false)
 const modalOpen = ref(false)
 const isDeleting = ref(false)
-const analysis = ref(null)
-const analysisError = ref('')
-const analysisLoading = ref(false)
 const trackPoints = ref([])
 const heartRateSeries = ref([])
 const speedSeries = ref([])
@@ -326,13 +374,33 @@ const isUploadingPhoto = ref(false)
 const isSharingActivity = ref(false)
 const activeTab = ref('overview')
 const splitMode = ref('lap')
+const showPoster = ref(false)
+const selfReviewSaved = ref(false)
+const SELF_REVIEW_STORAGE_KEY = 'motioncare-activity-self-review'
+const selfReviewDefaults = {
+  title: '',
+  restingHeartRate: '',
+  weightBefore: '',
+  weightAfter: '',
+  fatigue: 1,
+  feeling: 'great',
+  note: '',
+}
+const selfReview = reactive({ ...selfReviewDefaults })
+const feelOptions = [
+  { value: 'great', label: '很好' },
+  { value: 'easy', label: '轻松' },
+  { value: 'normal', label: '正常' },
+  { value: 'tired', label: '偏累' },
+  { value: 'hard', label: '吃力' },
+]
 
 const detailTabs = [
   { key: 'overview', label: '概览' },
   { key: 'charts', label: '图表' },
+  { key: 'splits', label: '分段' },
   { key: 'details', label: '详情' },
   { key: 'analysis', label: '分析' },
-  { key: 'splits', label: '分段' },
 ]
 const splitModeOptions = [
   { value: 'lap', label: '1公里' },
@@ -369,8 +437,13 @@ const canEditActivity = computed(() => {
   if (authSession.user.role === 'admin') return true
   return Number(authSession.user.id) === Number(activity.value?.ownerUserId)
 })
-const analysisInsights = computed(() => analysis.value?.insights || [])
-const analysisSuggestions = computed(() => analysis.value?.suggestions || [])
+const fatigueLabel = computed(() => {
+  const value = Number(selfReview.fatigue)
+  if (!Number.isFinite(value) || value <= 3) return '安静不费力'
+  if (value <= 6) return '有训练感'
+  if (value <= 8) return '偏累'
+  return '非常疲劳'
+})
 const trainingLoadValue = computed(() => {
   const load = Number(activity.value?.activity_training_load)
   return Number.isFinite(load) ? load : null
@@ -440,6 +513,32 @@ const overviewMetricItems = computed(() => overviewMetrics.value.map((metric) =>
   ...metric,
   ...splitMetricValue(metric.value),
 })))
+const posterPolyline = computed(() => {
+  const points = trackPoints.value
+    .map((point) => ({
+      lat: Number(point.latitude ?? point.lat),
+      lng: Number(point.longitude ?? point.lng),
+    }))
+    .filter((point) => Number.isFinite(point.lat) && Number.isFinite(point.lng))
+
+  if (points.length < 2) return ''
+
+  const minLat = Math.min(...points.map((point) => point.lat))
+  const maxLat = Math.max(...points.map((point) => point.lat))
+  const minLng = Math.min(...points.map((point) => point.lng))
+  const maxLng = Math.max(...points.map((point) => point.lng))
+  const latSpan = maxLat - minLat || 0.0001
+  const lngSpan = maxLng - minLng || 0.0001
+  const viewWidth = 320
+  const viewHeight = 360
+  const padding = 34
+
+  return points.map((point) => {
+    const x = padding + ((point.lng - minLng) / lngSpan) * (viewWidth - padding * 2)
+    const y = padding + ((maxLat - point.lat) / latSpan) * (viewHeight - padding * 2)
+    return `${x.toFixed(1)},${y.toFixed(1)}`
+  }).join(' ')
+})
 
 const heartRateOption = computed(() => createLineOption('心率', 'bpm', '#ef4444', heartRateSeries.value, 'heart_rate_bpm', {
   areaColor: 'rgba(239, 68, 68, 0.22)',
@@ -624,10 +723,6 @@ function selectTab(key) {
   document.querySelector('.page-frame')?.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
-function placeholderAction(message) {
-  showToast(message)
-}
-
 function splitMetricValue(value) {
   const text = String(value || '--')
   if (text === '--') return { valueText: '--', unitText: '' }
@@ -768,6 +863,23 @@ function formatDetailDateTime(value, withSeconds = false) {
   }).format(date)
 
   return `${dateText}（${weekday}） ${timeText}`
+}
+
+function formatPosterDate(value) {
+  if (!value) return '--'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '--'
+  const datePart = [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, '0'),
+    String(date.getDate()).padStart(2, '0'),
+  ].join('/')
+  const timePart = [
+    String(date.getHours()).padStart(2, '0'),
+    String(date.getMinutes()).padStart(2, '0'),
+    String(date.getSeconds()).padStart(2, '0'),
+  ].join(':')
+  return `${datePart} ${timePart}`
 }
 
 function elapsedLabels(source) {
@@ -997,10 +1109,9 @@ function createDistanceGroup(groupLaps, index, distanceM, targetDistanceM) {
 async function loadActivity(id) {
   loading.value = true
   error.value = ''
-  analysis.value = null
-  analysisError.value = ''
   activeTab.value = 'overview'
   splitMode.value = 'lap'
+  showPoster.value = false
   setNavTitle('运动详情')
 
   try {
@@ -1019,6 +1130,7 @@ async function loadActivity(id) {
 
     editForm.value.activityName = nextActivity.activity_name || ''
     editForm.value.effort = nextActivity.perceived_effort || null
+    loadSelfReview(nextActivity)
 
     selectedShoeId.value = nextActivity.shoe_id || nextActivity.shoeId || null
     shoeError.value = ''
@@ -1050,31 +1162,61 @@ async function loadActivity(id) {
   }
 }
 
-async function runAnalysis() {
-  analysisError.value = ''
-  analysisLoading.value = true
-  try {
-    const envelope = await analyzeActivity(activity.value.id)
-    analysis.value = envelope.data
-    showToast('分析完成')
-  } catch (err) {
-    analysisError.value = err instanceof Error ? err.message : '智能分析失败'
-  } finally {
-    analysisLoading.value = false
+function getSelfReviewKey(id = activity.value?.id) {
+  return id ? `${SELF_REVIEW_STORAGE_KEY}:${id}` : ''
+}
+
+function loadSelfReview(nextActivity) {
+  Object.assign(selfReview, selfReviewDefaults)
+  selfReviewSaved.value = false
+
+  const storedKey = getSelfReviewKey(nextActivity?.id)
+  if (storedKey) {
+    try {
+      const stored = window.localStorage.getItem(storedKey)
+      if (stored) {
+        Object.assign(selfReview, selfReviewDefaults, JSON.parse(stored))
+        selfReviewSaved.value = true
+        return
+      }
+    } catch {
+      window.localStorage.removeItem(storedKey)
+    }
+  }
+
+  const effort = Number(nextActivity?.perceived_effort)
+  if (Number.isFinite(effort) && effort > 0) {
+    selfReview.fatigue = Math.max(1, Math.min(10, Math.round(effort)))
   }
 }
 
-async function saveMeta() {
+function persistSelfReview() {
+  const storedKey = getSelfReviewKey()
+  if (!storedKey) return
+  window.localStorage.setItem(storedKey, JSON.stringify({
+    title: selfReview.title,
+    restingHeartRate: selfReview.restingHeartRate,
+    weightBefore: selfReview.weightBefore,
+    weightAfter: selfReview.weightAfter,
+    fatigue: selfReview.fatigue,
+    feeling: selfReview.feeling,
+    note: selfReview.note,
+  }))
+}
+
+async function saveSelfReview() {
   isSavingMeta.value = true
   try {
     const updated = await updateActivityMeta(activity.value.id, {
-      perceivedEffort: editForm.value.effort || null,
+      perceivedEffort: selfReview.fatigue || null,
     })
     activity.value = updated
     setNavTitle(updated.activity_name || updated.activity_type || '运动详情')
     editForm.value.activityName = updated.activity_name || ''
     editForm.value.effort = updated.perceived_effort || null
-    showToast('已保存')
+    persistSelfReview()
+    selfReviewSaved.value = true
+    showToast('自评已保存')
   } catch (err) {
     error.value = err instanceof Error ? err.message : '保存失败'
   } finally {
@@ -1153,7 +1295,7 @@ async function handleSaved(nextActivity) {
 
 async function bindShoe() {
   await apiClient.post(`/activities/${activity.value.id}/shoe`, { shoeId: selectedShoeId.value })
-  const shoe = shoes.value.find((item) => item.id === selectedShoeId.value)
+  const shoe = shoes.value.find((item) => Number(item.id) === Number(selectedShoeId.value))
   activity.value.shoeName = shoe?.name || null
   activity.value.shoe_name = shoe?.name || null
   showToast(shoe ? '已绑定跑鞋' : '已取消跑鞋绑定')
@@ -1330,7 +1472,6 @@ onBeforeUnmount(() => {
 }
 
 .training-analysis-card,
-.analysis-result-card,
 .chart-section,
 .detail-info-group,
 .split-table-card {
@@ -1343,53 +1484,77 @@ onBeforeUnmount(() => {
 
 .training-analysis-card {
   display: grid;
-  gap: 14px;
-  padding: 20px;
+  gap: 10px;
+  overflow: hidden;
+  padding: 22px;
+  border: 0;
+  background:
+    radial-gradient(circle at 92% 8%, color-mix(in srgb, var(--sport-color) 16%, transparent), transparent 28%),
+    linear-gradient(135deg, #ffffff 0%, color-mix(in srgb, var(--sport-color) 8%, #f8fafc) 100%);
+  box-shadow: 0 16px 36px rgb(15 23 42 / 0.08);
+}
+
+.analysis-tab .training-analysis-card {
+  margin-top: 18px;
+}
+
+.chart-tab .chart-section:first-child,
+.details-tab .detail-info-group:first-child {
+  margin-top: 18px;
 }
 
 .compact-heading {
   align-items: start;
 }
 
+.status-chip {
+  align-self: start;
+  padding: 7px 12px;
+  border: 1px solid color-mix(in srgb, var(--sport-color) 24%, #d7dce3);
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.78);
+  color: #0f7a4b;
+  font-size: 13px;
+  font-weight: 800;
+}
+
 .compact-heading h2 {
   margin: 2px 0 0;
   color: #111827;
-  font-size: 24px;
+  font-size: 28px;
+  line-height: 1.1;
 }
 
 .training-analysis-card p,
-.analysis-result-card p,
 .detail-analysis-summary {
+  max-width: 296px;
   margin: 0;
   color: #516073;
   font-size: 15px;
   line-height: 1.7;
 }
 
-.analysis-factor-grid,
-.analysis-insights {
+.analysis-factor-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
 }
 
-.analysis-factor-grid span,
-.analysis-insights span {
+.analysis-factor-grid span {
   min-width: 0;
   padding: 12px;
   border-radius: 14px;
-  background: #eef8f3;
+  background: rgb(255 255 255 / 0.76);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sport-color) 10%, transparent);
 }
 
-.analysis-factor-grid small,
-.analysis-insights small {
+.analysis-factor-grid small {
   display: block;
   color: #66758a;
   font-size: 12px;
 }
 
-.analysis-factor-grid b,
-.analysis-insights b {
+.analysis-factor-grid b {
   display: block;
   margin-top: 6px;
   color: #111827;
@@ -1424,25 +1589,17 @@ onBeforeUnmount(() => {
   color: #fff;
 }
 
-.analysis-result-card {
-  display: grid;
-  gap: 14px;
-  padding: 18px;
-}
-
-.analysis-result-card ul,
-.detail-analysis-list {
-  margin: 0;
-  padding-left: 18px;
-  color: #516073;
-  line-height: 1.7;
-}
-
 .chart-tab,
-.details-tab,
-.analysis-tab,
+.details-tab {
+  padding: 34px 0 28px;
+}
+
+.analysis-tab {
+  padding: 34px 0 28px;
+}
+
 .splits-tab {
-  padding: 18px 0 28px;
+  padding: 36px 0 28px;
 }
 
 .chart-section {
@@ -1602,18 +1759,287 @@ onBeforeUnmount(() => {
   color: #111827;
 }
 
+.activity-feedback-card,
+.activity-photo-card {
+  display: grid;
+  gap: 18px;
+}
+
+.self-review-heading,
+.photo-card-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.self-review-heading h2,
+.photo-card-heading h2 {
+  margin: 0;
+  font-size: 28px;
+  line-height: 1.1;
+}
+
+.self-review-heading h2 {
+  margin-right: auto;
+}
+
+.self-review-heading::before {
+  content: "";
+  width: 6px;
+  height: 32px;
+  border-radius: 0;
+  background: var(--sport-color);
+}
+
+.self-review-note input,
+.self-review-row input,
+.self-review-textarea textarea {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid #d7dce3;
+  border-radius: 14px;
+  background: #f8fafc;
+  color: #111827;
+  font: inherit;
+}
+
+.self-review-note input {
+  min-height: 56px;
+  padding: 0 14px;
+  font-size: 18px;
+}
+
+.self-review-row {
+  display: grid;
+  grid-template-columns: 118px minmax(0, 1fr);
+  align-items: center;
+  gap: 16px;
+  color: #111827;
+  font-size: 20px;
+}
+
+.self-review-row > span,
+.self-review-textarea > span {
+  font-weight: 600;
+}
+
+.self-review-row label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #4b5563;
+  font-size: 15px;
+}
+
+.compact-number-input {
+  justify-self: end;
+  display: grid !important;
+  grid-template-columns: minmax(0, 137px) auto;
+  align-items: center;
+  width: min(100%, 198px);
+}
+
+.compact-number-input b,
+.weight-inputs b {
+  white-space: nowrap;
+}
+
+.self-review-row input[type="number"] {
+  min-height: 46px;
+  padding: 0 14px;
+  text-align: right;
+  border: 0;
+  background: transparent;
+  color: #6b7280;
+  font-size: 15px;
+}
+
+.weight-inputs {
+  justify-self: end;
+  display: grid;
+  grid-template-columns: 82px 18px 82px auto;
+  align-items: center;
+  width: min(100%, 230px);
+}
+
+.weight-inputs em {
+  color: #64748b;
+  font-style: normal;
+  text-align: center;
+}
+
+.self-review-row--slider {
+  grid-template-columns: 72px minmax(0, 1fr) 108px;
+}
+
+.fatigue-range-shell {
+  position: relative;
+  width: 100%;
+  height: 34px;
+  background-image: linear-gradient(90deg, #f9f4bd 0%, #fff04d 45%, #f59e0b 72%, #ef4444 100%);
+  background-size: calc(100% - 18px) 10px;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.fatigue-range {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.fatigue-range::-webkit-slider-runnable-track {
+  height: 10px;
+  border-radius: 999px;
+  background: transparent;
+}
+
+.fatigue-range::-webkit-slider-thumb {
+  width: 20px;
+  height: 20px;
+  margin-top: -5px;
+  appearance: none;
+  border: 2px solid #fff;
+  border-radius: 999px;
+  background: var(--sport-color);
+  box-shadow: 0 8px 18px rgb(15 23 42 / 0.18);
+}
+
+.fatigue-range::-moz-range-track {
+  height: 10px;
+  border-radius: 999px;
+  background: transparent;
+}
+
+.fatigue-range::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border: 2px solid #fff;
+  border-radius: 999px;
+  background: var(--sport-color);
+  box-shadow: 0 8px 18px rgb(15 23 42 / 0.18);
+}
+
+.self-review-row--slider b {
+  color: #374151;
+  font-size: 16px;
+  text-align: right;
+}
+
+.self-review-row--feel {
+  grid-template-columns: 118px minmax(0, 1fr);
+}
+
+.feel-picker {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.feel-picker button {
+  min-width: 0;
+  min-height: 36px;
+  padding: 0 6px;
+  border: 1px solid #d7dce3;
+  border-radius: 999px;
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.feel-picker button.active {
+  border-color: color-mix(in srgb, var(--sport-color) 38%, #d7dce3);
+  background: color-mix(in srgb, var(--sport-color) 14%, #fff);
+  color: #0f7a4b;
+  box-shadow: 0 8px 18px rgb(34 197 94 / 0.24);
+}
+
+.self-review-textarea {
+  display: grid;
+  gap: 10px;
+}
+
+.self-review-textarea textarea {
+  min-height: 90px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #8b95a1;
+  font-size: 15px;
+  resize: vertical;
+}
+
+.self-review-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.self-review-actions span {
+  color: #16a34a;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.primary-link {
+  min-height: 44px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 12px;
+  background: #17bf72;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.primary-link:disabled {
+  opacity: 0.64;
+}
+
 .photo-section {
-  padding: 8px 0 0;
+  padding: 0;
   display: grid;
   gap: 12px;
 }
 
 .photo-upload-label {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  font-size: 13px;
+  position: relative;
+  min-height: 136px;
+  display: grid;
+  place-items: center;
+  gap: 6px;
+  padding: 18px;
+  border: 1.5px dashed color-mix(in srgb, var(--sport-color) 42%, #cbd5e1);
+  border-radius: 18px;
+  background: linear-gradient(135deg, #f8fafc, color-mix(in srgb, var(--sport-color) 8%, #fff));
+  color: #0f7a4b;
+  text-align: center;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.photo-upload-label small {
   color: #64748b;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.photo-upload-label input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
 }
 
 .upload-status {
@@ -1622,12 +2048,11 @@ onBeforeUnmount(() => {
 }
 
 .activity-photo {
-  width: auto;
-  max-width: 100%;
-  max-height: 180px;
-  border-radius: 8px;
+  width: 100%;
+  max-height: 220px;
+  border-radius: 16px;
   object-fit: cover;
-  margin-top: 8px;
+  box-shadow: 0 10px 22px rgb(15 23 42 / 0.1);
 }
 
 .detail-action-bar {
@@ -1665,21 +2090,52 @@ onBeforeUnmount(() => {
 }
 
 .shoe-bind {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 12px;
+  display: grid;
+  gap: 10px;
   padding: 8px 0;
 }
 
+.shoe-select-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  min-height: 58px;
+  padding: 8px 14px;
+  border: 1px solid color-mix(in srgb, var(--sport-color) 24%, #d7dce3);
+  border-radius: 16px;
+  background: linear-gradient(135deg, #fff, color-mix(in srgb, var(--sport-color) 8%, #f8fafc));
+  box-shadow: 0 8px 18px rgb(15 23 42 / 0.05);
+}
+
+.shoe-select-card::after {
+  content: "⌄";
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  translate: 0 -50%;
+  color: #0f8a57;
+  font-size: 22px;
+  pointer-events: none;
+}
+
+.shoe-select-card span {
+  color: #64748b;
+  font-size: 14px;
+  font-weight: 800;
+}
+
 .shoe-bind select {
-  flex: 1 1 180px;
+  width: 100%;
   min-width: 0;
-  padding: 10px 12px;
-  border: 1px solid #d7dce3;
-  border-radius: 10px;
-  background: #f8fafc;
+  padding: 10px 28px 10px 0;
+  border: 0;
+  appearance: none;
+  background: transparent;
   color: #111827;
+  font-size: 17px;
+  font-weight: 800;
 }
 
 .shoe-bind-info,
@@ -1694,24 +2150,29 @@ onBeforeUnmount(() => {
 
 .split-mode-toggle {
   display: flex;
-  gap: 10px;
-  padding: 0 20px;
+  gap: 4px;
+  width: fit-content;
+  margin: 8px 20px 20px;
+  padding: 4px;
+  border: 1px solid #d7dce3;
+  border-radius: 999px;
+  background: #e8eef5;
 }
 
 .split-mode-toggle button {
   min-height: 36px;
   padding: 0 14px;
-  border: 1px solid #d7dce3;
+  border: 0;
   border-radius: 999px;
-  background: #fff;
-  color: #111827;
-  font-weight: 500;
+  background: transparent;
+  color: #475569;
+  font-weight: 700;
 }
 
 .split-mode-toggle button.active {
-  border-color: #d7dce3;
   background: #fff;
-  color: #000;
+  color: #0f172a;
+  box-shadow: 0 4px 12px rgb(15 23 42 / 0.08);
 }
 
 .split-table-card {
@@ -1763,8 +2224,243 @@ onBeforeUnmount(() => {
 }
 
 .heart-rate-cell {
-  color: #b42335;
+  color: #111827;
   text-align: left;
+}
+
+.poster-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: start center;
+  overflow: auto;
+  padding: 16px;
+  background: rgb(15 23 42 / 0.52);
+}
+
+.poster-sheet {
+  width: min(100%, 430px);
+  display: grid;
+  gap: 12px;
+}
+
+.poster-sheet > header {
+  min-height: 56px;
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr) 72px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  border-radius: 18px;
+  background: #f8fafc;
+  box-shadow: 0 14px 34px rgb(15 23 42 / 0.2);
+}
+
+.poster-sheet > header h2 {
+  margin: 0;
+  color: #111827;
+  font-size: 20px;
+  text-align: center;
+}
+
+.poster-sheet > header button {
+  min-height: 38px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #0f8a57;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.activity-poster {
+  position: relative;
+  overflow: hidden;
+  min-height: 650px;
+  display: grid;
+  grid-template-rows: auto minmax(285px, 1fr) auto auto;
+  gap: 18px;
+  padding: 28px 20px 22px;
+  border-radius: 26px;
+  background: #dcefe7;
+  color: #10251a;
+  box-shadow: 0 28px 60px rgb(15 23 42 / 0.24);
+}
+
+.activity-poster::before,
+.activity-poster::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.activity-poster::before {
+  top: 0;
+  height: 210px;
+  background: linear-gradient(180deg, rgb(248 255 251 / 0.96) 0%, rgb(248 255 251 / 0.8) 42%, rgb(248 255 251 / 0) 100%);
+}
+
+.activity-poster::after {
+  bottom: 0;
+  height: 270px;
+  background: linear-gradient(0deg, rgb(248 255 251 / 0.96) 0%, rgb(248 255 251 / 0.74) 46%, rgb(248 255 251 / 0) 100%);
+}
+
+.poster-title,
+.poster-metrics,
+.activity-poster footer {
+  position: relative;
+  z-index: 2;
+}
+
+.poster-title {
+  grid-row: 1;
+}
+
+.poster-title h3 {
+  margin: 0;
+  color: #10251a;
+  font-size: 31px;
+  line-height: 1.12;
+}
+
+.poster-title p {
+  margin: 8px 0 0;
+  color: #64748b;
+  font-size: 16px;
+}
+
+.poster-route {
+  position: relative;
+  z-index: 2;
+  overflow: hidden;
+  min-height: 360px;
+  display: grid;
+  place-items: center;
+  border-radius: 22px;
+  background: #dcefe7;
+  box-shadow:
+    inset 0 0 0 1px rgb(255 255 255 / 0.55),
+    0 18px 36px rgb(15 23 42 / 0.14);
+}
+
+.poster-map-preview {
+  position: absolute;
+  inset: 0 auto 0 -20px;
+  z-index: 0;
+  width: calc(100% + 40px) !important;
+  max-width: none !important;
+  min-height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: #dcefe7;
+  box-shadow: none;
+}
+
+.poster-map-preview :deep(.panel-heading) {
+  display: none;
+}
+
+.poster-map-preview :deep(.route-map) {
+  width: 100%;
+  height: 100%;
+  min-height: 650px;
+  border-radius: 0;
+}
+
+.poster-map-preview :deep(.leaflet-control-container) {
+  display: none;
+}
+
+.poster-map-fade {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background:
+    radial-gradient(circle at 50% 45%, rgb(255 255 255 / 0) 0%, rgb(15 23 42 / 0.08) 100%),
+    linear-gradient(180deg, rgb(255 255 255 / 0.18) 0%, rgb(255 255 255 / 0) 28%, rgb(255 255 255 / 0) 58%, rgb(255 255 255 / 0.18) 100%);
+  pointer-events: none;
+}
+
+.poster-route svg {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  max-height: 360px;
+  overflow: visible;
+}
+
+.poster-route polyline {
+  fill: none;
+  stroke: #00f529;
+  stroke-width: 11;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 0 10px rgb(34 255 67 / 0.8));
+}
+
+.poster-route span {
+  position: relative;
+  z-index: 2;
+  color: #64748b;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.poster-metrics {
+  grid-row: 3;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  text-align: center;
+}
+
+.poster-metrics span {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 8px 4px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.poster-metrics small {
+  color: #42526a;
+  font-size: 15px;
+  font-weight: 800;
+  text-shadow: 0 1px 8px rgb(255 255 255 / 0.92);
+}
+
+.poster-metrics b {
+  color: #10251a;
+  font-size: 27px;
+  line-height: 1.05;
+  white-space: nowrap;
+  text-shadow: 0 2px 12px rgb(255 255 255 / 0.95);
+}
+
+.activity-poster footer {
+  grid-row: 4;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: #64748b;
+  font-size: 15px;
+}
+
+.activity-poster footer b {
+  color: #16e875;
+  font-size: 17px;
 }
 
 @container phone-frame (min-width: 410px) {
@@ -1785,13 +2481,55 @@ onBeforeUnmount(() => {
   }
 
   .overview-metric-grid,
-  .analysis-factor-grid,
-  .analysis-insights {
+  .analysis-factor-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .detail-action-row {
     grid-template-columns: 1fr;
+  }
+
+  .self-review-row,
+  .self-review-row--feel {
+    grid-template-columns: 1fr;
+  }
+
+  .self-review-row--slider {
+    grid-template-columns: 1fr;
+  }
+
+  .feel-picker {
+    grid-template-columns: repeat(5, minmax(36px, 1fr));
+  }
+
+  .feel-picker button {
+    width: 100%;
+  }
+
+  .poster-overlay {
+    padding: 10px;
+  }
+
+  .activity-poster {
+    min-height: 640px;
+    padding: 24px 18px 20px;
+  }
+
+  .poster-map-preview :deep(.route-map) {
+    min-height: 640px;
+  }
+
+  .poster-map-preview {
+    left: -18px;
+    width: calc(100% + 36px) !important;
+  }
+
+  .poster-title h3 {
+    font-size: 29px;
+  }
+
+  .poster-metrics b {
+    font-size: 38px;
   }
 
   .zone-row-detail {

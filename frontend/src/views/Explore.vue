@@ -12,7 +12,9 @@
           :to="item.to"
           :aria-label="item.label"
         >
-          <component :is="item.icon" :size="38" :style="{ color: item.color }" aria-hidden="true" />
+          <span class="explore-entry-card__icon" :style="{ '--entry-color': item.color, '--entry-bg': item.bg }">
+            <component :is="item.icon" :size="26" aria-hidden="true" />
+          </span>
           <span>{{ item.label }}</span>
         </RouterLink>
         <button
@@ -22,7 +24,9 @@
           :aria-label="item.label"
           @click="showComingSoon(item.label)"
         >
-          <component :is="item.icon" :size="38" :style="{ color: item.color }" aria-hidden="true" />
+          <span class="explore-entry-card__icon" :style="{ '--entry-color': item.color, '--entry-bg': item.bg }">
+            <component :is="item.icon" :size="26" aria-hidden="true" />
+          </span>
           <span>{{ item.label }}</span>
         </button>
       </template>
@@ -36,22 +40,31 @@ import {
   BarChart3,
   BookOpen,
   Bot,
+  CalendarDays,
+  ClipboardList,
+  CloudCog,
   Flame,
-  Gauge,
   HeartPulse,
+  LineChart,
   Route,
+  Settings2,
+  Sparkles,
   Trophy,
 } from '@lucide/vue'
 
 const exploreEntries = [
-  { label: '状态', to: { path: '/status', query: { from: 'explore' } }, icon: Gauge, color: '#16a34a' },
-  { label: '教练', to: { path: '/coach', query: { from: 'explore' } }, icon: Bot, color: '#8b5cf6' },
-  { label: '运动统计', to: { path: '/status/trends', query: { from: 'explore' } }, icon: BarChart3, color: '#2563eb' },
-  { label: '最佳榜单', to: { path: '/status/records', query: { from: 'explore' } }, icon: Trophy, color: '#f59e0b' },
-  { label: '热门赛事', icon: Flame, color: '#dc2626' },
-  { label: '运动路线', icon: Route, color: '#0f9f8f' },
-  { label: '身体数据', to: { path: '/status/health', query: { from: 'explore' } }, icon: HeartPulse, color: '#e11d48' },
-  { label: '常用课程', icon: BookOpen, color: '#4f46e5' },
+  { label: '运动日历', to: { path: '/status/calendar', query: { from: 'explore' } }, icon: CalendarDays, color: '#2563eb', bg: '#dbeafe' },
+  { label: '健康度', to: { path: '/status/health', query: { from: 'explore' } }, icon: HeartPulse, color: '#f59e0b', bg: '#fef3c7' },
+  { label: '趋势', to: { path: '/status/trends', query: { from: 'explore' } }, icon: LineChart, color: '#0ea5e9', bg: '#e0f2fe' },
+  { label: '身体数据', to: { path: '/me/settings', query: { from: 'explore', section: 'body' } }, icon: Settings2, color: '#0f9f8f', bg: '#ccfbf1' },
+  { label: '训练计划', to: { path: '/coach', query: { from: 'explore' } }, icon: ClipboardList, color: '#16a34a', bg: '#dcfce7' },
+  { label: '常用课程', to: { path: '/explore/courses' }, icon: BookOpen, color: '#4f46e5', bg: '#e0e7ff' },
+  { label: '状态总览', to: { path: '/status', query: { from: 'explore' } }, icon: Sparkles, color: '#14b8a6', bg: '#ccfbf1' },
+  { label: 'AI教练', to: { path: '/coach', query: { from: 'explore' } }, icon: Bot, color: '#8b5cf6', bg: '#ede9fe' },
+  { label: '最佳榜单', to: { path: '/status/records', query: { from: 'explore' } }, icon: Trophy, color: '#f59e0b', bg: '#fef3c7' },
+  { label: '运动路线', to: { path: '/explore/routes' }, icon: Route, color: '#0f9f8f', bg: '#ccfbf1' },
+  { label: '热门赛事', to: { path: '/explore/events' }, icon: Flame, color: '#dc2626', bg: '#fee2e2' },
+  { label: '数据同步', to: { path: '/me/sync', query: { from: 'explore' } }, icon: CloudCog, color: '#0ea5e9', bg: '#dbeafe' },
 ]
 
 function showComingSoon(label) {
@@ -61,14 +74,14 @@ function showComingSoon(label) {
 
 <style scoped>
 .explore-home {
-  gap: 18px;
+  gap: 16px;
 }
 
 .explore-heading {
   display: grid;
   place-items: center;
-  min-height: 64px;
-  padding-top: 8px;
+  min-height: 58px;
+  padding-top: 6px;
 }
 
 .explore-heading h1 {
@@ -83,40 +96,47 @@ function showComingSoon(label) {
 .explore-entry-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
+  gap: 14px 12px;
 }
 
 .explore-entry-card {
-  display: grid;
-  grid-template-rows: 42px auto;
-  align-items: center;
-  justify-items: center;
-  gap: 10px;
   min-width: 0;
-  min-height: 118px;
-  padding: 18px 8px 14px;
-  border: 1px solid color-mix(in srgb, var(--app-green) 14%, var(--border));
-  border-radius: 18px;
-  background: var(--panel);
+  min-height: 96px;
+  display: grid;
+  grid-template-rows: 50px auto;
+  align-items: start;
+  justify-items: center;
+  gap: 8px;
+  padding: 10px 6px 12px;
+  border: 0;
+  background: transparent;
   color: var(--text);
   text-align: center;
   text-decoration: none;
-  box-shadow: var(--shadow-sm);
   cursor: pointer;
 }
 
-.explore-entry-card svg {
-  width: 38px;
-  height: 38px;
-  stroke-width: 2.6;
+.explore-entry-card__icon {
+  width: 50px;
+  height: 50px;
+  display: grid;
+  place-items: center;
+  border-radius: 16px;
+  background: var(--entry-bg, color-mix(in srgb, var(--entry-color) 12%, #f8fafc));
+  color: var(--entry-color);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--entry-color) 10%, transparent);
 }
 
-.explore-entry-card span {
+.explore-entry-card__icon svg {
+  stroke-width: 2.5;
+}
+
+.explore-entry-card > span:last-child {
   min-width: 0;
   color: var(--text);
-  font-size: 14px;
-  line-height: 1.15;
-  font-weight: 900;
+  font-size: 13px;
+  line-height: 1.18;
+  font-weight: 800;
   overflow-wrap: anywhere;
 }
 
@@ -126,22 +146,22 @@ function showComingSoon(label) {
 
 @container phone-frame (max-width: 390px) {
   .explore-entry-grid {
-    gap: 9px;
+    gap: 10px 8px;
   }
 
   .explore-entry-card {
-    min-height: 108px;
-    padding: 15px 6px 12px;
-    border-radius: 16px;
+    min-height: 88px;
+    padding-inline: 3px;
   }
 
-  .explore-entry-card svg {
-    width: 34px;
-    height: 34px;
+  .explore-entry-card__icon {
+    width: 46px;
+    height: 46px;
+    border-radius: 15px;
   }
 
-  .explore-entry-card span {
-    font-size: 13px;
+  .explore-entry-card > span:last-child {
+    font-size: 12px;
   }
 }
 </style>
