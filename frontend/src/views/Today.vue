@@ -206,7 +206,7 @@ const todayActions = [
   { label: '运动日历', to: { path: '/status/calendar', query: { from: 'today' } }, icon: CalendarDays, color: '#2563eb' },
   { label: '健康度', to: { path: '/status/health', query: { from: 'today' } }, icon: HeartPulse, color: '#f59e0b' },
   { label: '趋势', to: { path: '/status/trends', query: { from: 'today' } }, icon: TrendingUp, color: '#0ea5e9' },
-  { label: '训练计划', to: { path: '/coach', query: { from: 'today' } }, icon: ClipboardList, color: '#16a34a' },
+  { label: '训练计划', to: { path: '/training-plans', query: { from: 'today' } }, icon: ClipboardList, color: '#16a34a' },
 ]
 const latestWeatherActivity = computed(() => recentActivities.value.find((activity) => (
   activity.weather_condition || activity.temperature_c != null || activity.feels_like_c != null || activity.humidity_percent != null

@@ -8,7 +8,11 @@
       <span>{{ validPoints.length }} 点</span>
     </div>
 
-    <div v-if="validPoints.length" ref="mapRef" class="route-map" aria-label="轨迹地图预览"></div>
+    <div v-if="validPoints.length && !mapError" ref="mapRef" class="route-map" aria-label="轨迹地图预览"></div>
+    <div v-else-if="validPoints.length && mapError" class="route-map route-map-empty route-map-error" aria-label="轨迹地图加载失败">
+      <strong>地图加载失败</strong>
+      <span>{{ mapError }}</span>
+    </div>
     <div v-else class="route-map route-map-empty" aria-label="轨迹地图预览为空">
       <strong>暂无可用地图轨迹</strong>
       <span>当前运动没有有效经纬度采样点。</span>
@@ -17,10 +21,10 @@
 </template>
 
 <script setup>
-import 'leaflet/dist/leaflet.css'
-
-import L from 'leaflet'
+import AMapLoader from '@amap/amap-jsapi-loader'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+
+import { getPublicConfig } from '@/services/system'
 
 const props = defineProps({
   points: {
@@ -30,15 +34,15 @@ const props = defineProps({
 })
 
 const mapRef = ref(null)
+const mapError = ref('')
+let AMapApi = null
 let map = null
-let tileLayer = null
-let routeLayer = null
-let markerLayer = null
+let routeOverlays = []
+let markerOverlays = []
+let refreshToken = 0
 
 const EARTH_RADIUS_M = 6371000
 const FALLBACK_ROUTE_COLOR = '#21d47b'
-const MAP_PROVIDER = import.meta.env.VITE_MAP_PROVIDER || 'amap'
-const MAP_TILE_URL = import.meta.env.VITE_MAP_TILE_URL
 const SPEED_COLOR_STOPS = [
   { at: 0, color: [37, 99, 235] },
   { at: 0.25, color: [6, 182, 212] },
@@ -46,24 +50,7 @@ const SPEED_COLOR_STOPS = [
   { at: 0.75, color: [245, 158, 11] },
   { at: 1, color: [239, 68, 68] },
 ]
-
-const TILE_CONFIGS = {
-  amap: {
-    url: MAP_TILE_URL || 'https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}',
-    options: {
-      subdomains: ['1', '2', '3', '4'],
-      maxZoom: 19,
-      attribution: '&copy; AMap',
-    },
-  },
-  osm: {
-    url: MAP_TILE_URL || 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-    options: {
-      maxZoom: 19,
-      attribution: '&copy; OpenStreetMap contributors',
-    },
-  },
-}
+let publicConfigPromise = null
 
 function toCoordinate(value) {
   if (value === null || value === undefined || value === '') return null
@@ -142,7 +129,8 @@ function colorForSpeed(speedMps, minSpeedMps, maxSpeedMps) {
 
   const span = maxSpeedMps - minSpeedMps
   const ratio = span > 0 ? (speedMps - minSpeedMps) / span : 0.5
-  return colorFromStops(ratio)
+  const bucketedRatio = Math.round(clamp(ratio, 0, 1) * 18) / 18
+  return colorFromStops(bucketedRatio)
 }
 
 function distanceBetween(a, b) {
@@ -189,7 +177,7 @@ function transformLon(x, y) {
 }
 
 function toDisplayCoordinate(latitude, longitude) {
-  if (MAP_PROVIDER !== 'amap' || !isInChina(latitude, longitude)) {
+  if (!isInChina(latitude, longitude)) {
     return { latitude, longitude }
   }
 
@@ -204,6 +192,50 @@ function toDisplayCoordinate(latitude, longitude) {
   dLat = (dLat * 180) / (((axis * (1 - offset)) / (magic * sqrtMagic)) * Math.PI)
   dLon = (dLon * 180) / ((axis / sqrtMagic) * Math.cos(radLat) * Math.PI)
   return { latitude: latitude + dLat, longitude: longitude + dLon }
+}
+
+function toAmapPath(points) {
+  return points.map((point) => [point.displayLongitude, point.displayLatitude])
+}
+
+async function getAmapConfig() {
+  if (!publicConfigPromise) {
+    publicConfigPromise = getPublicConfig()
+  }
+  const publicConfig = await publicConfigPromise
+  return publicConfig?.maps?.amap || {}
+}
+
+function configureAmapSecurity(securityCode) {
+  if (!securityCode || typeof window === 'undefined') return
+  window._AMapSecurityConfig = {
+    ...(window._AMapSecurityConfig || {}),
+    securityJsCode: securityCode,
+  }
+}
+
+async function loadAmap() {
+  if (typeof window === 'undefined') {
+    throw new Error('当前运行环境不支持地图渲染。')
+  }
+  const amapConfig = await getAmapConfig()
+  const key = amapConfig.key || ''
+  if (!key) {
+    throw new Error('缺少 AMAP_JS_API_KEY，请在 backend/.env 中配置高德 JS API Key。')
+  }
+
+  configureAmapSecurity(amapConfig.securityCode)
+  if (window.AMap?.Map) return window.AMap
+
+  if (!window.__motioncareAmapLoadPromise) {
+    window.__motioncareAmapLoadPromise = AMapLoader.load({
+      key,
+      version: '2.0',
+      plugins: ['AMap.Scale', 'AMap.ToolBar'],
+    })
+  }
+
+  return window.__motioncareAmapLoadPromise
 }
 
 const validPoints = computed(() =>
@@ -253,7 +285,7 @@ const validPoints = computed(() =>
     }, []),
 )
 
-const latLngs = computed(() => validPoints.value.map((point) => [point.displayLatitude, point.displayLongitude]))
+const amapPath = computed(() => toAmapPath(validPoints.value))
 
 const routeSegments = computed(() => {
   if (validPoints.value.length < 2) return []
@@ -270,9 +302,9 @@ const routeSegments = computed(() => {
     const speedMps = point.speedMps ?? previous.speedMps ?? fallbackSpeedMps
 
     return {
-      latLngs: [
-        [previous.displayLatitude, previous.displayLongitude],
-        [point.displayLatitude, point.displayLongitude],
+      path: [
+        [previous.displayLongitude, previous.displayLatitude],
+        [point.displayLongitude, point.displayLatitude],
       ],
       speedMps,
     }
@@ -289,6 +321,18 @@ const routeSegments = computed(() => {
     color: colorForSpeed(segment.speedMps, minSpeedMps, maxSpeedMps),
   }))
 })
+
+const groupedRouteSegments = computed(() =>
+  routeSegments.value.reduce((groups, segment) => {
+    const previous = groups.at(-1)
+    if (previous && previous.color === segment.color) {
+      previous.path.push(segment.path[1])
+    } else {
+      groups.push({ color: segment.color, path: [...segment.path] })
+    }
+    return groups
+  }, []),
+)
 
 const kilometerMarkers = computed(() => {
   if (validPoints.value.length < 2) return []
@@ -324,112 +368,114 @@ const kilometerMarkers = computed(() => {
   return markers
 })
 
-function createEndpointIcon(label, tone) {
-  return L.divIcon({
-    className: `route-endpoint route-endpoint-${tone}`,
-    html: `<span>${label}</span>`,
-    iconSize: [28, 28],
-    iconAnchor: [14, 14],
+function createEndpointMarker(label, tone, position) {
+  return new AMapApi.Marker({
+    position,
+    content: `<div class="route-endpoint route-endpoint-${tone}"><span>${label}</span></div>`,
+    offset: new AMapApi.Pixel(-14, -14),
+    zIndex: 120,
   })
 }
 
-function createKilometerIcon(kilometer) {
-  const label = String(kilometer)
+function createKilometerMarker(marker) {
+  const label = String(marker.kilometer)
   const size = label.length >= 3 ? 18 : 14
-  return L.divIcon({
-    className: 'route-km-marker',
-    html: `<span>${label}</span>`,
-    iconSize: [size, size],
-    iconAnchor: [size / 2, size / 2],
+  return new AMapApi.Marker({
+    position: [marker.longitude, marker.latitude],
+    content: `<div class="route-km-marker" style="width:${size}px;height:${size}px"><span>${label}</span></div>`,
+    offset: new AMapApi.Pixel(-size / 2, -size / 2),
+    title: `${label} km`,
+    zIndex: 140,
   })
 }
 
 function ensureMap() {
-  if (!mapRef.value || map) return
+  if (!mapRef.value || map || !AMapApi) return
 
-  map = L.map(mapRef.value, {
-    attributionControl: true,
-    scrollWheelZoom: true,
-    zoomControl: true,
+  map = new AMapApi.Map(mapRef.value, {
+    viewMode: '2D',
+    zoom: 13,
+    resizeEnable: true,
+    dragEnable: true,
+    zoomEnable: true,
   })
-
-  const tileConfig = TILE_CONFIGS[MAP_PROVIDER] || TILE_CONFIGS.osm
-  tileLayer = L.tileLayer(tileConfig.url, tileConfig.options).addTo(map)
+  map.addControl(new AMapApi.Scale())
+  map.addControl(new AMapApi.ToolBar({ position: 'LT' }))
 }
 
 function clearLayers() {
-  if (routeLayer) {
-    routeLayer.remove()
-    routeLayer = null
+  const overlays = [...routeOverlays, ...markerOverlays]
+  if (map && overlays.length) {
+    map.remove(overlays)
   }
-  if (markerLayer) {
-    markerLayer.remove()
-    markerLayer = null
-  }
+  routeOverlays = []
+  markerOverlays = []
 }
 
 function destroyMap() {
   clearLayers()
-  tileLayer?.remove()
-  tileLayer = null
-  map?.remove()
+  map?.destroy()
   map = null
 }
 
 function renderRoute() {
-  if (!map || !latLngs.value.length) return
+  if (!map || !AMapApi || !amapPath.value.length) return
 
   clearLayers()
 
-  routeLayer = L.layerGroup(
-    routeSegments.value.map((segment) =>
-      L.polyline(segment.latLngs, {
-        color: segment.color,
-        weight: 5,
-        opacity: 0.95,
-        lineCap: 'round',
-        lineJoin: 'round',
-      }),
-    ),
-  ).addTo(map)
+  routeOverlays = groupedRouteSegments.value.map((segment) =>
+    new AMapApi.Polyline({
+      path: segment.path,
+      strokeColor: segment.color,
+      strokeWeight: 5,
+      strokeOpacity: 0.95,
+      lineJoin: 'round',
+      lineCap: 'round',
+      zIndex: 80,
+    }),
+  )
 
   const markers = []
-  const start = latLngs.value[0]
-  const end = latLngs.value.at(-1)
-  markers.push(L.marker(start, { icon: createEndpointIcon('起', 'start'), keyboard: false }))
+  const start = amapPath.value[0]
+  const end = amapPath.value.at(-1)
+  markers.push(createEndpointMarker('起', 'start', start))
   for (const marker of kilometerMarkers.value) {
-    markers.push(L.marker(
-      [marker.latitude, marker.longitude],
-      {
-        icon: createKilometerIcon(marker.kilometer),
-        keyboard: false,
-        title: `${marker.kilometer} km`,
-        zIndexOffset: 300,
-      },
-    ))
+    markers.push(createKilometerMarker(marker))
   }
   if (end && (end[0] !== start[0] || end[1] !== start[1])) {
-    markers.push(L.marker(end, { icon: createEndpointIcon('终', 'finish'), keyboard: false }))
+    markers.push(createEndpointMarker('终', 'finish', end))
   }
-  markerLayer = L.layerGroup(markers).addTo(map)
+  markerOverlays = markers
 
-  const bounds = L.latLngBounds(latLngs.value)
-  map.fitBounds(bounds, {
-    padding: [28, 28],
-    maxZoom: 17,
-  })
-  map.invalidateSize()
+  const overlays = [...routeOverlays, ...markerOverlays]
+  if (overlays.length) {
+    map.add(overlays)
+    map.setFitView(overlays, false, [28, 28, 28, 28], 17)
+  }
+  map.resize()
 }
 
 async function refreshMap() {
+  const token = ++refreshToken
+  mapError.value = ''
+
   if (!validPoints.value.length) {
     destroyMap()
     return
   }
 
   await nextTick()
-  ensureMap()
-  renderRoute()
+  if (token !== refreshToken) return
+
+  try {
+    AMapApi = await loadAmap()
+    if (token !== refreshToken) return
+    ensureMap()
+    renderRoute()
+  } catch (err) {
+    destroyMap()
+    mapError.value = err instanceof Error ? err.message : '高德地图 SDK 加载失败。'
+  }
 }
 
 onMounted(refreshMap)
@@ -437,6 +483,7 @@ onMounted(refreshMap)
 watch(() => props.points, refreshMap, { deep: true })
 
 onBeforeUnmount(() => {
+  refreshToken += 1
   destroyMap()
 })
 </script>

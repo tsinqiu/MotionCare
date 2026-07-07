@@ -1,13 +1,5 @@
 <template>
   <div class="page-stack">
-    <section class="status-hero">
-      <div class="status-hero__top">
-        <p class="overline">身体与训练</p>
-        <span class="status-chip" :class="statusBadge.tone">{{ statusBadge.label }}</span>
-      </div>
-      <p class="status-hero__message">{{ statusBadge.message }}</p>
-    </section>
-
     <StateBlock v-if="loading" title="正在加载状态" message="正在汇总健康、负荷、纪录和日历。" />
     <StateBlock
       v-else-if="!hasData && errors.length"
@@ -21,7 +13,6 @@
       <section class="status-empty-rq-panel" aria-label="空态也保留跑力分析入口">
         <div class="status-empty-rq-panel__head">
           <div>
-            <p class="overline">跑步五力</p>
             <h2>等待跑力</h2>
           </div>
           <span class="status-chip neutral">数据不足</span>
@@ -48,15 +39,8 @@
       </section>
     </template>
 
-      <template v-else>
+    <template v-else>
       <p v-if="errors.length" class="soft-note">部分数据暂时不可用，其余内容已正常显示。</p>
-
-      <div class="metric-grid">
-        <MetricCard label="睡眠分数" :value="metricValue(health.sleepScore)" />
-        <MetricCard label="静息心率" :value="metricValue(health.restingHeartRateBpm, ' 次/分')" />
-        <MetricCard label="平均压力" :value="metricValue(health.avgStressLevel)" />
-        <MetricCard label="心率变异" :value="metricValue(health.avgHrv)" />
-      </div>
 
       <section class="rq-score-panel">
         <div class="rq-score-panel__title">
@@ -76,7 +60,6 @@
       <section class="rq-five-power-panel">
         <div class="rq-five-power-panel__head">
           <div>
-            <p class="overline">跑步五力</p>
             <h2>五力分析图</h2>
           </div>
           <span class="status-chip" :class="statusBadge.tone">{{ runningPowerLevel }}</span>
@@ -132,30 +115,33 @@
         </div>
       </section>
 
-      <section class="analysis-category-grid" aria-label="跑步分析分类">
-        <article
-          v-for="category in analysisCategories"
-          :key="category.title"
-          class="analysis-category-card"
-          :class="`analysis-category-card--${category.tone}`"
-        >
-          <span>{{ category.title }}</span>
-          <strong>{{ category.value }}</strong>
-          <small>{{ category.caption }}</small>
-        </article>
-      </section>
+      <div class="metric-grid status-health-grid">
+        <MetricCard label="睡眠分数" :value="metricValue(health.sleepScore)" />
+        <MetricCard label="静息心率" :value="metricValue(health.restingHeartRateBpm, ' 次/分')" />
+        <MetricCard label="平均压力" :value="metricValue(health.avgStressLevel)" />
+        <MetricCard label="心率变异" :value="metricValue(health.avgHrv)" />
+      </div>
 
-      <section class="dark-panel">
+      <section class="dark-panel training-load-panel">
         <div class="section-heading">
           <div><h2>训练负荷</h2></div>
+          <span class="status-chip" :class="loadBalanceTone">{{ loadBalanceLabel }}</span>
         </div>
         <p class="load-reading">{{ loadReading }}</p>
-        <div class="training-targets">
-          <span><small>体能储备</small><b>{{ metricValue(currentLoad.ctl) }}</b></span>
-          <span><small>疲劳负荷</small><b>{{ metricValue(currentLoad.atl) }}</b></span>
-          <span><small>状态余量</small><b>{{ metricValue(currentLoad.tsb) }}</b></span>
+        <div class="training-targets training-load-targets">
+          <span><small>体能（CTL）</small><b>{{ metricValue(currentLoad.ctl) }}</b></span>
+          <span><small>疲劳（ATL）</small><b>{{ metricValue(currentLoad.atl) }}</b></span>
+          <span><small>状态（TSB）</small><b>{{ metricValue(currentLoad.tsb) }}</b></span>
           <span><small>今日负荷</small><b>{{ metricValue(currentLoad.dailyTrainingLoad) }}</b></span>
         </div>
+      </section>
+
+      <section class="status-hero status-hero--bottom">
+        <div class="status-hero__top">
+          <p class="overline">身体与训练</p>
+          <span class="status-chip" :class="statusBadge.tone">{{ statusBadge.label }}</span>
+        </div>
+        <p class="status-hero__message">{{ statusBadge.message }}</p>
       </section>
     </template>
   </div>
@@ -200,6 +186,23 @@ const loadReading = computed(() => {
   if (value <= 10) return '体能和疲劳比较平衡，可以按计划继续训练。'
   return '身体比较轻松，适合安排一次高质量训练或比赛。'
 })
+const loadBalanceLabel = computed(() => {
+  const tsb = currentLoad.value.tsb
+  if (tsb === null || tsb === undefined || tsb === '') return '待同步'
+  const value = Number(tsb)
+  if (value <= -20) return '恢复优先'
+  if (value < -8) return '负荷累积'
+  if (value <= 10) return '平衡'
+  return '状态轻松'
+})
+const loadBalanceTone = computed(() => {
+  const tsb = currentLoad.value.tsb
+  if (tsb === null || tsb === undefined || tsb === '') return 'neutral'
+  const value = Number(tsb)
+  if (value <= -20) return 'danger'
+  if (value < -8) return 'warning'
+  return 'good'
+})
 const pbHighlights = computed(() => {
   const groups = [
     ['跑步', personalBests.value.running],
@@ -209,7 +212,6 @@ const pbHighlights = computed(() => {
   ]
   return groups.flatMap(([group, items]) => (items || []).slice(0, 2).map((item) => ({ ...item, group }))).slice(0, 6)
 })
-const runningRecord = computed(() => pbHighlights.value.find((item) => item.group === '跑步') || null)
 const runningPower = computed(() => performanceProfile.value?.runningPower || null)
 const runningPowerScore = computed(() => {
   const value = Number(runningPower.value?.score)
@@ -273,26 +275,6 @@ const recentLoadBars = computed(() => {
     }
   })
 })
-const analysisCategories = computed(() => [
-  {
-    title: '体能',
-    value: metricValue(currentLoad.value.ctl),
-    caption: '长期体能储备',
-    tone: 'fitness',
-  },
-  {
-    title: '最长距离',
-    value: runningRecord.value?.value ? `${runningRecord.value.value}${runningRecord.value.unit ? ` ${runningRecord.value.unit}` : ''}` : '--',
-    caption: runningRecord.value?.activityName || runningRecord.value?.label || '等待跑步纪录',
-    tone: 'power',
-  },
-  {
-    title: '技术',
-    value: metricValue(currentLoad.value.dailyTrainingLoad),
-    caption: '今日负荷与动作质量线索',
-    tone: 'technique',
-  },
-])
 const hasData = computed(() => (
   Object.keys(health.value || {}).length > 0
   || loadRows.value.length > 0
@@ -378,7 +360,20 @@ onMounted(load)
   background: var(--panel-soft);
   border-radius: var(--radius-lg);
 }
-.load-reading { margin: 0 0 14px; color: var(--muted); line-height: 1.55; }
+
+.status-chip.neutral {
+  color: var(--muted);
+}
+
+.status-chip.warning {
+  color: var(--app-amber);
+  border-color: color-mix(in srgb, var(--app-amber) 40%, var(--border));
+  background: color-mix(in srgb, var(--app-amber) 10%, var(--panel));
+}
+
+.status-chip.good {
+  background: color-mix(in srgb, var(--app-green) 10%, var(--panel));
+}
 
 .status-empty-rq-panel {
   display: grid;
@@ -503,38 +498,60 @@ onMounted(load)
   transform: translate(-50%, -50%);
 }
 
-.analysis-category-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+.status-health-grid {
+  order: 0;
+}
+
+.training-load-panel {
+  position: relative;
+  overflow: hidden;
+  border-left: 4px solid var(--app-green);
+}
+
+.training-load-panel::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 74px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--app-green) 8%, transparent), transparent);
+  pointer-events: none;
+}
+
+.training-load-panel > * {
+  position: relative;
+}
+
+.training-load-panel .section-heading {
+  align-items: center;
+}
+
+.load-reading {
+  margin: -4px 0 16px;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.training-load-targets {
   gap: 10px;
 }
-.analysis-category-card {
+
+.training-load-targets span {
   display: grid;
-  gap: 6px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 6px 10px;
   min-width: 0;
-  padding: 14px 10px;
-  border: 1px solid color-mix(in srgb, var(--green) 16%, var(--border));
-  border-radius: 12px;
-  background: var(--panel);
-  box-shadow: var(--shadow-sm);
+  padding: 12px;
+  border-color: color-mix(in srgb, var(--app-green) 18%, var(--border));
+  background: color-mix(in srgb, var(--app-green) 5%, var(--panel-soft));
 }
-.analysis-category-card span {
-  font-size: 13px;
-  font-weight: 800;
-  color: var(--green-strong);
+
+.training-load-targets small {
+  grid-column: 1 / -1;
 }
-.analysis-category-card strong {
+
+.training-load-targets b {
   min-width: 0;
-  font-size: clamp(18px, 7cqi, 24px);
-  line-height: 1;
-  color: var(--text);
-  overflow-wrap: anywhere;
+  font-size: 20px;
 }
-.analysis-category-card small {
-  color: var(--muted);
-  font-size: 11px;
-  line-height: 1.3;
-}
-.analysis-category-card--power span { color: var(--app-blue); }
-.analysis-category-card--technique span { color: var(--app-amber); }
 </style>

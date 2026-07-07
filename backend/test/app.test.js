@@ -354,6 +354,23 @@ test('GET /api/health returns service and database status', async () => {
   assert.equal(typeof response.body.data.cache.stats.size, 'number');
 });
 
+test('GET /api/system/public-config returns public map runtime config without login', async () => {
+  const originalAmap = { ...config.maps.amap };
+  config.maps.amap.key = 'test-amap-key';
+  config.maps.amap.securityCode = 'test-amap-security';
+  try {
+    const response = await request(buildApp()).get('/api/system/public-config');
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(response.body.data.maps.amap, {
+      key: 'test-amap-key',
+      securityCode: 'test-amap-security'
+    });
+  } finally {
+    config.maps.amap = originalAmap;
+  }
+});
+
 test('CORS preflight allows mobile app preview and Capacitor origins', async () => {
   for (const origin of ['http://127.0.0.1:4173', 'http://127.0.0.1:5177', 'http://localhost:5178', 'https://localhost']) {
     const response = await request(buildApp())

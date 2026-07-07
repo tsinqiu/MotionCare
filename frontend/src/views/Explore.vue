@@ -57,7 +57,7 @@ const exploreEntries = [
   { label: '健康度', to: { path: '/status/health', query: { from: 'explore' } }, icon: HeartPulse, color: '#f59e0b', bg: '#fef3c7' },
   { label: '趋势', to: { path: '/status/trends', query: { from: 'explore' } }, icon: LineChart, color: '#0ea5e9', bg: '#e0f2fe' },
   { label: '身体数据', to: { path: '/me/settings', query: { from: 'explore', section: 'body' } }, icon: Settings2, color: '#0f9f8f', bg: '#ccfbf1' },
-  { label: '训练计划', to: { path: '/coach', query: { from: 'explore' } }, icon: ClipboardList, color: '#16a34a', bg: '#dcfce7' },
+  { label: '训练计划', to: { path: '/training-plans', query: { from: 'explore' } }, icon: ClipboardList, color: '#16a34a', bg: '#dcfce7' },
   { label: '常用课程', to: { path: '/explore/courses' }, icon: BookOpen, color: '#4f46e5', bg: '#e0e7ff' },
   { label: '状态总览', to: { path: '/status', query: { from: 'explore' } }, icon: Sparkles, color: '#14b8a6', bg: '#ccfbf1' },
   { label: 'AI教练', to: { path: '/coach', query: { from: 'explore' } }, icon: Bot, color: '#8b5cf6', bg: '#ede9fe' },

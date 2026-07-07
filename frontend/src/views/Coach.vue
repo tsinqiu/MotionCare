@@ -1,65 +1,23 @@
 <template>
   <div class="page-stack coach-page">
-    <section class="coach-head">
-      <div>
-        <p class="overline">智能教练</p>
-        <h2>训练建议</h2>
-      </div>
-      <span class="ai-mode-pill" :class="{ fallback: modelStatus.fallback }">
-        <span class="dot" aria-hidden="true"></span>
-        {{ modelStatus.label }}
-      </span>
-    </section>
-
-    <section class="coach-insight-panel">
-      <div class="section-heading">
-        <div>
-          <p class="overline">每日简报</p>
-          <h2>训练建议</h2>
-        </div>
-        <span class="status-chip">{{ modelStatus.label }}</span>
-      </div>
-      <p>把近期训练、恢复和目标放在同一个对话里，优先生成可执行的下一次训练安排。</p>
-      <div class="coach-prescription-grid">
-        <span>
-          <small>训练处方</small>
-          <b>强度 / 时长 / 配速</b>
+    <section class="coach-summary-card">
+      <div class="coach-summary-card__top">
+        <span class="ai-mode-pill" :class="{ fallback: modelStatus.fallback }">
+          <span class="dot" aria-hidden="true"></span>
+          {{ modelStatus.label }}
         </span>
-        <span>
-          <small>恢复建议</small>
-          <b>睡眠 / 压力 / 心率变异</b>
-        </span>
-        <span>
-          <small>比赛策略</small>
-          <b>补给 / 分段 / 目标</b>
-        </span>
-      </div>
-    </section>
-
-    <section class="coach-ml-panel">
-      <div class="section-heading">
-        <div>
-          <p class="overline">本地教练模型</p>
-          <h2>模型判断</h2>
-        </div>
         <span class="status-chip" :class="mlRiskTone">{{ mlRiskLabel }}</span>
       </div>
 
-      <div class="coach-ml-score">
-        <span>
+      <div class="coach-summary-card__main">
+        <div class="coach-score-ring" :style="{ '--score-position': `${readinessScoreValue}%` }">
           <small>训练指数</small>
           <strong>{{ readinessScoreDisplay }}</strong>
-        </span>
-        <div class="coach-ml-score__track" :style="{ '--score-position': `${readinessScoreValue}%` }">
-          <i aria-hidden="true"></i>
         </div>
-      </div>
-
-      <div class="coach-ml-metrics">
-        <span><small>模型来源</small><b>{{ coachProviderLabel }}</b></span>
-        <span><small>训练动作</small><b>{{ loadActionLabel }}</b></span>
-        <span><small>置信度</small><b>{{ confidenceDisplay }}</b></span>
-        <span><small>数据完整度</small><b>{{ dataCompletenessDisplay }}</b></span>
+        <div class="coach-summary-copy">
+          <h2>{{ loadActionLabel }}</h2>
+          <p>{{ coachSummaryText }}</p>
+        </div>
       </div>
 
       <div v-if="topFactors.length" class="factor-strip">
@@ -81,59 +39,13 @@
       <p v-if="feedbackMessage" class="soft-note">{{ feedbackMessage }}</p>
     </section>
 
-    <section class="morning-readiness-card">
-      <div class="section-heading">
+    <section class="chat-surface">
+      <div class="chat-surface__head">
         <div>
-          <p class="overline">主观输入</p>
-          <h2>晨间状态</h2>
+          <h2>教练</h2>
         </div>
       </div>
-      <form class="readiness-form" @submit.prevent="saveReadiness">
-        <label class="readiness-range">
-          <span>主观状态 <b>{{ readinessForm.readinessScore }}/5</b></span>
-          <input v-model.number="readinessForm.readinessScore" type="range" min="1" max="5" step="1" />
-        </label>
 
-        <div class="segmented-field">
-          <span>肌肉酸痛</span>
-          <div>
-            <button
-              v-for="option in sorenessOptions"
-              :key="option.value"
-              type="button"
-              :class="{ active: readinessForm.muscleSoreness === option.value }"
-              @click="readinessForm.muscleSoreness = option.value"
-            >
-              {{ option.label }}
-            </button>
-          </div>
-        </div>
-
-        <div class="segmented-field">
-          <span>训练意愿</span>
-          <div>
-            <button
-              v-for="option in willingnessOptions"
-              :key="option.value"
-              type="button"
-              :class="{ active: readinessForm.trainingWillingness === option.value }"
-              @click="readinessForm.trainingWillingness = option.value"
-            >
-              {{ option.label }}
-            </button>
-          </div>
-        </div>
-
-        <textarea v-model.trim="readinessForm.note" rows="2" maxlength="180" placeholder="今天的身体备注"></textarea>
-        <button class="save-readiness-btn" type="submit" :disabled="readinessSending">
-          <Check :size="16" />
-          {{ readinessSending ? '保存中' : '保存状态' }}
-        </button>
-      </form>
-      <p v-if="readinessMessage" class="soft-note">{{ readinessMessage }}</p>
-    </section>
-
-    <section class="chat-surface">
       <StateBlock
         v-if="aiLoading"
         title="正在连接教练"
@@ -149,11 +61,10 @@
       />
 
       <template v-else>
-        <StateBlock
-          v-if="messages.length === 0"
-          title="还没有对话"
-          message="选择一个常见问题，或直接说说你接下来的训练目标。"
-        />
+        <div v-if="messages.length === 0" class="chat-empty-state">
+          <strong>从一个问题开始</strong>
+          <p>你可以让教练把训练、恢复和目标拆成下一次可执行安排。</p>
+        </div>
         <div v-else ref="messageListRef" class="chat-messages">
           <TransitionGroup name="msg">
             <article v-for="message in messages" :key="message.id" class="chat-message" :class="message.role">
@@ -186,27 +97,66 @@
       </template>
     </section>
 
+    <section class="morning-readiness-card">
+      <div class="readiness-head">
+        <h2>晨间状态</h2>
+      </div>
+      <form class="readiness-form" @submit.prevent="saveReadiness">
+        <label class="readiness-range">
+          <span>主观状态 <b>{{ readinessForm.readinessScore }}/5</b></span>
+          <input v-model.number="readinessForm.readinessScore" type="range" min="1" max="5" step="1" />
+        </label>
+
+        <div class="readiness-option-grid">
+          <div class="segmented-field">
+          <span>肌肉酸痛</span>
+          <div>
+            <button
+              v-for="option in sorenessOptions"
+              :key="option.value"
+              type="button"
+              :class="{ active: readinessForm.muscleSoreness === option.value }"
+              @click="readinessForm.muscleSoreness = option.value"
+            >
+              {{ option.label }}
+            </button>
+          </div>
+          </div>
+
+          <div class="segmented-field">
+          <span>训练意愿</span>
+          <div>
+            <button
+              v-for="option in willingnessOptions"
+              :key="option.value"
+              type="button"
+              :class="{ active: readinessForm.trainingWillingness === option.value }"
+              @click="readinessForm.trainingWillingness = option.value"
+            >
+              {{ option.label }}
+            </button>
+          </div>
+          </div>
+        </div>
+
+        <div class="readiness-note-row">
+          <textarea v-model.trim="readinessForm.note" rows="1" maxlength="180" placeholder="身体备注"></textarea>
+          <button class="save-readiness-btn" type="submit" :disabled="readinessSending">
+            <Check :size="16" />
+            {{ readinessSending ? '保存中' : '保存' }}
+          </button>
+        </div>
+      </form>
+      <p v-if="readinessMessage" class="soft-note">{{ readinessMessage }}</p>
+    </section>
+
     <section class="coach-course-panel">
       <div class="section-heading">
         <div>
-          <p class="overline">训练建议</p>
+          <p class="overline">可执行建议</p>
           <h2>推荐训练</h2>
         </div>
-        <span class="status-chip good">推荐训练</span>
-      </div>
-      <div class="course-prescription-strip">
-        <span>
-          <small>本周重点</small>
-          <b>{{ courseFocusLabel }}</b>
-        </span>
-        <span>
-          <small>强度控制</small>
-          <b>{{ courseIntensityLabel }}</b>
-        </span>
-        <span>
-          <small>执行方式</small>
-          <b>建议 + 教练追问</b>
-        </span>
+        <span class="status-chip good">{{ courseIntensityLabel }}</span>
       </div>
       <StateBlock v-if="recommendationLoading" title="正在加载推荐" message="正在读取训练建议。" />
       <StateBlock
@@ -224,24 +174,21 @@
       />
       <div v-else class="recommendation-list">
         <article v-for="item in recommendations" :key="item.id" class="recommendation-card">
-          <div class="recommendation-card__top">
-            <small class="course-pill">{{ typeLabel(item.type) }}</small>
-            <span class="course-intensity-ladder" :aria-label="recommendationMeta(item).intensity">
-              <i :class="{ active: recommendationMeta(item).intensityLevel >= 1 }">轻</i>
-              <i :class="{ active: recommendationMeta(item).intensityLevel >= 2 }">中</i>
-              <i :class="{ active: recommendationMeta(item).intensityLevel >= 3 }">强</i>
-            </span>
+          <div class="recommendation-card__icon" aria-hidden="true">
+            <Check :size="22" />
           </div>
-          <h3>{{ item.title }}</h3>
-          <p>{{ item.summary || item.content || '打开教练对话，结合你的情况继续询问。' }}</p>
-          <div class="recommendation-card__metrics">
-            <span><small>训练目标</small><b>{{ recommendationMeta(item).goal }}</b></span>
-            <span><small>预计时长</small><b>{{ recommendationMeta(item).duration }}</b></span>
-            <span><small>推荐原因</small><b>{{ recommendationMeta(item).reason }}</b></span>
+          <div class="recommendation-card__body">
+            <div class="recommendation-card__top">
+              <small class="course-pill">{{ typeLabel(item.type) }}</small>
+              <span>{{ recommendationMeta(item).duration }}</span>
+            </div>
+            <h3>{{ item.title }}</h3>
+            <p>{{ item.summary || item.content || '打开教练对话，结合你的情况继续询问。' }}</p>
+            <small>{{ recommendationMeta(item).reason }} · {{ recommendationMeta(item).intensity }}</small>
           </div>
           <button class="course-plan-btn" type="button" @click="ask(coursePrompt(item))">
             <Check :size="15" />
-            加入今日计划
+            加入
           </button>
         </article>
       </div>
@@ -264,7 +211,7 @@ import {
 import { getExploreRecommendations } from '@/services/explore'
 import { authSession } from '@/stores/authStore'
 
-const quickPrompts = ['生成训练处方', '恢复建议怎么做？', '下一次跑步怎么安排？', '比赛配速怎么拆？']
+const quickPrompts = ['今天怎么练？', '恢复怎么安排？', '下一次跑步怎么跑？', '比赛配速建议']
 const feedbackOptions = [
   { label: '有帮助', value: 'helpful' },
   { label: '太保守', value: 'too_conservative' },
@@ -318,14 +265,6 @@ const readinessScoreValue = computed(() => {
   return Number.isFinite(score) ? Math.max(0, Math.min(100, score)) : 0
 })
 const readinessScoreDisplay = computed(() => (mlInsight.value?.readinessScore ?? '--'))
-const confidenceDisplay = computed(() => {
-  const confidence = Number(mlInsight.value?.confidence)
-  return Number.isFinite(confidence) ? `${Math.round(confidence * 100)}%` : '--'
-})
-const dataCompletenessDisplay = computed(() => {
-  const score = Number(mlInsight.value?.dataCompleteness?.score)
-  return Number.isFinite(score) ? `${Math.round(score)}%` : '--'
-})
 const coachProviderLabel = computed(() => {
   if (mlInsight.value?.provider === 'local_model') return '本地模型'
   if (mlInsight.value?.provider === 'rules') return '规则基线'
@@ -337,7 +276,13 @@ const loadActionLabel = computed(() => ({
   reduce: '降负荷',
   maintain: '维持',
   progress: '推进',
-}[mlInsight.value?.loadAction] || '--'))
+}[mlInsight.value?.loadAction] || '待判断'))
+const coachSummaryText = computed(() => ({
+  rest: '今天优先恢复，把睡眠、拉伸和轻活动放在训练前面。',
+  reduce: '身体负荷偏高，建议缩短时长并把强度控制在轻松区间。',
+  maintain: '状态比较稳定，可以按计划完成一次有氧或技术训练。',
+  progress: '恢复和负荷条件允许，可以安排一次更有质量的训练。',
+}[mlInsight.value?.loadAction] || '同步近期训练和恢复数据后，教练会给出更具体的安排。'))
 const mlRiskLabel = computed(() => ({
   green: '低风险',
   yellow: '注意',
@@ -510,72 +455,18 @@ onMounted(loadCoach)
 </script>
 
 <style scoped>
-.coach-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 12px;
-  padding: var(--space-5);
-  border: 1px solid color-mix(in srgb, var(--app-green) 14%, var(--border));
-  border-radius: var(--radius-xl);
-  background: var(--panel);
-  box-shadow: var(--shadow-sm);
-}
-.coach-head > div { min-width: 0; }
-.coach-head h2 {
-  margin: 2px 0 0;
-  font-size: 24px;
-  line-height: 1.15;
-}
-.coach-head .overline { margin: 0; }
-
-.coach-insight-panel {
-  display: grid;
-  gap: 14px;
-  padding: var(--space-5);
-  border: 1px solid color-mix(in srgb, var(--app-green) 14%, var(--border));
-  border-top: 4px solid var(--app-green);
-  border-radius: 12px;
-  background: var(--panel);
-  box-shadow: var(--shadow-sm);
-}
-
-.coach-insight-panel p {
-  margin: 0;
-  color: var(--muted);
-  line-height: 1.55;
-}
-
-.coach-prescription-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.coach-prescription-grid span {
-  display: grid;
-  gap: 4px;
-  min-width: 0;
-  padding: 10px;
-  border-radius: 10px;
-  background: var(--panel-soft);
-}
-
-.coach-prescription-grid small {
-  color: var(--muted);
-  font-size: 11px;
-}
-
-.coach-prescription-grid b {
-  color: var(--text);
-  font-size: 14px;
-  line-height: 1.35;
-  overflow-wrap: anywhere;
-}
-
 .ai-mode-pill {
   flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 11px;
+  border: 1px solid color-mix(in srgb, var(--app-green) 34%, var(--border));
+  border-radius: var(--radius-pill);
+  color: var(--green-strong);
+  background: color-mix(in srgb, var(--app-green) 10%, var(--panel));
+  font-size: 12px;
+  font-weight: 900;
   white-space: nowrap;
 }
 
@@ -588,84 +479,107 @@ onMounted(loadCoach)
   margin-right: 6px;
   vertical-align: middle;
 }
-.ai-mode-pill.fallback .dot { background: var(--orange); }
+.ai-mode-pill.fallback {
+  border-color: color-mix(in srgb, var(--app-amber) 34%, var(--border));
+  color: var(--app-amber);
+  background: color-mix(in srgb, var(--app-amber) 10%, var(--panel));
+}
+.ai-mode-pill.fallback .dot { background: var(--app-amber); }
 
-.coach-ml-panel,
+.status-chip.warning,
+.status-chip.steady {
+  color: var(--app-amber);
+  border-color: color-mix(in srgb, var(--app-amber) 38%, var(--border));
+  background: color-mix(in srgb, var(--app-amber) 9%, var(--panel));
+}
+
+.status-chip.good {
+  background: color-mix(in srgb, var(--app-green) 10%, var(--panel));
+}
+
+.coach-summary-card,
 .morning-readiness-card {
   display: grid;
   min-width: 0;
-  gap: 14px;
+  gap: 12px;
   padding: var(--space-5);
   border-radius: 12px;
-  border: 1px solid var(--border);
+  border: 1px solid color-mix(in srgb, var(--app-green) 16%, var(--border));
   background: var(--panel);
   box-shadow: var(--shadow-sm);
 }
 
-.coach-ml-score {
-  display: grid;
-  gap: 10px;
+.coach-summary-card {
+  overflow: hidden;
+  border-top: 4px solid var(--app-green);
+  background:
+    radial-gradient(90% 100% at 0% 0%, color-mix(in srgb, var(--app-blue) 10%, transparent), transparent 52%),
+    var(--panel);
 }
 
-.coach-ml-score span {
+.coach-summary-card__top,
+.coach-summary-card__main,
+.chat-surface__head,
+.recommendation-card__top {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
+  min-width: 0;
   gap: 12px;
 }
 
-.coach-ml-score small,
-.coach-ml-metrics small,
-.segmented-field > span,
-.readiness-range > span {
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 600;
+.coach-summary-card__main {
+  align-items: stretch;
+  justify-content: flex-start;
 }
 
-.coach-ml-score strong {
+.coach-score-ring {
+  flex: 0 0 96px;
+  width: 96px;
+  height: 96px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 4px;
+  border-radius: 24px;
+  background:
+    linear-gradient(var(--panel), var(--panel)) padding-box,
+    conic-gradient(var(--app-green) 0 var(--score-position), color-mix(in srgb, var(--app-blue) 20%, var(--border)) var(--score-position) 100%) border-box;
+  border: 8px solid transparent;
+}
+
+.coach-score-ring small,
+.segmented-field > span,
+.readiness-range > span,
+.recommendation-card small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.coach-score-ring strong {
+  color: var(--text);
   font-size: 34px;
   line-height: 1;
 }
 
-.coach-ml-score__track {
-  position: relative;
-  height: 8px;
-  overflow: hidden;
-  border-radius: var(--radius-pill);
-  background: linear-gradient(90deg, #ef4444, #f59e0b 42%, var(--green) 78%);
-}
-
-.coach-ml-score__track i {
-  position: absolute;
-  top: -4px;
-  left: clamp(0%, var(--score-position), 100%);
-  width: 4px;
-  height: 16px;
-  border-radius: 2px;
-  background: var(--text);
-  transform: translateX(-2px);
-}
-
-.coach-ml-metrics {
+.coach-summary-copy {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
+  align-content: center;
+  min-width: 0;
+  gap: 5px;
 }
 
-.coach-ml-metrics span {
-  display: grid;
-  min-width: 0;
-  gap: 4px;
-  padding: 10px;
-  border-radius: 10px;
-  background: var(--panel-soft);
+.coach-summary-copy h2 {
+  margin: 0;
+  font-size: 26px;
+  line-height: 1.1;
 }
 
-.coach-ml-metrics b {
-  min-width: 0;
-  font-size: 14px;
-  overflow-wrap: anywhere;
+.coach-summary-copy p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
 }
 
 .factor-strip,
@@ -683,7 +597,7 @@ onMounted(loadCoach)
 .factor-strip span {
   flex: 0 0 auto;
   max-width: 220px;
-  padding: 7px 10px;
+  padding: 6px 10px;
   border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--app-green) 12%, var(--panel-soft));
   color: var(--green-strong);
@@ -693,6 +607,7 @@ onMounted(loadCoach)
 
 .feedback-actions {
   align-items: center;
+  padding-top: 2px;
 }
 
 .feedback-actions > span {
@@ -714,7 +629,20 @@ onMounted(loadCoach)
 }
 
 .feedback-actions button {
-  padding: 8px 12px;
+  padding: 7px 11px;
+}
+
+.readiness-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.readiness-head h2 {
+  margin: 0;
+  font-size: var(--fs-title);
+  line-height: 1.15;
 }
 
 .readiness-form {
@@ -732,8 +660,20 @@ onMounted(loadCoach)
 
 .readiness-range > span {
   display: flex;
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
+}
+
+.readiness-range > span b {
+  flex: 0 0 auto;
+  min-height: 30px;
+  padding: 5px 12px;
+  border-radius: var(--radius-pill);
+  color: var(--green-strong);
+  background: color-mix(in srgb, var(--app-green) 12%, var(--panel-soft));
+  font-size: 13px;
+  line-height: 1.2;
 }
 
 .readiness-range input {
@@ -741,18 +681,21 @@ onMounted(loadCoach)
   accent-color: var(--green);
 }
 
-.segmented-field > div {
-  display: flex;
-  min-width: 0;
+.readiness-option-grid {
+  display: grid;
+  grid-template-columns: 1fr;
   gap: 8px;
-  overflow-x: auto;
-  scrollbar-width: none;
 }
 
-.segmented-field > div::-webkit-scrollbar { display: none; }
+.segmented-field > div {
+  display: flex;
+  flex-wrap: wrap;
+  min-width: 0;
+  gap: 6px;
+}
 
 .segmented-field button {
-  padding: 8px 13px;
+  padding: 7px 10px;
 }
 
 .segmented-field button.active {
@@ -761,16 +704,24 @@ onMounted(loadCoach)
   color: #04240f;
 }
 
+.readiness-note-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: stretch;
+}
+
 .readiness-form textarea {
   width: 100%;
+  min-height: 46px;
   min-width: 0;
   border: 1px solid var(--border);
   border-radius: 12px;
   background: var(--panel-soft);
   color: var(--text);
-  resize: vertical;
+  resize: none;
   line-height: 1.5;
-  padding: 10px 12px;
+  padding: 11px 12px;
 }
 
 .readiness-form textarea:focus {
@@ -781,12 +732,13 @@ onMounted(loadCoach)
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  justify-self: start;
+  align-self: stretch;
   gap: 6px;
-  min-height: 40px;
-  padding: 0 14px;
+  min-width: 86px;
+  min-height: 46px;
+  padding: 0 13px;
   border: none;
-  border-radius: var(--radius-pill);
+  border-radius: 12px;
   background: var(--green);
   color: #04240f;
   font-weight: 700;
@@ -798,12 +750,37 @@ onMounted(loadCoach)
   width: 100%;
   min-width: 0;
   max-width: 100%;
-  gap: 14px;
+  gap: 12px;
   padding: var(--space-4);
   border-radius: var(--radius-lg);
-  border: 1px solid var(--border);
+  border: 1px solid color-mix(in srgb, var(--app-blue) 14%, var(--border));
   background: var(--panel);
   box-shadow: var(--shadow-sm);
+}
+
+.chat-surface__head h2 {
+  margin: 2px 0 0;
+  font-size: var(--fs-title);
+}
+
+.chat-empty-state {
+  display: grid;
+  gap: 6px;
+  min-height: 128px;
+  align-content: center;
+  padding: 18px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--app-blue) 6%, var(--panel-soft));
+}
+
+.chat-empty-state strong {
+  font-size: 20px;
+}
+
+.chat-empty-state p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.55;
 }
 
 .chat-messages {
@@ -812,7 +789,8 @@ onMounted(loadCoach)
   width: 100%;
   min-width: 0;
   gap: 12px;
-  max-height: 48vh;
+  max-height: 44vh;
+  min-height: 180px;
   overflow-y: auto;
   scrollbar-width: none;
 }
@@ -878,12 +856,12 @@ onMounted(loadCoach)
   gap: 8px;
   overflow-x: auto;
   scrollbar-width: none;
-  padding-bottom: 2px;
+  padding-bottom: 1px;
 }
 .quick-prompts::-webkit-scrollbar { display: none; }
 .quick-prompts button {
   flex: 0 0 auto;
-  padding: 8px 14px;
+  padding: 7px 12px;
   border-radius: var(--radius-pill);
   border: 1px solid var(--border);
   background: var(--panel-soft);
@@ -898,7 +876,7 @@ onMounted(loadCoach)
   min-width: 0;
   align-items: flex-end;
   gap: 10px;
-  padding: 8px;
+  padding: 7px;
   border-radius: var(--radius-lg);
   border: 1px solid var(--border);
   background: var(--panel-soft);
@@ -917,8 +895,8 @@ onMounted(loadCoach)
 .chat-composer textarea:focus { outline: none; }
 .send-btn {
   flex: 0 0 auto;
-  width: 44px;
-  height: 44px;
+  width: 42px;
+  height: 42px;
   display: grid;
   place-items: center;
   border-radius: 50%;
@@ -930,7 +908,7 @@ onMounted(loadCoach)
 .coach-course-panel {
   display: grid;
   min-width: 0;
-  gap: 14px;
+  gap: 12px;
   padding: var(--space-5);
   border: 1px solid color-mix(in srgb, var(--app-green) 14%, var(--border));
   border-top: 4px solid var(--app-green);
@@ -944,60 +922,52 @@ onMounted(loadCoach)
   margin: 0;
 }
 
-.course-prescription-strip,
-.recommendation-card__metrics {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.course-prescription-strip span,
-.recommendation-card__metrics span {
-  display: grid;
-  min-width: 0;
-  gap: 4px;
-  padding: 10px;
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--app-green) 8%, var(--panel-soft));
-}
-
-.course-prescription-strip small,
-.recommendation-card__metrics small {
-  color: var(--muted);
-  font-size: 11px;
-}
-
-.course-prescription-strip b,
-.recommendation-card__metrics b {
-  min-width: 0;
-  color: var(--text);
-  font-size: 13px;
-  line-height: 1.25;
-  overflow-wrap: anywhere;
-}
-
 .recommendation-list { display: grid; min-width: 0; gap: 12px; }
 .recommendation-card {
   display: grid;
-  gap: 10px;
+  grid-template-columns: 52px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
   min-width: 0;
-  padding: 14px;
+  padding: 12px;
   border: 1px solid color-mix(in srgb, var(--app-green) 12%, var(--border));
   border-radius: var(--radius-lg);
   background: var(--panel-soft);
 }
-.recommendation-card__top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  min-width: 0;
+
+.recommendation-card__icon {
+  width: 52px;
+  height: 52px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  color: var(--green-strong);
+  background: color-mix(in srgb, var(--app-green) 12%, var(--panel));
 }
+
+.recommendation-card__body {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.recommendation-card__top {
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.recommendation-card__top > span {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .course-pill {
   display: inline-flex;
   align-items: center;
   min-width: 0;
-  max-width: 60%;
+  max-width: 100%;
   padding: 5px 9px;
   border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--app-green) 12%, transparent);
@@ -1006,40 +976,36 @@ onMounted(loadCoach)
   font-weight: 800;
   white-space: nowrap;
 }
-.course-intensity-ladder {
-  display: inline-grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 3px;
-  min-width: 86px;
-  padding: 3px;
-  border-radius: var(--radius-pill);
-  background: var(--panel);
-}
-.course-intensity-ladder i {
-  display: grid;
-  place-items: center;
+
+.recommendation-card h3 {
   min-width: 0;
-  min-height: 22px;
-  border-radius: var(--radius-pill);
+  margin: 0;
+  font-size: 17px;
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recommendation-card p {
+  display: -webkit-box;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
   color: var(--muted);
-  font-size: 11px;
-  font-style: normal;
-  font-weight: 800;
+  line-height: 1.45;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
 }
-.course-intensity-ladder i.active {
-  background: var(--app-green);
-  color: #04240f;
-}
-.recommendation-card h3 { margin: 0; font-size: var(--fs-title); line-height: 1.28; }
-.recommendation-card p { margin: 0; color: var(--muted); line-height: 1.5; overflow-wrap: anywhere; }
+
 .course-plan-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  justify-self: start;
+  justify-self: end;
   gap: 6px;
-  min-height: 38px;
-  padding: 0 13px;
+  min-height: 36px;
+  padding: 0 12px;
   border: none;
   border-radius: var(--radius-pill);
   background: var(--green);
@@ -1049,15 +1015,50 @@ onMounted(loadCoach)
 }
 
 @media (max-width: 640px) {
-  .coach-prescription-grid,
-  .coach-ml-metrics,
-  .course-prescription-strip,
-  .recommendation-card__metrics {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .coach-score-ring {
+    flex-basis: 88px;
+    width: 88px;
+    height: 88px;
+    border-width: 7px;
   }
 
-  .coach-ml-score strong {
-    font-size: 30px;
+  .coach-summary-copy h2 {
+    font-size: 24px;
+  }
+}
+
+@container phone-frame (max-width: 390px) {
+  .coach-summary-card__main {
+    gap: 10px;
+  }
+
+  .coach-score-ring {
+    flex-basis: 82px;
+    width: 82px;
+    height: 82px;
+  }
+
+  .coach-score-ring strong {
+    font-size: 28px;
+  }
+
+  .readiness-option-grid,
+  .readiness-note-row {
+    grid-template-columns: 1fr;
+  }
+
+  .recommendation-card {
+    grid-template-columns: 46px minmax(0, 1fr);
+  }
+
+  .recommendation-card__icon {
+    width: 46px;
+    height: 46px;
+  }
+
+  .course-plan-btn {
+    grid-column: 1 / -1;
+    justify-self: stretch;
   }
 }
 </style>

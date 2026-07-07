@@ -2374,7 +2374,11 @@ onBeforeUnmount(() => {
   border-radius: 0;
 }
 
-.poster-map-preview :deep(.leaflet-control-container) {
+.poster-map-preview :deep(.amap-control),
+.poster-map-preview :deep(.amap-toolbar),
+.poster-map-preview :deep(.amap-scalecontrol),
+.poster-map-preview :deep(.amap-copyright),
+.poster-map-preview :deep(.amap-logo) {
   display: none;
 }
 

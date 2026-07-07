@@ -122,6 +122,12 @@ const config = {
   cache: {
     statsTtlSeconds: parseInteger(process.env.STATS_CACHE_TTL_SECONDS, 60)
   },
+  maps: {
+    amap: {
+      key: process.env.AMAP_JS_API_KEY || process.env.AMAP_KEY || '',
+      securityCode: process.env.AMAP_SECURITY_CODE || ''
+    }
+  },
   uploads: {
     root: resolveBackendPath(process.env.UPLOAD_ROOT, 'uploads'),
     exploreVideosDir: resolveBackendPath(process.env.EXPLORE_VIDEO_UPLOAD_DIR, 'uploads/explore-videos'),

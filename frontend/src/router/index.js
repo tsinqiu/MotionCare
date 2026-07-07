@@ -27,6 +27,7 @@ import Status from '@/views/Status.vue'
 import Sync from '@/views/Sync.vue'
 import Today from '@/views/Today.vue'
 import TrainingLoad from '@/views/TrainingLoad.vue'
+import TrainingPlans from '@/views/TrainingPlans.vue'
 import {
   authSession,
   hasAuthToken,
@@ -97,7 +98,7 @@ const routes = [
     path: '/status/health',
     name: 'status-health',
     component: HealthDetail,
-    meta: { title: '健康详情', requiresAuth: true, backTo: '/status' },
+    meta: { title: '健康度', requiresAuth: true, backTo: '/status' },
   },
   {
     path: '/status/performance',
@@ -115,13 +116,13 @@ const routes = [
     path: '/status/trends',
     name: 'status-trends',
     component: Statistics,
-    meta: { title: '运动趋势', requiresAuth: true, backTo: '/status' },
+    meta: { title: '趋势', requiresAuth: true, backTo: '/status' },
   },
   {
     path: '/status/calendar',
     name: 'status-calendar',
     component: Calendar,
-    meta: { title: '训练日历', requiresAuth: true, backTo: '/status' },
+    meta: { title: '运动日历', requiresAuth: true, backTo: '/status' },
   },
   {
     path: '/status/records',
@@ -134,6 +135,12 @@ const routes = [
     name: 'coach',
     component: Coach,
     meta: { title: '教练', requiresAuth: true },
+  },
+  {
+    path: '/training-plans',
+    name: 'training-plans',
+    component: TrainingPlans,
+    meta: { title: '训练计划', requiresAuth: true, backTo: '/explore' },
   },
   {
     path: '/explore',

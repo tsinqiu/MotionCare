@@ -3,7 +3,6 @@
     <section class="dark-panel">
       <div class="section-heading">
         <div>
-          <p class="overline">训练日历</p>
           <h2>运动日历</h2>
         </div>
       </div>

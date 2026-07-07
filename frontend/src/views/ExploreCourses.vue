@@ -1,316 +1,217 @@
 <template>
-  <div class="page-stack course-page">
-    <header class="course-header">
-      <h2>常用训练计划</h2>
-      <p>选择经典模板，或创建自己的长距离和课表计划。</p>
+  <div v-if="selectedCourse" class="course-detail-page">
+    <header class="course-detail-hero">
+      <span class="course-detail-icon" :style="{ '--course-color': selectedCourse.color }">
+        <component :is="selectedCourse.icon" :size="32" aria-hidden="true" />
+      </span>
+      <div class="course-detail-copy">
+        <h2>{{ selectedCourse.name }}</h2>
+        <p>{{ selectedCourse.goal }}</p>
+        <span class="course-phase-chip">{{ selectedWeek.phase }}</span>
+      </div>
     </header>
 
+    <nav class="course-week-tabs" aria-label="训练周次">
+      <button
+        v-for="week in selectedCourse.weeks"
+        :key="week.week"
+        type="button"
+        :class="{ active: activeWeek === week.week }"
+        @click="activeWeek = week.week"
+      >
+        <Check v-if="activeWeek === week.week" :size="18" aria-hidden="true" />
+        <span>W{{ week.week }}</span>
+      </button>
+    </nav>
+
+    <section class="course-workout-list" aria-label="本周训练安排">
+      <article v-for="workout in selectedWeek.days" :key="`${selectedWeek.week}-${workout.day}`" class="course-workout-row">
+        <span class="course-day-badge">{{ workout.day }}</span>
+        <div>
+          <strong>{{ workout.title }}</strong>
+          <p>{{ workout.subtitle }}</p>
+          <small v-if="workout.note">{{ workout.note }}</small>
+        </div>
+        <Info v-if="workout.note" :size="19" aria-hidden="true" />
+      </article>
+    </section>
+
+    <div class="course-detail-actions">
+      <button type="button" class="course-back-button" @click="closeDetail">Back</button>
+      <button type="button" class="course-save-button" @click="savePlan">
+        <Check :size="20" aria-hidden="true" />
+        <span>保存计划</span>
+      </button>
+    </div>
+  </div>
+
+  <div v-else class="page-stack course-page">
     <div class="course-layout">
       <nav class="course-rail" aria-label="课程分类">
-        <button v-for="filter in filters" :key="filter.key" type="button" :class="{ active: activeFilter === filter.key }" @click="activeFilter = filter.key">
-          <component :is="filter.icon" :size="24" aria-hidden="true" />
+        <button
+          v-for="filter in trainingPlanFilters"
+          :key="filter.key"
+          type="button"
+          :class="{ active: activeFilter === filter.key }"
+          @click="activeFilter = filter.key"
+        >
+          <component :is="filter.icon" :size="filter.key === 'all' ? 28 : 32" aria-hidden="true" />
           <span>{{ filter.label }}</span>
         </button>
       </nav>
 
       <main class="course-content">
-        <section class="course-list">
-          <article v-for="course in filteredTemplates" :key="course.id" class="course-card">
-            <span class="course-card__icon" :style="{ '--course-color': course.color }">
-              <component :is="course.icon" :size="26" aria-hidden="true" />
+        <section class="course-list" aria-label="常用训练计划">
+          <button
+            v-for="course in filteredTemplates"
+            :key="course.id"
+            type="button"
+            class="course-entry-card"
+            @click="openCourse(course)"
+          >
+            <span class="course-entry-card__icon" :style="{ '--course-color': course.color }">
+              <component :is="course.icon" :size="30" aria-hidden="true" />
             </span>
-            <div>
-              <h3>{{ course.name }}</h3>
-              <p>{{ course.typeLabel }} · {{ course.duration }} · {{ course.frequency }}</p>
-              <small>{{ course.summary }}</small>
-              <ol>
-                <li v-for="item in course.plan" :key="item">{{ item }}</li>
-              </ol>
-              <button type="button" class="secondary-link" @click="addCourse(course)">加入我的课程</button>
-            </div>
-          </article>
+            <span class="course-entry-card__body">
+              <strong>{{ course.name }}</strong>
+              <small>{{ course.typeLabel }}</small>
+            </span>
+            <ChevronRight :size="28" aria-hidden="true" />
+          </button>
         </section>
       </main>
     </div>
-
-    <section class="my-course-panel">
-      <div class="section-heading">
-        <div>
-          <p class="overline">My Plans</p>
-          <h2>我的课程</h2>
-        </div>
-        <span class="status-chip good">{{ myCourses.length }} 个</span>
-      </div>
-      <div class="my-course-list">
-        <article v-if="!myCourses.length" class="tool-empty-card">
-          <strong>暂无课程</strong>
-          <span>从模板加入，或在下方创建自己的课程。</span>
-        </article>
-        <article v-for="course in myCourses" :key="course.id" class="my-course-row">
-          <div>
-            <strong>{{ course.name }}</strong>
-            <span>{{ course.typeLabel || typeLabel(course.type) }} · {{ course.duration }} · {{ course.frequency }}</span>
-          </div>
-          <button type="button" class="danger-link" @click="removeCourse(course.id)">移除</button>
-        </article>
-      </div>
-    </section>
-
-    <form class="course-form-card" @submit.prevent="saveCustomCourse">
-      <div class="section-heading">
-        <div>
-          <p class="overline">Custom</p>
-          <h2>自定义课程</h2>
-        </div>
-      </div>
-      <div class="course-form-grid">
-        <label>
-          <span>课程名称</span>
-          <input v-model.trim="draft.name" type="text" placeholder="例如 10周长距离" required />
-        </label>
-        <label>
-          <span>运动类型</span>
-          <select v-model="draft.type">
-            <option value="running">跑步</option>
-            <option value="cycling">骑行</option>
-            <option value="swimming">游泳</option>
-          </select>
-        </label>
-        <label>
-          <span>周期</span>
-          <input v-model.trim="draft.duration" type="text" placeholder="例如 8周" />
-        </label>
-        <label>
-          <span>每周训练日</span>
-          <input v-model.trim="draft.frequency" type="text" placeholder="例如 每周4练" />
-        </label>
-        <label class="course-form-wide">
-          <span>目标</span>
-          <input v-model.trim="draft.summary" type="text" placeholder="例如 完成首次半马" />
-        </label>
-        <label class="course-form-wide">
-          <span>课程说明</span>
-          <textarea v-model.trim="draft.description" rows="3" placeholder="填写长距离、间歇、恢复日等安排" />
-        </label>
-      </div>
-      <button class="primary-link" type="submit">保存课程</button>
-    </form>
   </div>
 </template>
 
 <script setup>
-import { computed, reactive, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { showToast } from 'vant'
-import { Activity, Bike, Grid2X2, Waves } from '@lucide/vue'
-
-const STORAGE_KEY = 'motioncare-my-courses'
-
-const filters = [
-  { key: 'all', label: 'All', icon: Grid2X2 },
-  { key: 'running', label: '跑步', icon: Activity },
-  { key: 'cycling', label: '骑行', icon: Bike },
-  { key: 'swimming', label: '游泳', icon: Waves },
-]
-
-const templates = [
-  {
-    id: 'run-8w-beginner',
-    name: '8周入门跑步',
-    type: 'running',
-    typeLabel: '跑步',
-    duration: '8周',
-    frequency: '每周3-4练',
-    summary: '从跑走结合过渡到连续轻松跑。',
-    plan: ['前2周跑走结合', '中期建立30分钟轻松跑', '后期加入短节奏跑'],
-    icon: Activity,
-    color: '#16a34a',
-  },
-  {
-    id: 'run-12w-half',
-    name: '12周首次半马',
-    type: 'running',
-    typeLabel: '跑步',
-    duration: '12周',
-    frequency: '每周4练',
-    summary: '逐步拉长周末长距离，目标完成半程马拉松。',
-    plan: ['1次长距离', '1次节奏跑', '2次轻松跑或恢复跑'],
-    icon: Activity,
-    color: '#16a34a',
-  },
-  {
-    id: 'run-16w-sub4',
-    name: '16周全马 Sub 4:00',
-    type: 'running',
-    typeLabel: '跑步',
-    duration: '16周',
-    frequency: '每周5练',
-    summary: '围绕马拉松配速、长距离和恢复周构建。',
-    plan: ['长距离递进', '马配训练', '间歇与恢复周交替'],
-    icon: Activity,
-    color: '#16a34a',
-  },
-  {
-    id: 'ride-8w-beginner',
-    name: '8周入门骑行',
-    type: 'cycling',
-    typeLabel: '骑行',
-    duration: '8周',
-    frequency: '每周3练',
-    summary: '提升踩踏稳定性与基础有氧。',
-    plan: ['短距离通勤强度', '周末耐力骑', '低强度恢复骑'],
-    icon: Bike,
-    color: '#f59e0b',
-  },
-  {
-    id: 'ride-10w-century',
-    name: '10周百公里骑行',
-    type: 'cycling',
-    typeLabel: '骑行',
-    duration: '10周',
-    frequency: '每周3-4练',
-    summary: '逐步建立完成100公里骑行的耐力。',
-    plan: ['周中节奏骑', '周末长距离', '补给与爬坡练习'],
-    icon: Bike,
-    color: '#f59e0b',
-  },
-  {
-    id: 'swim-20-session-endurance',
-    name: '20次游泳耐力',
-    type: 'swimming',
-    typeLabel: '游泳',
-    duration: '20次',
-    frequency: '每周2-3练',
-    summary: '从技术稳定到1500m连续游。',
-    plan: ['技术分解', '主项间歇', '连续游距离递进'],
-    icon: Waves,
-    color: '#0ea5e9',
-  },
-]
+import { Check, ChevronRight, Info } from '@lucide/vue'
+import { trainingPlanFilters, trainingPlanTemplates } from '@/data/trainingPlanTemplates'
 
 const activeFilter = ref('all')
-const myCourses = ref(loadItems())
-const draft = reactive({
-  name: '',
-  type: 'running',
-  duration: '',
-  frequency: '',
-  summary: '',
-  description: '',
-})
+const selectedCourse = ref(null)
+const activeWeek = ref(1)
 
 const filteredTemplates = computed(() => {
-  if (activeFilter.value === 'all') return templates
-  return templates.filter((course) => course.type === activeFilter.value)
+  if (activeFilter.value === 'all') return trainingPlanTemplates
+  return trainingPlanTemplates.filter((course) => course.type === activeFilter.value)
 })
 
-function loadItems() {
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY)
-    return raw ? JSON.parse(raw) : []
-  } catch {
-    window.localStorage.removeItem(STORAGE_KEY)
-    return []
-  }
+const selectedWeek = computed(() => (
+  selectedCourse.value?.weeks.find((week) => week.week === activeWeek.value) || selectedCourse.value?.weeks[0]
+))
+
+function openCourse(course) {
+  selectedCourse.value = course
+  activeWeek.value = 1
 }
 
-function persist() {
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(myCourses.value))
+function closeDetail() {
+  selectedCourse.value = null
 }
 
-function typeLabel(type) {
-  return filters.find((filter) => filter.key === type)?.label || '课程'
+function savePlan() {
+  showToast('计划已保存')
 }
 
-function addCourse(course) {
-  if (myCourses.value.some((item) => item.id === course.id)) {
-    showToast('课程已在我的课程中')
-    return
-  }
-  myCourses.value.unshift({ ...course })
-  persist()
-  showToast('已加入我的课程')
+function handleShellBack(event) {
+  if (!selectedCourse.value) return
+  event.preventDefault()
+  closeDetail()
 }
 
-function removeCourse(id) {
-  myCourses.value = myCourses.value.filter((course) => course.id !== id)
-  persist()
-}
+onMounted(() => {
+  window.addEventListener('motioncare:nav-back', handleShellBack)
+})
 
-function saveCustomCourse() {
-  if (!draft.name) {
-    showToast('请填写课程名称')
-    return
-  }
-  const item = {
-    ...draft,
-    id: `custom-course-${Date.now()}`,
-    typeLabel: typeLabel(draft.type),
-    icon: draft.type === 'cycling' ? Bike : draft.type === 'swimming' ? Waves : Activity,
-    color: draft.type === 'cycling' ? '#f59e0b' : draft.type === 'swimming' ? '#0ea5e9' : '#16a34a',
-    plan: draft.description ? draft.description.split(/[;\n，。]/).map((item) => item.trim()).filter(Boolean).slice(0, 3) : [],
-  }
-  myCourses.value.unshift(item)
-  persist()
-  Object.assign(draft, { name: '', type: 'running', duration: '', frequency: '', summary: '', description: '' })
-  showToast('课程已保存')
-}
+onBeforeUnmount(() => {
+  window.removeEventListener('motioncare:nav-back', handleShellBack)
+})
 </script>
 
 <style scoped>
-.course-page { gap: 16px; }
-.course-header {
-  display: grid;
-  gap: 6px;
-  padding: 10px 2px 0;
-  text-align: center;
+.course-page {
+  min-height: calc(100dvh - 96px);
+  gap: 0;
 }
-.course-header h2 { margin: 0; color: var(--text); font-size: 26px; line-height: 1.15; }
-.course-header p { margin: 0; color: var(--muted); line-height: 1.5; }
+
 .course-layout {
+  width: calc(100% + (2 * var(--space-4)));
+  max-width: none !important;
+  min-height: calc(100dvh - 96px);
   display: grid;
   grid-template-columns: 86px minmax(0, 1fr);
-  gap: 12px;
-  align-items: start;
+  align-items: stretch;
+  margin: 16px calc(-1 * var(--space-4)) calc(-1 * var(--space-4));
 }
+
 .course-rail {
   position: sticky;
-  top: 10px;
-  overflow: hidden;
+  top: 0;
+  min-height: calc(100dvh - 52px);
+  align-self: start;
   display: grid;
-  border-radius: var(--radius-lg);
-  background: color-mix(in srgb, var(--panel-soft) 80%, var(--panel));
-  border: 1px solid color-mix(in srgb, var(--text) 8%, transparent);
+  align-content: start;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--panel-soft) 72%, #f8fafc);
+  border-right: 1px solid color-mix(in srgb, var(--text) 16%, transparent);
 }
+
 .course-rail button {
-  min-height: 82px;
+  min-height: 98px;
   display: grid;
   place-items: center;
-  gap: 6px;
+  gap: 8px;
   border: 0;
-  border-left: 4px solid transparent;
+  border-left: 5px solid transparent;
   background: transparent;
-  color: var(--muted);
+  color: color-mix(in srgb, var(--muted) 88%, #111827);
+  font: inherit;
+  font-size: 15px;
   font-weight: 900;
 }
+
 .course-rail button.active {
   border-left-color: var(--app-green);
   background: color-mix(in srgb, var(--app-green) 12%, var(--panel));
   color: var(--app-green-dark);
 }
-.course-content,
-.course-list,
-.my-course-list { display: grid; gap: 12px; }
-.course-card {
-  display: grid;
-  grid-template-columns: 58px minmax(0, 1fr);
-  gap: 14px;
-  padding: 16px;
-  border-radius: var(--radius-lg);
-  background: var(--panel);
-  border: 1px solid color-mix(in srgb, var(--app-green) 12%, var(--border));
-  box-shadow: var(--shadow-sm);
+
+.course-content {
+  min-width: 0;
+  padding: 32px 6px 28px 18px;
+  background: color-mix(in srgb, var(--panel-soft) 55%, var(--bg));
 }
-.course-card__icon {
+
+.course-list {
+  display: grid;
+  gap: 18px;
+}
+
+.course-entry-card {
+  width: 100%;
+  min-height: 92px;
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr) 24px;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border: 2px solid color-mix(in srgb, var(--text) 18%, transparent);
+  border-radius: 22px;
+  background: color-mix(in srgb, var(--panel) 96%, #f8fafc);
+  color: var(--text);
+  box-shadow: none;
+  text-align: left;
+}
+
+.course-entry-card:active {
+  transform: translateY(1px);
+}
+
+.course-entry-card__icon,
+.course-detail-icon {
   width: 58px;
   height: 58px;
   display: grid;
@@ -319,67 +220,266 @@ function saveCustomCourse() {
   background: color-mix(in srgb, var(--course-color) 12%, #f8fafc);
   color: var(--course-color);
 }
-.course-card h3 { margin: 0; color: var(--text); font-size: 18px; line-height: 1.25; }
-.course-card p,
-.course-card small { display: block; margin: 5px 0 0; color: var(--muted); line-height: 1.4; }
-.course-card ol {
-  margin: 10px 0 12px;
-  padding-left: 18px;
-  color: var(--text);
-  line-height: 1.5;
-  font-size: 13px;
-  font-weight: 700;
-}
-.my-course-panel,
-.course-form-card {
-  display: grid;
-  gap: 12px;
-  padding: 16px;
-  border-radius: var(--radius-lg);
-  background: var(--panel);
-  border: 1px solid color-mix(in srgb, var(--app-green) 12%, var(--border));
-  box-shadow: var(--shadow-sm);
-}
-.tool-empty-card {
-  display: grid;
-  gap: 5px;
-  padding: 14px;
-  border-radius: 14px;
-  background: color-mix(in srgb, var(--app-green) 6%, var(--panel));
-  color: var(--muted);
-}
-.tool-empty-card strong { color: var(--text); }
-.my-course-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 10px;
-  align-items: center;
-  padding: 12px;
-  border-radius: 14px;
-  background: color-mix(in srgb, var(--panel-soft) 64%, var(--panel));
-}
-.my-course-row div { min-width: 0; display: grid; gap: 4px; }
-.my-course-row strong { color: var(--text); }
-.my-course-row span { color: var(--muted); font-size: 13px; }
-.course-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-.course-form-grid label { display: grid; gap: 6px; min-width: 0; }
-.course-form-grid span { color: var(--muted); font-size: 12px; font-weight: 800; }
-.course-form-grid :is(input, select, textarea) {
-  width: 100%;
+
+.course-entry-card__body {
   min-width: 0;
-  border: 1px solid color-mix(in srgb, var(--app-green) 12%, var(--border));
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--panel) 82%, var(--panel-soft));
+  display: grid;
+  gap: 8px;
+}
+
+.course-entry-card strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  writing-mode: horizontal-tb;
+  color: var(--text);
+  font-size: 20px;
+  font-weight: 950;
+  line-height: 1.2;
+}
+
+.course-entry-card small {
+  color: var(--muted);
+  font-size: 15px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.course-detail-page {
+  display: grid;
+  gap: 22px;
+  padding-bottom: 96px;
+}
+
+.course-detail-hero {
+  display: grid;
+  grid-template-columns: 74px minmax(0, 1fr);
+  align-items: start;
+  gap: 16px;
+  padding: 20px 0 6px;
+}
+
+.course-detail-copy {
+  min-width: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.course-detail-hero h2 {
+  margin: 0;
+  color: var(--text);
+  font-size: 30px;
+  font-weight: 950;
+  line-height: 1.15;
+}
+
+.course-detail-hero p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 18px;
+  line-height: 1.5;
+}
+
+.course-phase-chip {
+  width: fit-content;
+  padding: 8px 18px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--app-green) 15%, var(--panel));
+  color: var(--app-green-dark);
+  font-size: 17px;
+  font-weight: 900;
+}
+
+.course-week-tabs {
+  display: flex;
+  gap: 12px;
+  margin-inline: calc(-1 * var(--space-4));
+  padding: 4px var(--space-4) 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.course-week-tabs::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+.course-week-tabs button {
+  flex: 0 0 116px;
+  min-height: 64px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border: 1px solid color-mix(in srgb, var(--text) 18%, transparent);
+  border-radius: 14px;
+  background: var(--panel);
   color: var(--text);
   font: inherit;
-  padding: 10px 12px;
+  font-size: 20px;
+  font-weight: 900;
 }
-.course-form-wide { grid-column: 1 / -1; }
+
+.course-week-tabs button.active {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--app-green) 16%, var(--panel));
+  color: var(--text);
+}
+
+.course-workout-list {
+  display: grid;
+  border-radius: 22px;
+  overflow: hidden;
+  background: var(--panel);
+  box-shadow: var(--shadow-sm);
+}
+
+.course-workout-row {
+  min-height: 118px;
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr) 24px;
+  align-items: center;
+  gap: 18px;
+  padding: 18px;
+  border-bottom: 1px solid color-mix(in srgb, var(--text) 8%, transparent);
+}
+
+.course-workout-row:last-child {
+  border-bottom: 0;
+}
+
+.course-day-badge {
+  width: 46px;
+  height: 46px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text) 7%, transparent);
+  color: var(--text);
+  font-size: 18px;
+  font-weight: 950;
+}
+
+.course-workout-row div {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.course-workout-row strong {
+  color: var(--text);
+  font-size: 21px;
+  line-height: 1.35;
+}
+
+.course-workout-row p,
+.course-workout-row small {
+  margin: 0;
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1.45;
+}
+
+.course-workout-row > svg {
+  color: var(--app-green);
+}
+
+.course-detail-actions {
+  position: fixed;
+  left: max(18px, calc((100vw - var(--phone-max)) / 2 + 18px));
+  right: max(18px, calc((100vw - var(--phone-max)) / 2 + 18px));
+  bottom: calc(16px + var(--safe-bottom));
+  z-index: 10;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+}
+
+.course-back-button,
+.course-save-button {
+  min-height: 58px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.course-back-button {
+  border: 1px solid color-mix(in srgb, var(--text) 34%, transparent);
+  background: var(--panel);
+  color: var(--text);
+}
+
+.course-save-button {
+  border: 1px solid var(--app-green);
+  background: var(--app-green);
+  color: #fff;
+  box-shadow: 0 12px 28px rgb(22 163 74 / 0.22);
+}
+
 @container phone-frame (max-width: 390px) {
-  .course-layout { grid-template-columns: 74px minmax(0, 1fr); gap: 9px; }
-  .course-rail button { min-height: 72px; font-size: 12px; }
-  .course-card { grid-template-columns: 1fr; }
-  .course-form-grid,
-  .my-course-row { grid-template-columns: 1fr; }
+  .course-layout {
+    grid-template-columns: 76px minmax(0, 1fr);
+  }
+
+  .course-rail button {
+    min-height: 90px;
+    font-size: 14px;
+  }
+
+  .course-content {
+    padding: 28px 6px 24px 14px;
+  }
+
+  .course-list {
+    gap: 16px;
+  }
+
+  .course-entry-card {
+    min-height: 82px;
+    grid-template-columns: 48px minmax(0, 1fr) 22px;
+    gap: 12px;
+    padding: 12px 12px;
+    border-radius: 20px;
+  }
+
+  .course-entry-card__icon,
+  .course-detail-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 14px;
+  }
+
+  .course-entry-card strong {
+    font-size: 17px;
+  }
+
+  .course-entry-card small {
+    font-size: 13px;
+  }
+
+  .course-detail-hero h2 {
+    font-size: 24px;
+  }
+
+  .course-workout-row {
+    grid-template-columns: 48px minmax(0, 1fr) 20px;
+    gap: 12px;
+    padding: 16px 14px;
+  }
+
+  .course-workout-row strong {
+    font-size: 18px;
+  }
+
+  .course-workout-row p,
+  .course-workout-row small {
+    font-size: 15px;
+  }
 }
 </style>
