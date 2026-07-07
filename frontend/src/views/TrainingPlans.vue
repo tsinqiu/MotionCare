@@ -1,5 +1,11 @@
 <template>
-  <div class="training-plan-page" :class="{ 'training-plan-page--detail': selectedPlan }">
+  <div
+    class="training-plan-page"
+    :class="{
+      'training-plan-page--detail': selectedPlan,
+      'training-plan-page--empty': !selectedPlan && plans.length === 0,
+    }"
+  >
     <template v-if="selectedPlan">
       <header class="training-detail-hero">
         <span class="training-detail-icon" :style="{ '--plan-color': typeMeta(selectedPlan.type).color }">
@@ -450,7 +456,8 @@ onBeforeUnmount(() => {
   min-height: calc(100dvh - 120px);
   display: flex;
   flex-direction: column;
-  padding-bottom: 148px;
+  gap: 18px;
+  padding-bottom: 0;
 }
 
 .training-plan-page--detail {
@@ -459,18 +466,23 @@ onBeforeUnmount(() => {
   padding-bottom: 96px;
 }
 
+.training-plan-page--empty {
+  min-height: calc(100dvh - 168px);
+}
+
 .training-empty-state {
   flex: 1;
   display: grid;
   place-items: center;
   align-content: center;
-  gap: 18px;
+  gap: 14px;
+  min-height: clamp(360px, 52dvh, 480px);
   text-align: center;
 }
 
 .training-empty-icon {
-  width: 180px;
-  height: 180px;
+  width: 154px;
+  height: 154px;
   display: grid;
   place-items: center;
   border-radius: 50%;
@@ -481,14 +493,14 @@ onBeforeUnmount(() => {
 .training-empty-state h2 {
   margin: 0;
   color: var(--text);
-  font-size: 31px;
+  font-size: 28px;
   font-weight: 950;
 }
 
 .training-empty-state p {
   margin: 0;
   color: var(--muted);
-  font-size: 18px;
+  font-size: 16px;
   line-height: 1.5;
 }
 
@@ -516,6 +528,7 @@ onBeforeUnmount(() => {
 .training-plan-list {
   display: grid;
   gap: 12px;
+  padding-bottom: 132px;
 }
 
 .training-plan-card {
@@ -843,13 +856,14 @@ onBeforeUnmount(() => {
 }
 
 .training-plan-actions {
-  position: fixed;
-  left: max(18px, calc((100vw - var(--phone-max)) / 2 + 18px));
-  right: max(18px, calc((100vw - var(--phone-max)) / 2 + 18px));
-  bottom: calc(16px + var(--safe-bottom));
+  position: sticky;
+  bottom: calc(12px + var(--safe-bottom));
   z-index: 20;
   display: grid;
   gap: 14px;
+  margin-top: auto;
+  padding-top: 10px;
+  background: linear-gradient(180deg, transparent, var(--bg) 26%);
 }
 
 .training-plan-actions button {

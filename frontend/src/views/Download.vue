@@ -12,27 +12,62 @@
 
       <ServerHealthBadge compact :show-caption="false" :show-detail="false" />
 
-      <a class="download-primary" href="/downloads/motioncare-release.apk" download>
+      <a
+        v-if="apkAvailable"
+        class="download-primary"
+        href="/downloads/motioncare-release.apk"
+        download
+      >
         <DownloadIcon :size="20" />
         <span>
           <strong>下载安卓版 APK</strong>
         </span>
       </a>
+      <button v-else class="download-primary download-primary--disabled" type="button" disabled>
+        <DownloadIcon :size="20" />
+        <span>
+          <strong>{{ apkChecking ? '正在检查安装包' : '安装包暂未上传' }}</strong>
+        </span>
+      </button>
 
       <RouterLink class="download-return" to="/today">
         <ArrowLeft :size="16" aria-hidden="true" />
         <span>返回主页</span>
       </RouterLink>
 
-      <p class="download-note">如果无法安装，请检查是否允许安装未知来源应用。</p>
+      <p class="download-note">{{ downloadNote }}</p>
     </section>
   </main>
 </template>
 
 <script setup>
 import { ArrowLeft, Download as DownloadIcon } from '@lucide/vue'
+import { computed, onMounted, ref } from 'vue'
 
 import ServerHealthBadge from '@/components/ServerHealthBadge.vue'
+
+const apkAvailable = ref(false)
+const apkChecking = ref(true)
+
+const downloadNote = computed(() => {
+  if (apkChecking.value) return '正在确认安卓安装包是否可下载。'
+  if (!apkAvailable.value) return '服务器已上线，安卓安装包需要生成后再上传。'
+  return '如果无法安装，请检查是否允许安装未知来源应用。'
+})
+
+onMounted(async () => {
+  try {
+    const response = await fetch('/downloads/motioncare-release.apk', {
+      method: 'HEAD',
+      cache: 'no-store',
+    })
+    apkAvailable.value = response.ok
+  } catch {
+    apkAvailable.value = false
+  } finally {
+    apkChecking.value = false
+  }
+})
 </script>
 
 <style scoped>
@@ -51,6 +86,12 @@ import ServerHealthBadge from '@/components/ServerHealthBadge.vue'
 .download-primary strong {
   font-size: 17px;
   line-height: 1.2;
+}
+
+.download-primary--disabled {
+  border: 0;
+  opacity: 0.72;
+  cursor: not-allowed;
 }
 
 .download-return {
