@@ -15,5 +15,5 @@ Write-Output "Backend started PID: $($backendJob.Id)"
 $frontendJob = Start-Process -WindowStyle Hidden -FilePath "cmd" -ArgumentList "/c npm run dev" -WorkingDirectory $frontendDirectory -PassThru
 Write-Output "Frontend started PID: $($frontendJob.Id)"
 
-Write-Output "Backend: http://localhost:8089"
+Write-Output "Backend: http://localhost:8080"
 Write-Output "Frontend: http://localhost:5173"

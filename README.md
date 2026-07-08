@@ -107,15 +107,38 @@ npm run dev -- --host 0.0.0.0
 地址：
 
 ```text
-后端: http://127.0.0.1:8089/api
+后端: http://127.0.0.1:8080/api
 前端: http://localhost:5173/
 ```
 
 健康检查：
 
 ```powershell
-Invoke-RestMethod http://127.0.0.1:8089/api/health
+Invoke-RestMethod http://127.0.0.1:8080/api/health
 ```
+
+本地前端开发环境默认请求 `http://localhost:8080/api`。如果改动
+`backend/.env` 里的 `PORT`，需要同步调整前端 API 配置或显式提供
+`VITE_API_BASE_URL`。生产环境前端默认走同源 `/api`，由 Nginx 反向代理到后端。
+
+## Garmin 同步依赖
+
+Garmin 同步登录和下载由 `database/scripts/download_garmin_connect.py` 执行。
+首次在服务器或本地启用数据同步前，需要安装 Python 依赖：
+
+```powershell
+python -m pip install -r database\requirements.txt
+```
+
+Linux 服务器上可使用：
+
+```bash
+python3 -m pip install -r /var/www/motion-analysis/database/requirements.txt
+```
+
+如果同步页出现 `No module named 'garminconnect'`，说明当前运行脚本的 Python
+环境没有安装 `database/requirements.txt` 中的依赖。安装完成后重新点击“重试”
+或重新绑定 Garmin 账号即可触发新的登录流程。
 
 ## 常用命令
 
