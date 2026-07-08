@@ -1,0 +1,179 @@
+{
+  "source": "FitRec/Endomondo HR offline reference, academic use only",
+  "format": "Python literal records from endomondoHR.json.gz parsed with ast.literal_eval",
+  "sampled": true,
+  "maxRecords": 5000,
+  "filters": {
+    "sport": "run",
+    "minActivitiesPerUser": 20,
+    "maxAvgPaceMinKm": 6.0,
+    "distanceKm": [
+      1,
+      100
+    ],
+    "durationMinutes": [
+      5,
+      480
+    ],
+    "paceMinKm": [
+      2.5,
+      12
+    ]
+  },
+  "counts": {
+    "validRunningActivities": 2019,
+    "uniqueRunningUsers": 17,
+    "similarUsers": 10,
+    "similarUserActivities": 1462,
+    "referenceActivities": 1462
+  },
+  "quality": {
+    "non_run": 2919,
+    "valid_run": 2019,
+    "pace_outlier": 24,
+    "too_short": 34,
+    "missing_duration": 3,
+    "too_long": 1
+  },
+  "similarActivityDistribution": {
+    "paceMinKm": {
+      "p10": 4.553,
+      "p20": 4.771,
+      "p50": 5.235,
+      "p80": 5.813,
+      "p90": 6.099
+    },
+    "distanceKm": {
+      "p10": 3.629,
+      "p20": 5.79,
+      "p50": 10.051,
+      "p80": 14.303,
+      "p90": 18.006
+    },
+    "durationMinutes": {
+      "p10": 19.5,
+      "p20": 29.873,
+      "p50": 53.008,
+      "p80": 74.717,
+      "p90": 95.818
+    },
+    "avgHeartRate": {
+      "p10": 137.5,
+      "p20": 141.8,
+      "p50": 149.2,
+      "p80": 156.2,
+      "p90": 160.0
+    },
+    "maxHeartRate": {
+      "p10": 153.0,
+      "p20": 158.0,
+      "p50": 168.0,
+      "p80": 179.0,
+      "p90": 188.0
+    },
+    "ascentM": {
+      "p10": 40.0,
+      "p20": 68.0,
+      "p50": 133.6,
+      "p80": 226.3,
+      "p90": 289.9
+    }
+  },
+  "topSimilarUsers": [
+    {
+      "userId": "4007546",
+      "activityCount": 448,
+      "avgPaceMinKm": 5.748,
+      "medianDistanceKm": 10.257,
+      "p80DistanceKm": 13.475,
+      "p80DurationMinutes": 76.72,
+      "avgHeartRate": 149.4
+    },
+    {
+      "userId": "885462",
+      "activityCount": 344,
+      "avgPaceMinKm": 5.01,
+      "medianDistanceKm": 5.01,
+      "p80DistanceKm": 10.075,
+      "p80DurationMinutes": 46.2,
+      "avgHeartRate": 150.9
+    },
+    {
+      "userId": "3905196",
+      "activityCount": 176,
+      "avgPaceMinKm": 4.985,
+      "medianDistanceKm": 10.746,
+      "p80DistanceKm": 12.394,
+      "p80DurationMinutes": 64.783,
+      "avgHeartRate": 143.5
+    },
+    {
+      "userId": "13693003",
+      "activityCount": 150,
+      "avgPaceMinKm": 5.004,
+      "medianDistanceKm": 9.0,
+      "p80DistanceKm": 16.027,
+      "p80DurationMinutes": 81.82,
+      "avgHeartRate": 151.9
+    },
+    {
+      "userId": "4969375",
+      "activityCount": 135,
+      "avgPaceMinKm": 5.295,
+      "medianDistanceKm": 17.32,
+      "p80DistanceKm": 25.018,
+      "p80DurationMinutes": 137.86,
+      "avgHeartRate": 138.6
+    },
+    {
+      "userId": "4419649",
+      "activityCount": 61,
+      "avgPaceMinKm": 5.341,
+      "medianDistanceKm": 6.231,
+      "p80DistanceKm": 10.134,
+      "p80DurationMinutes": 51.867,
+      "avgHeartRate": 150.3
+    },
+    {
+      "userId": "854368",
+      "activityCount": 55,
+      "avgPaceMinKm": 5.386,
+      "medianDistanceKm": 9.03,
+      "p80DistanceKm": 15.361,
+      "p80DurationMinutes": 86.07,
+      "avgHeartRate": 158.1
+    },
+    {
+      "userId": "6361870",
+      "activityCount": 33,
+      "avgPaceMinKm": 5.608,
+      "medianDistanceKm": 9.971,
+      "p80DistanceKm": 10.903,
+      "p80DurationMinutes": 65.1,
+      "avgHeartRate": 154.4
+    },
+    {
+      "userId": "279317",
+      "activityCount": 33,
+      "avgPaceMinKm": 5.917,
+      "medianDistanceKm": 9.723,
+      "p80DistanceKm": 13.177,
+      "p80DurationMinutes": 71.877,
+      "avgHeartRate": 143.5
+    },
+    {
+      "userId": "15279967",
+      "activityCount": 27,
+      "avgPaceMinKm": 5.981,
+      "medianDistanceKm": 13.067,
+      "p80DistanceKm": 19.872,
+      "p80DurationMinutes": 116.067,
+      "avgHeartRate": 149.7
+    }
+  ],
+  "notes": [
+    "This aggregate report is for cold-start calibration and academic comparison only.",
+    "Do not redistribute the original FitRec/Endomondo data with the project.",
+    "Final coach decisions still prioritize local Garmin-derived data, user feedback, recovery labels, and safety rules."
+  ]
+}

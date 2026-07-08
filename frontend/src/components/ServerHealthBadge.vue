@@ -1,11 +1,15 @@
 <template>
-  <section class="server-health-badge" :class="`server-health-badge--${tone}`" aria-live="polite">
+  <section
+    class="server-health-badge"
+    :class="[`server-health-badge--${tone}`, { 'server-health-badge--compact': compact }]"
+    aria-live="polite"
+  >
     <span class="server-health-badge__dot" />
     <div>
-      <small>数据服务</small>
+      <small v-if="showCaption">数据服务</small>
       <strong>{{ label }}</strong>
     </div>
-    <em>{{ detail }}</em>
+    <em v-if="showDetail">{{ detail }}</em>
   </section>
 </template>
 
@@ -13,6 +17,21 @@
 import { computed, onMounted, ref } from 'vue'
 
 import { getServerHealth } from '@/services/system'
+
+defineProps({
+  compact: {
+    type: Boolean,
+    default: false,
+  },
+  showCaption: {
+    type: Boolean,
+    default: true,
+  },
+  showDetail: {
+    type: Boolean,
+    default: true,
+  },
+})
 
 const status = ref('checking')
 const detail = ref('正在连接服务')
@@ -47,3 +66,19 @@ onMounted(async () => {
   }
 })
 </script>
+
+<style scoped>
+.server-health-badge--compact {
+  grid-template-columns: auto minmax(0, 1fr);
+  padding: 11px 14px;
+}
+
+.server-health-badge--compact div {
+  align-items: start;
+}
+
+.server-health-badge--compact strong {
+  font-size: 16px;
+  line-height: 1.2;
+}
+</style>

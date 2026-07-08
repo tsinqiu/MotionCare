@@ -11,33 +11,8 @@
       </div>
 
       <div class="auth-heading">
-        <p class="overline">建立跑者档案</p>
         <h1>注册 MotionCare</h1>
-        <p>从第一天开始记录跑力、恢复和训练目标。</p>
       </div>
-
-      <ServerHealthBadge />
-
-      <section class="auth-setup-panel">
-        <div class="auth-setup-panel__title">
-          <span>建立跑者档案</span>
-          <strong>3 步</strong>
-        </div>
-        <div class="auth-setup-grid">
-          <span>
-            <small>数据源</small>
-            <b>Garmin / 手动</b>
-          </span>
-          <span>
-            <small>训练目标</small>
-            <b>耐力赛</b>
-          </span>
-          <span>
-            <small>恢复追踪</small>
-            <b>睡眠 / 压力</b>
-          </span>
-        </div>
-      </section>
 
       <form class="auth-form" @submit.prevent="submit">
         <label>
@@ -52,7 +27,7 @@
           <span>邮箱</span>
           <div class="input-with-icon">
             <Mail :size="18" />
-            <input v-model.trim="form.email" type="email" autocomplete="email" placeholder="name@example.com" required />
+            <input v-model.trim="form.email" type="email" autocomplete="email" placeholder="name@motioncare.com" required />
           </div>
         </label>
 
@@ -103,7 +78,6 @@ import { reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Eye, EyeOff, LockKeyhole, Mail, UserRound } from '@lucide/vue'
 
-import ServerHealthBadge from '@/components/ServerHealthBadge.vue'
 import { authSession, normalizeRedirect, signUp } from '@/stores/authStore'
 
 const route = useRoute()
@@ -149,3 +123,16 @@ async function submit() {
   }
 }
 </script>
+
+<style scoped>
+.auth-heading {
+  justify-items: center;
+  padding-block: 6px 4px;
+  text-align: center;
+}
+
+.auth-heading h1 {
+  padding-block: 3px;
+  line-height: 1.18;
+}
+</style>

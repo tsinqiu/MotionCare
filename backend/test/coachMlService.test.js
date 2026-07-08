@@ -1,20 +1,9 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-let coachMlService;
-let featureSchema;
-
-try {
-  coachMlService = require('../src/services/coachMlService');
-} catch (_error) {
-  coachMlService = null;
-}
-
-try {
-  featureSchema = require('../ml/feature_schema.json');
-} catch (_error) {
-  featureSchema = null;
-}
+const config = require('../src/config');
+const coachMlService = require('../src/services/coachMlService');
+const featureSchema = require('../ml/feature_schema.json');
 
 function sampleContext(overrides = {}) {
   return {
@@ -67,13 +56,19 @@ function sampleContext(overrides = {}) {
       humidityPercent: 75,
       feelsLikeC: 35
     },
+    signals: {
+      activityCount28d: 2,
+      healthDays14d: 1,
+      sleepDays14d: 1,
+      trainingDays14d: 1,
+      weatherSamples28d: 1,
+      feedbackCount: 0
+    },
     ...overrides
   };
 }
 
 test('coach ML service loads with the shared feature schema', () => {
-  assert.ok(coachMlService, 'coachMlService should be available in dev backend');
-  assert.ok(featureSchema, 'feature_schema.json should be available in dev backend');
   assert.deepEqual(
     coachMlService.FEATURE_NAMES,
     featureSchema.features.map((feature) => feature.name)
@@ -91,35 +86,56 @@ test('coach ML service loads with the shared feature schema', () => {
   );
 });
 
-test('coach ML service builds the ml branch historical load features', () => {
-  assert.ok(coachMlService, 'coachMlService should be available in dev backend');
+test('coach ML service builds personal percentile and rolling load features', () => {
+  const features = coachMlService.buildFeatureSet(
+    { trainingLoad: [{ atl: 720, ctl: 540, tsb: -180 }] },
+    sampleContext()
+  );
 
+  assert.equal(features.distance_1d, 5);
+  assert.equal(features.distance_7d, 15);
+  assert.equal(features.load_7d, 250);
+  assert.equal(features.hard_minutes_7d, 60);
+  assert.equal(features.sleep_score, 55);
+  assert.equal(features.weather_risk_level, 2);
+  assert.equal(features.heat_humidity_flag, 1);
+  assert.equal(features.sleep_coverage_14d, 0.071);
+  assert.equal(features.weather_coverage_14d, 0.143);
+  assert.equal(features.hrv_coverage_14d, 0.071);
+  assert.equal(features.training_status_coverage_14d, 0.071);
+  assert.equal(features.session_load_percentile_90d, 0);
+  assert.equal(features.distance_percentile_90d, 0);
+  assert.equal(features.duration_percentile_90d, 0);
+  assert.equal(features.long_run_ratio_28d, 0.5);
+  assert.equal(features.hard_session_gap_days, 3);
+  assert.equal(features.load_spike_ratio_28d, 0.563);
+});
+
+test('coach ML service classifies perceived effort by personal percentile instead of fixed load', () => {
+  assert.equal(
+    coachMlService.__private.classifyRelativePerceivedEffort({
+      load_1d: 150,
+      hard_minutes_7d: 60,
+      session_load_percentile_90d: 70
+    }),
+    'moderate'
+  );
+  assert.equal(
+    coachMlService.__private.classifyRelativePerceivedEffort({
+      load_1d: 150,
+      hard_minutes_7d: 60,
+      session_load_percentile_90d: 92
+    }),
+    'hard'
+  );
+});
+
+test('coach ML service rules protect high heat and poor recovery', () => {
   const features = coachMlService.buildFeatureSet(
     { trainingLoad: [{ atl: 720, ctl: 540, tsb: -180 }] },
     sampleContext()
   );
   const prediction = coachMlService.rulePrediction(features);
-
-  assert.equal(features.long_run_ratio_28d, 0.5);
-  assert.equal(features.hard_session_gap_days, 3);
-  assert.equal(features.load_spike_ratio_28d, 0.563);
-  assert.notEqual(features.session_load_percentile_90d, undefined);
-  assert.notEqual(features.distance_percentile_90d, undefined);
-  assert.notEqual(features.duration_percentile_90d, undefined);
-  assert.match(prediction.perceivedEffortLevel, /^(easy|moderate|hard)$/);
-});
-
-test('coach ML service rules protect high heat and poor recovery when no coach model exists', async () => {
-  assert.ok(coachMlService, 'coachMlService should be available in dev backend');
-
-  const features = coachMlService.buildFeatureSet(
-    { trainingLoad: [{ atl: 720, ctl: 540, tsb: -180 }] },
-    sampleContext()
-  );
-  const prediction = await coachMlService.predict({
-    overview: { trainingLoad: [{ atl: 720, ctl: 540, tsb: -180 }] },
-    context: sampleContext({ userId: 7 })
-  });
 
   assert.equal(features.weather_risk_level, 2);
   assert.equal(prediction.provider, 'rules');
@@ -128,4 +144,74 @@ test('coach ML service rules protect high heat and poor recovery when no coach m
   assert.equal(prediction.loadAction, 'rest');
   assert.equal(prediction.primaryRecommendation, 'rest');
   assert.ok(prediction.topFactors.includes('体感温度较高'));
+});
+
+test('coach ML service predict falls back to rules when local model is missing', async () => {
+  const originalCoachModelPath = config.ml.coachModelPath;
+  config.ml.coachModelPath = '__missing_coach_model__.joblib';
+  let prediction;
+  try {
+    prediction = await coachMlService.predict({
+      overview: { trainingLoad: [{ atl: 720, ctl: 540, tsb: -180 }] },
+      context: sampleContext({ userId: 707 })
+    });
+  } finally {
+    config.ml.coachModelPath = originalCoachModelPath;
+  }
+
+  assert.equal(prediction.provider, 'rules');
+  assert.equal(prediction.fallback, true);
+  assert.equal(prediction.riskLevel, 'red');
+  assert.equal(prediction.loadAction, 'rest');
+});
+
+test('coach ML service does not let local model relax red rule risk', () => {
+  const fallback = {
+    readinessScore: 20,
+    readinessLevel: 'low',
+    recoveryRisk: 'high',
+    riskLevel: 'red',
+    loadAction: 'rest',
+    trainingModifier: 'avoid_hard_session',
+    weatherRisk: 'high',
+    primaryRecommendation: 'rest',
+    recommendationTypes: ['rest'],
+    topFactors: ['TSB 显著偏低'],
+    confidence: 0.62,
+    modelVersion: 'coach-v1',
+    provider: 'rules',
+    fallback: true
+  };
+  const prediction = coachMlService.__private.normalizeModelPrediction({
+    readinessScore: 80,
+    readinessLevel: 'high',
+    recoveryRisk: 'low',
+    riskLevel: 'green',
+    loadAction: 'progress',
+    trainingModifier: 'normal',
+    weatherRisk: 'low',
+    primaryRecommendation: 'normal_training',
+    recommendationTypes: ['normal_training'],
+    confidence: 0.9
+  }, fallback);
+
+  assert.equal(prediction.riskLevel, 'red');
+  assert.equal(prediction.loadAction, 'rest');
+  assert.equal(prediction.primaryRecommendation, 'rest');
+  assert.equal(prediction.trainingModifier, 'avoid_hard_session');
+});
+
+test('coach ML service cache key changes when data signals change', () => {
+  const base = sampleContext();
+  const changed = sampleContext({
+    signals: {
+      ...base.signals,
+      feedbackCount: 2
+    }
+  });
+
+  const firstKey = coachMlService.__private.modelCacheKey(base);
+  const secondKey = coachMlService.__private.modelCacheKey(changed);
+
+  assert.notEqual(firstKey, secondKey);
 });

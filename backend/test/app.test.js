@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const request = require('supertest');
 const createApp = require('../src/app');
+const config = require('../src/config');
 const db = require('../src/db');
 const statsCache = require('../src/cache/statsCache');
 const activityServiceModule = require('../src/services/activityService');
@@ -66,7 +67,37 @@ function buildApp(overrides = {}) {
       'avgStrideLengthCm',
       'normalizedPowerW'
     ],
-    getHealth: async () => ({ status: 'ok', modelVersion: 'running-v1' }),
+    getHealth: async () => ({
+      status: 'ok',
+      modelVersion: 'running-v1',
+      performanceProfile: { status: 'ok', modelVersion: 'performance-v1' }
+    }),
+    getPerformanceProfile: async (user) => ({
+      trainingIndex: {
+        score: 68,
+        level: 'steady',
+        label: '稳态训练',
+        recommendation: '适合中低强度有氧。',
+        factors: ['负荷整体可控']
+      },
+      runningPower: {
+        score: 72,
+        level: 'strong',
+        label: '强劲',
+        trend: 'stable',
+        factors: ['VO2max 较高']
+      },
+      fivePower: [
+        { key: 'endurance', label: '耐力', score: 74 },
+        { key: 'speed', label: '速度', score: 70 },
+        { key: 'technique', label: '技术', score: 62 },
+        { key: 'strength', label: '肌力', score: 65 },
+        { key: 'stability', label: '稳定', score: 58 }
+      ],
+      dataQuality: { score: 82, warnings: [] },
+      model: { modelVersion: 'performance-v1', provider: 'local_performance_model', confidence: 0.8 },
+      userId: user.id
+    }),
     runPrediction: async () => ({
       predictedTrainingLoadLevel: 'medium',
       fatigueRisk: 'medium',
@@ -321,6 +352,23 @@ test('GET /api/health returns service and database status', async () => {
   assert.equal(response.body.data.status, 'ok');
   assert.equal(response.body.data.database.ok, true);
   assert.equal(typeof response.body.data.cache.stats.size, 'number');
+});
+
+test('GET /api/system/public-config returns public map runtime config without login', async () => {
+  const originalAmap = { ...config.maps.amap };
+  config.maps.amap.key = 'test-amap-key';
+  config.maps.amap.securityCode = 'test-amap-security';
+  try {
+    const response = await request(buildApp()).get('/api/system/public-config');
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(response.body.data.maps.amap, {
+      key: 'test-amap-key',
+      securityCode: 'test-amap-security'
+    });
+  } finally {
+    config.maps.amap = originalAmap;
+  }
 });
 
 test('CORS preflight allows mobile app preview and Capacitor origins', async () => {
@@ -933,6 +981,27 @@ test('GET /api/ml/health returns model status', async () => {
   assert.equal(response.status, 200);
   assert.equal(response.body.data.status, 'ok');
   assert.equal(response.body.data.modelVersion, 'running-v1');
+  assert.equal(response.body.data.performanceProfile.modelVersion, 'performance-v1');
+});
+
+test('GET /api/ml/performance-profile requires login', async () => {
+  const response = await request(buildApp()).get('/api/ml/performance-profile');
+
+  assert.equal(response.status, 401);
+  assert.equal(response.body.error.code, 'AUTH_REQUIRED');
+});
+
+test('GET /api/ml/performance-profile returns training index and running power for current user', async () => {
+  const response = await request(buildApp())
+    .get('/api/ml/performance-profile')
+    .set('Authorization', 'Bearer valid-user-token');
+
+  assert.equal(response.status, 200);
+  assert.equal(response.body.data.userId, 2);
+  assert.equal(response.body.data.trainingIndex.score, 68);
+  assert.equal(response.body.data.runningPower.score, 72);
+  assert.equal(response.body.data.fivePower.length, 5);
+  assert.equal(response.body.data.model.modelVersion, 'performance-v1');
 });
 
 test('POST /api/ml/running-prediction requires login', async () => {
@@ -1061,7 +1130,7 @@ test('POST /api/ml/running-prediction allows local API origin', async () => {
   const response = await request(buildApp())
     .post('/api/ml/running-prediction')
     .set('Authorization', 'Bearer valid-user-token')
-    .set('Origin', 'http://127.0.0.1:8089')
+    .set('Origin', `http://127.0.0.1:${config.server.port}`)
     .send(payload);
 
   assert.equal(response.status, 200);
@@ -1671,6 +1740,49 @@ test('POST /api/workouts/:id/track-points accepts batch points', async () => {
   assert.equal(captured.user.id, 2);
 });
 
+test('POST /api/workouts/:id/track-points accepts location quality metadata', async () => {
+  let captured;
+  const app = buildApp({
+    workoutService: {
+      createWorkout: async () => ({}),
+      getWorkout: async () => ({}),
+      appendTrackPoints: async (id, points, user) => {
+        captured = { id, points, user };
+        return { workoutId: id, inserted: points.length };
+      },
+      pauseWorkout: async () => ({}),
+      resumeWorkout: async () => ({}),
+      finishWorkout: async () => ({}),
+      cancelWorkout: async () => ({})
+    }
+  });
+
+  const response = await request(app)
+    .post('/api/workouts/8/track-points')
+    .set('Authorization', 'Bearer valid-user-token')
+    .send({
+      trackPoints: [
+        {
+          sampleTimeUtc: '2026-06-12 08:00:00.000',
+          latitude: 31.2,
+          longitude: 121.4,
+          accuracyM: 8.5,
+          bearingDeg: 92,
+          provider: 'native-fused',
+          isAccepted: false,
+          rejectReason: 'gps_drift'
+        }
+      ]
+    });
+
+  assert.equal(response.status, 201);
+  assert.equal(captured.points[0].accuracyM, 8.5);
+  assert.equal(captured.points[0].bearingDeg, 92);
+  assert.equal(captured.points[0].provider, 'native-fused');
+  assert.equal(captured.points[0].isAccepted, false);
+  assert.equal(captured.points[0].rejectReason, 'gps_drift');
+});
+
 test('POST /api/workouts/:id/track-points rejects empty batch', async () => {
   const response = await request(buildApp())
     .post('/api/workouts/8/track-points')
@@ -2101,6 +2213,96 @@ test('workoutService finish writes activity summary and track points', async () 
     assert.ok(writes.some((entry) => entry.sql.includes('INSERT INTO ActivitySummaries')));
     assert.ok(writes.some((entry) => entry.sql.includes('INSERT INTO TrackPoints')));
     assert.ok(writes.some((entry) => entry.sql.includes("data_source, is_manual, match_status")));
+  } finally {
+    db.transaction = originalTransaction;
+    db.query = originalQuery;
+  }
+});
+
+test('workoutService finish recomputes distance from accepted points instead of trusting payload', async () => {
+  const originalTransaction = db.transaction;
+  const originalQuery = db.query;
+  const writes = [];
+
+  db.transaction = async (handler) => {
+    const connection = {
+      query: async (sql, params = []) => {
+        writes.push({ sql, params });
+        if (sql.includes('FROM WorkoutSessions')) {
+          return [[{
+            id: 7,
+            userId: 2,
+            activityType: 'running',
+            status: 'active',
+            startedAt: '2026-06-12 08:00:00.000',
+            pausedDurationS: 0
+          }]];
+        }
+        if (sql.includes('FROM WorkoutTrackPoints')) {
+          return [[
+            {
+              sampleIndex: 0,
+              sampleTimeUtc: '2026-06-12 08:00:00.000',
+              latitude: 31.2,
+              longitude: 121.4,
+              accuracyM: 8,
+              distanceM: 0,
+              speedMps: 2.5,
+              isAccepted: true
+            },
+            {
+              sampleIndex: 1,
+              sampleTimeUtc: '2026-06-12 08:00:04.000',
+              latitude: 32.2,
+              longitude: 122.4,
+              accuracyM: 120,
+              distanceM: 5000,
+              speedMps: 30,
+              isAccepted: false,
+              rejectReason: 'gps_jump'
+            },
+            {
+              sampleIndex: 2,
+              sampleTimeUtc: '2026-06-12 08:00:10.000',
+              latitude: 31.2001,
+              longitude: 121.4001,
+              accuracyM: 9,
+              distanceM: 5005,
+              speedMps: 2.6,
+              isAccepted: true
+            }
+          ]];
+        }
+        if (sql.includes('INSERT INTO Activities')) {
+          return [{ insertId: 99 }];
+        }
+        return [{}];
+      }
+    };
+    return handler(connection);
+  };
+  db.query = async () => [{
+    id: 7,
+    userId: 2,
+    activityType: 'running',
+    status: 'finished',
+    startedAt: '2026-06-12 08:00:00.000',
+    pausedDurationS: 0,
+    finishedAt: '2026-06-12 08:00:10.000',
+    activityId: 99
+  }];
+
+  try {
+    await workoutServiceModule.finishWorkout(
+      7,
+      { activityName: 'Live Run', distanceM: 5000, durationS: 10 },
+      { id: 2, role: 'user' }
+    );
+
+    const summaryWrite = writes.find((entry) => entry.sql.includes('INSERT INTO ActivitySummaries'));
+    assert.ok(summaryWrite);
+    assert.ok(summaryWrite.params[4] > 10);
+    assert.ok(summaryWrite.params[4] < 30);
   } finally {
     db.transaction = originalTransaction;
     db.query = originalQuery;

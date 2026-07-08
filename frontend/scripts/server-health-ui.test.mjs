@@ -16,6 +16,7 @@ const [
   serverHealthBadge,
   loginView,
   registerView,
+  todayView,
   downloadView,
   routerSource,
   appCss,
@@ -26,6 +27,7 @@ const [
   source('src/components/ServerHealthBadge.vue'),
   source('src/views/Login.vue'),
   source('src/views/Register.vue'),
+  source('src/views/Today.vue'),
   source('src/views/Download.vue'),
   source('src/router/index.js'),
   source('src/assets/app.css'),
@@ -86,6 +88,18 @@ test('download page is the web-only home for the server-hosted Android package',
   assert.match(downloadView, /download-primary/)
   assert.match(appCss, /\.download-page\s*\{[\s\S]*?--download-green:\s*#2e681d/)
   assert.match(appCss, /\.download-primary\s*\{[\s\S]*?background:\s*var\(--download-green\)/)
+})
+
+test('home page surfaces the APK download page and download page returns home', () => {
+  assert.match(todayView, /type=["']button["'][\s\S]*?@click=["']goToDownload["']/)
+  assert.match(todayView, /router\.push\(['"]\/download['"]\)/)
+  assert.match(todayView, /android-download-link/)
+  assert.match(todayView, /下载安卓版/)
+  assert.doesNotMatch(todayView, /<RouterLink/)
+  assert.doesNotMatch(todayView, /\/downloads\/motioncare-release\.apk/)
+  assert.match(downloadView, /to=["']\/today["']/)
+  assert.match(downloadView, /返回主页/)
+  assert.match(downloadView, /download-return/)
 })
 
 test('server health badge follows the RQ-style green system status treatment', () => {

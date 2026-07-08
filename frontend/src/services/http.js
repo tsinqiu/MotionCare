@@ -2,7 +2,7 @@ import axios from 'axios'
 import { Capacitor } from '@capacitor/core'
 
 const TOKEN_STORAGE_KEY = 'motion-analysis-token'
-const LOCAL_API_BASE_URL = import.meta.env.DEV ? 'http://localhost:8089/api' : '/api'
+const LOCAL_API_BASE_URL = import.meta.env.DEV ? 'http://localhost:8080/api' : '/api'
 let authFailureHandler = null
 
 export function resolveApiBaseUrl() {

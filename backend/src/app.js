@@ -21,6 +21,7 @@ const createCommunityRouter = require('./routes/communityRoutes');
 const createExploreRouter = require('./routes/exploreRoutes');
 const createSettingsRouter = require('./routes/settingsRoutes');
 const createShoeRouter = require('./routes/shoeRoutes');
+const createSystemRouter = require('./routes/systemRoutes');
 const defaultShoeService = require('./services/shoeService');
 
 function createApp({
@@ -91,6 +92,7 @@ function createApp({
   app.use('/uploads', express.static(config.uploads.root));
 
   app.use('/api', createAuthRouter(authService, securityService));
+  app.use('/api', createSystemRouter());
   app.use('/api', createAdminUserRouter(authService));
   app.use('/api', createHealthRouter(healthService, authService));
   app.use('/api', createActivityRouter(activityService, authService));

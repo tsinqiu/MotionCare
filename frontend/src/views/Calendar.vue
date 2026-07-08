@@ -3,7 +3,6 @@
     <section class="dark-panel">
       <div class="section-heading">
         <div>
-          <p class="overline">训练日历</p>
           <h2>运动日历</h2>
         </div>
       </div>
@@ -18,28 +17,19 @@
     <StateBlock v-else-if="error" title="日历加载失败" :message="error" action-label="重试" tone="danger" @action="load" />
 
     <template v-else>
-      <section class="calendar-rq-panel">
-        <div class="section-heading">
-          <div>
-            <p class="overline">本月训练</p>
-            <h2>{{ monthLabel }}</h2>
-          </div>
-          <span class="status-chip">{{ monthlyActivityCount }} 次</span>
-        </div>
-        <div class="calendar-summary-grid">
-          <span>
-            <small>月跑量</small>
-            <b>{{ monthlyDistanceText }}</b>
-          </span>
-          <span>
-            <small>训练连续性</small>
-            <b>{{ trainingContinuityText }}</b>
-          </span>
-          <span>
-            <small>训练天数</small>
-            <b>{{ monthlyTrainingDays }} 天</b>
-          </span>
-        </div>
+      <section class="calendar-stat-grid" aria-label="本月训练概览">
+        <article>
+          <small>月跑量</small>
+          <b>{{ monthlyDistanceText }}</b>
+        </article>
+        <article>
+          <small>训练次数</small>
+          <b>{{ monthlyActivityCount }} 次</b>
+        </article>
+        <article>
+          <small>训练天数</small>
+          <b>{{ monthlyTrainingDays }} 天</b>
+        </article>
       </section>
 
       <section class="calendar-grid-panel">
@@ -64,25 +54,16 @@
         </div>
       </section>
 
-      <section class="dark-panel">
-        <div class="section-heading">
-          <div>
-            <h2>{{ selectedDate || monthLabel }}</h2>
-          </div>
-        </div>
-        <StateBlock
-          v-if="selectedActivities.length === 0"
-          title="当天暂无运动"
-          message="这一天还没有运动记录。"
+      <section v-if="selectedActivities.length === 0" class="calendar-empty-day">
+        <strong>当天暂无运动</strong>
+      </section>
+      <section v-else class="activity-card-grid">
+        <ActivityCard
+          v-for="activity in selectedActivities"
+          :key="activity.id"
+          :activity="activity"
+          @select="router.push(`/activities/${activity.id}`)"
         />
-        <div v-else class="activity-card-grid">
-          <ActivityCard
-            v-for="activity in selectedActivities"
-            :key="activity.id"
-            :activity="activity"
-            @select="router.push(`/activities/${activity.id}`)"
-          />
-        </div>
       </section>
     </template>
 
@@ -120,14 +101,6 @@ const monthlyDistanceText = computed(() => {
   const distance = monthlyActivities.value.reduce((sum, activity) => sum + Number(activity.total_distance_m || 0), 0)
   return distance > 0 ? formatDistance(distance) : '--'
 })
-const trainingContinuityText = computed(() => {
-  const days = monthlyTrainingDays.value
-  if (!days) return '--'
-  const calendarDays = Math.max((calendar.value.days || []).length, 1)
-  const ratio = Math.round((days / calendarDays) * 100)
-  return `${ratio}%`
-})
-
 function iconClass(type) {
   if (String(type).includes('cycling')) return 'ride'
   if (String(type).includes('swim')) return 'swim'
@@ -160,3 +133,52 @@ async function load() {
 
 watch(month, load, { immediate: true })
 </script>
+
+<style scoped>
+.calendar-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.calendar-stat-grid article {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding: 14px 12px;
+  border: 1px solid color-mix(in srgb, var(--app-green) 16%, var(--border));
+  border-radius: 14px;
+  background: var(--panel);
+  box-shadow: var(--shadow-sm);
+}
+
+.calendar-stat-grid small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.calendar-stat-grid b {
+  color: var(--text);
+  font-size: 18px;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
+.calendar-empty-day {
+  min-height: 106px;
+  display: grid;
+  place-items: center;
+  padding: 22px;
+  border: 1px solid color-mix(in srgb, var(--app-green) 16%, var(--border));
+  border-radius: 18px;
+  background: var(--panel);
+  box-shadow: var(--shadow-sm);
+}
+
+.calendar-empty-day strong {
+  color: var(--text);
+  font-size: 20px;
+  line-height: 1.25;
+}
+</style>

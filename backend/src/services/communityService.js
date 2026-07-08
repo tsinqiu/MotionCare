@@ -12,6 +12,14 @@ function toPost(row) {
     activityName: row.activityName || '',
     activityType: row.activityType || '',
     activityLocalStartTime: row.activityLocalStartTime || '',
+    activityLocationName: row.activityLocationName || '',
+    distanceM: row.distanceM == null ? null : Number(row.distanceM),
+    durationS: row.durationS == null ? null : Number(row.durationS),
+    elevationGainM: row.elevationGainM == null ? null : Number(row.elevationGainM),
+    calories: row.calories == null ? null : Number(row.calories),
+    activityTrainingLoad: row.activityTrainingLoad == null ? null : Number(row.activityTrainingLoad),
+    weatherCondition: row.weatherCondition || '',
+    temperatureC: row.temperatureC == null ? null : Number(row.temperatureC),
     visibility: row.visibility,
     imageUrl: row.imagePath || '',
     imageOriginalName: row.imageOriginalName || '',
@@ -49,6 +57,14 @@ function postSelect(user) {
       a.activity_name AS activityName,
       a.activity_type AS activityType,
       a.local_start_time AS activityLocalStartTime,
+      a.location_name AS activityLocationName,
+      a.weather_condition AS weatherCondition,
+      a.temperature_c AS temperatureC,
+      js.distance_m AS distanceM,
+      js.duration_s AS durationS,
+      js.elevation_gain_m AS elevationGainM,
+      js.calories,
+      js.activity_training_load AS activityTrainingLoad,
       p.visibility,
       p.image_path AS imagePath,
       p.image_original_name AS imageOriginalName,
@@ -71,6 +87,7 @@ function postSelect(user) {
     FROM CommunityPosts p
     JOIN Users u ON u.id = p.user_id
     LEFT JOIN Activities a ON a.id = p.activity_id
+    LEFT JOIN ActivitySummaries js ON js.activity_id = a.id
   `;
 }
 

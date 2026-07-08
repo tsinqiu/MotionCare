@@ -396,7 +396,7 @@ def collect_time_series(user_id: int, day: str, payload: dict[str, Any]) -> dict
                 "acwr_status", "acwr_percent", "optimal_load_min", "optimal_load_max",
                 "low_aerobic_load", "low_aerobic_target_min", "low_aerobic_target_max",
                 "high_aerobic_load", "high_aerobic_target_min", "high_aerobic_target_max",
-                "anaerobic_load", "anaerobic_target_min", "anaerobic_target_max", "raw_json",
+                "anaerobic_load", "anaerobic_target_min", "anaerobic_target_max",
             ],
             [sql_int(user_id), sql_string(str(status_date)[:10]),
              sql_number(vo2max),
@@ -417,8 +417,7 @@ def collect_time_series(user_id: int, day: str, payload: dict[str, Any]) -> dict
              sql_number(high_aerobic_max),
              sql_number(anaerobic),
              sql_number(anaerobic_min),
-             sql_number(anaerobic_max),
-             sql_json(training_status)])
+             sql_number(anaerobic_max)])
 
     race_preds = payload.get("race_predictions") or {}
     pred_list = race_preds if isinstance(race_preds, list) else [race_preds]
@@ -426,13 +425,12 @@ def collect_time_series(user_id: int, day: str, payload: dict[str, Any]) -> dict
         pred_date = first_present(entry, "predictionDate", "calendarDate", "date") if isinstance(entry, dict) else None
         if isinstance(entry, dict) and pred_date:
             add_batch("RacePredictions",
-                ["user_id", "prediction_date", "time_5k_s", "time_10k_s", "time_half_marathon_s", "time_marathon_s", "raw_json"],
+                ["user_id", "prediction_date", "time_5k_s", "time_10k_s", "time_half_marathon_s", "time_marathon_s"],
                 [sql_int(user_id), sql_string(str(pred_date)[:10]),
                  sql_int(first_present(entry, "5k", "time5K", "time5k")),
                  sql_int(first_present(entry, "10k", "time10K", "time10k")),
                  sql_int(first_present(entry, "halfMarathon", "timeHalfMarathon")),
-                 sql_int(first_present(entry, "marathon", "timeMarathon")),
-                 sql_json(entry)])
+                 sql_int(first_present(entry, "marathon", "timeMarathon"))])
 
     lt = payload.get("lactate_threshold") or {}
     lt_hr = scalar(first_key(lt, "heartRateBpm", "heartRate", "heartRateInBeatsPerMinute"), "value")
@@ -443,26 +441,24 @@ def collect_time_series(user_id: int, day: str, payload: dict[str, Any]) -> dict
     lt_date = first_key(lt, "calendarDate", "date") or day
     if isinstance(lt, dict) and (lt_hr or lt_speed or lt_power):
         add_batch("LactateThresholds",
-            ["user_id", "threshold_date", "heart_rate_bpm", "cycling_heart_rate_bpm", "speed_mps", "power_w", "power_to_weight", "raw_json"],
+            ["user_id", "threshold_date", "heart_rate_bpm", "cycling_heart_rate_bpm", "speed_mps", "power_w", "power_to_weight"],
             [sql_int(user_id), sql_string(str(lt_date)[:10]),
              sql_int(lt_hr),
              sql_int(lt_cycling_hr),
              sql_number(lt_speed),
              sql_int(lt_power),
-             sql_number(lt_power_to_weight),
-             sql_json(lt)])
+             sql_number(lt_power_to_weight)])
 
     ftp = payload.get("cycling_ftp") or {}
     ftp_w = first_present(ftp, "functionalThresholdPower", "ftp", "thresholdPower")
     ftp_date = first_present(ftp, "calendarDate", "date") or day
     if isinstance(ftp, dict) and ftp_w:
         add_batch("CyclingFtpSnapshots",
-            ["user_id", "snapshot_date", "ftp_w", "sport", "source", "raw_json"],
+            ["user_id", "snapshot_date", "ftp_w", "sport", "source"],
             [sql_int(user_id), sql_string(str(ftp_date)[:10]),
              sql_int(ftp_w),
              sql_string(ftp.get("sport") or "cycling"),
-             sql_string(ftp.get("biometricSourceType") or ftp.get("source") or "garmin"),
-             sql_json(ftp)])
+             sql_string(ftp.get("biometricSourceType") or ftp.get("source") or "garmin")])
 
     return batches
 

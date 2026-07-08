@@ -9,6 +9,7 @@
     @keydown.enter="$emit('select', activity)"
     @keydown.space.prevent="$emit('select', activity)"
   >
+    <time class="activity-card-time">{{ formattedCardTime }}</time>
     <div class="activity-card-main">
       <span class="activity-accent" aria-hidden="true"></span>
       <span class="activity-icon" aria-hidden="true">
@@ -18,7 +19,6 @@
       <span class="activity-copy">
         <span class="activity-title">
           <strong>{{ displayTitle }}</strong>
-          <time>{{ formatDateTime(activity.local_start_time) }}</time>
         </span>
         <span class="activity-subtitle">
           {{ activity.activity_type }}
@@ -27,33 +27,9 @@
     </div>
 
     <div class="activity-metrics">
-      <span>
-        <small>距离</small>
-        <b>{{ formatDistance(activity.total_distance_m) }}</b>
-      </span>
-      <span>
-        <small>时长</small>
-        <b>{{ formatClockDuration(activity.total_timer_time_s) }}</b>
-      </span>
-      <span>
-        <small>{{ speedLabel }}</small>
-        <b>{{ speedValue }}</b>
-      </span>
-      <span>
-        <small>卡路里</small>
-        <b>{{ formatCalories(activity.total_calories) }}</b>
-      </span>
-      <span v-if="trainingLoadValue !== '--'">
-        <small>训练负荷</small>
-        <b>{{ trainingLoadValue }}</b>
-      </span>
-      <span v-if="activity.perceived_effort">
-        <small>体感</small>
-        <b>{{ activity.perceived_effort }}/10</b>
-      </span>
-      <span v-if="activity.weather_condition || activity.temperature_c != null">
-        <small>天气</small>
-        <b>{{ weatherText }}</b>
+      <span v-for="metric in metricItems" :key="metric.label">
+        <small>{{ metric.label }}</small>
+        <b>{{ metric.value }}</b>
       </span>
     </div>
 
@@ -110,6 +86,7 @@ const sportIcon = computed(() => ({
 const displayTitle = computed(() => (
   props.activity.activity_name || props.activity.location_name || props.activity.activity_type
 ))
+const formattedCardTime = computed(() => formatCardDateTime(props.activity.local_start_time))
 
 const speedLabel = computed(() => (sportClass.value === 'ride' ? '速度' : '配速'))
 const speedValue = computed(() => (sportClass.value === 'ride'
@@ -127,9 +104,28 @@ const weatherText = computed(() => {
   const temp = props.activity.temperature_c
   return temp === null || temp === undefined ? condition : `${condition} ${Math.round(temp)}°C`
 })
+const metricItems = computed(() => [
+  { label: '距离', value: formatDistance(props.activity.total_distance_m) },
+  { label: '时长', value: formatClockDuration(props.activity.total_timer_time_s) },
+  { label: speedLabel.value, value: speedValue.value },
+  { label: '卡路里', value: formatCalories(props.activity.total_calories) },
+  { label: '训练负荷', value: trainingLoadValue.value },
+  { label: '天气', value: weatherText.value },
+])
 
 function photoUrl(path) {
   return resolveMediaUrl(path)
+}
+
+function formatCardDateTime(value) {
+  if (!value) return '--'
+  const normalized = typeof value === 'string' ? value.replace(' ', 'T') : value
+  const date = new Date(normalized)
+  if (Number.isNaN(date.getTime())) return formatDateTime(value)
+  const week = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][date.getDay()]
+  const dateText = `${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')}`
+  const timeText = `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+  return `${dateText}（${week}） ${timeText}`
 }
 </script>
 

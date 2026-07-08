@@ -3,9 +3,20 @@ const config = require('../config');
 
 const REQUIRED_SCHEMA = Object.freeze({
   Users: { columns: ['id', 'role', 'status'] },
-  Activities: { columns: ['id', 'owner_user_id', 'data_source', 'is_manual', 'raw_json'] },
+  Activities: { columns: ['id', 'owner_user_id', 'data_source', 'is_manual'] },
   ActivitySummaries: { columns: ['activity_id', 'activity_training_load'] },
-  TrackPoints: { columns: ['activity_id', 'sample_index', 'sample_time_utc'] },
+  TrackPoints: {
+    columns: [
+      'activity_id',
+      'sample_index',
+      'sample_time_utc',
+      'accuracy_m',
+      'bearing_deg',
+      'provider',
+      'is_accepted',
+      'reject_reason'
+    ]
+  },
   Shoes: {
     columns: [
       'id',
@@ -109,7 +120,8 @@ async function verifyDatabase({ query = db.query, databaseName = config.db.datab
     if (missingItems.length) {
       throw new DatabaseVerificationError(
         `Database schema is incomplete: ${missingItems.join(', ')}. `
-          + 'If the database was rebuilt manually, apply database/sql/17_security_hardening.sql before starting. '
+          + 'If the database was rebuilt manually, apply database/sql/17_security_hardening.sql '
+          + 'and database/sql/19_live_workout_location_quality.sql before starting. '
           + 'database/scripts/import_shared_seed.ps1 already replays this migration automatically.',
         'DATABASE_SCHEMA_INCOMPLETE',
         missing

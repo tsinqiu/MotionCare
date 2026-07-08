@@ -1,13 +1,5 @@
 <template>
   <div class="page-stack">
-    <section class="status-hero">
-      <div class="status-hero__top">
-        <p class="overline">身体与训练</p>
-        <span class="status-chip" :class="statusBadge.tone">{{ statusBadge.label }}</span>
-      </div>
-      <p class="status-hero__message">{{ statusBadge.message }}</p>
-    </section>
-
     <StateBlock v-if="loading" title="正在加载状态" message="正在汇总健康、负荷、纪录和日历。" />
     <StateBlock
       v-else-if="!hasData && errors.length"
@@ -21,7 +13,6 @@
       <section class="status-empty-rq-panel" aria-label="空态也保留跑力分析入口">
         <div class="status-empty-rq-panel__head">
           <div>
-            <p class="overline">跑步五力</p>
             <h2>等待跑力</h2>
           </div>
           <span class="status-chip neutral">数据不足</span>
@@ -48,27 +39,20 @@
       </section>
     </template>
 
-      <template v-else>
+    <template v-else>
       <p v-if="errors.length" class="soft-note">部分数据暂时不可用，其余内容已正常显示。</p>
-
-      <div class="metric-grid">
-        <MetricCard label="睡眠分数" :value="metricValue(health.sleepScore)" />
-        <MetricCard label="静息心率" :value="metricValue(health.restingHeartRateBpm, ' 次/分')" />
-        <MetricCard label="平均压力" :value="metricValue(health.avgStressLevel)" />
-        <MetricCard label="心率变异" :value="metricValue(health.avgHrv)" />
-      </div>
 
       <section class="rq-score-panel">
         <div class="rq-score-panel__title">
           <span>当前跑力</span>
-          <small>{{ runningPowerLevel }}</small>
+          <button type="button" class="rq-detail-link" @click="goPerformanceDetail">详情</button>
         </div>
         <strong>{{ runningPowerDisplay }}</strong>
-        <div class="score-band" :style="scoreMarkerStyle" aria-label="跑力等级">
-          <span class="score-band__segment score-band__segment--base">基础</span>
-          <span class="score-band__segment score-band__segment--steady">稳定</span>
-          <span class="score-band__segment score-band__segment--strong">强劲</span>
-          <span class="score-band__segment score-band__segment--peak">巅峰</span>
+        <div class="performance-gradient-track" :style="scoreMarkerStyle" aria-label="跑力等级">
+          <span>基础</span>
+          <span>稳定</span>
+          <span>强劲</span>
+          <span>巅峰</span>
           <i class="score-band__marker" aria-hidden="true"></i>
         </div>
       </section>
@@ -76,7 +60,6 @@
       <section class="rq-five-power-panel">
         <div class="rq-five-power-panel__head">
           <div>
-            <p class="overline">跑步五力</p>
             <h2>五力分析图</h2>
           </div>
           <span class="status-chip" :class="statusBadge.tone">{{ runningPowerLevel }}</span>
@@ -132,30 +115,33 @@
         </div>
       </section>
 
-      <section class="analysis-category-grid" aria-label="跑步分析分类">
-        <article
-          v-for="category in analysisCategories"
-          :key="category.title"
-          class="analysis-category-card"
-          :class="`analysis-category-card--${category.tone}`"
-        >
-          <span>{{ category.title }}</span>
-          <strong>{{ category.value }}</strong>
-          <small>{{ category.caption }}</small>
-        </article>
-      </section>
+      <div class="metric-grid status-health-grid">
+        <MetricCard label="睡眠分数" :value="metricValue(health.sleepScore)" />
+        <MetricCard label="静息心率" :value="metricValue(health.restingHeartRateBpm, ' 次/分')" />
+        <MetricCard label="平均压力" :value="metricValue(health.avgStressLevel)" />
+        <MetricCard label="心率变异" :value="metricValue(health.avgHrv)" />
+      </div>
 
-      <section class="dark-panel">
+      <section class="dark-panel training-load-panel">
         <div class="section-heading">
           <div><h2>训练负荷</h2></div>
+          <span class="status-chip" :class="loadBalanceTone">{{ loadBalanceLabel }}</span>
         </div>
         <p class="load-reading">{{ loadReading }}</p>
-        <div class="training-targets">
-          <span><small>体能储备</small><b>{{ metricValue(currentLoad.ctl) }}</b></span>
-          <span><small>疲劳负荷</small><b>{{ metricValue(currentLoad.atl) }}</b></span>
-          <span><small>状态余量</small><b>{{ metricValue(currentLoad.tsb) }}</b></span>
+        <div class="training-targets training-load-targets">
+          <span><small>体能（CTL）</small><b>{{ metricValue(currentLoad.ctl) }}</b></span>
+          <span><small>疲劳（ATL）</small><b>{{ metricValue(currentLoad.atl) }}</b></span>
+          <span><small>状态（TSB）</small><b>{{ metricValue(currentLoad.tsb) }}</b></span>
           <span><small>今日负荷</small><b>{{ metricValue(currentLoad.dailyTrainingLoad) }}</b></span>
         </div>
+      </section>
+
+      <section class="status-hero status-hero--bottom">
+        <div class="status-hero__top">
+          <p class="overline">身体与训练</p>
+          <span class="status-chip" :class="statusBadge.tone">{{ statusBadge.label }}</span>
+        </div>
+        <p class="status-hero__message">{{ statusBadge.message }}</p>
       </section>
     </template>
   </div>
@@ -163,18 +149,22 @@
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 
 import MetricCard from '@/components/MetricCard.vue'
 import StateBlock from '@/components/StateBlock.vue'
 import { getTodayHealth } from '@/services/dashboard'
 import { getCalendarStats, getPersonalBests } from '@/services/stats'
 import { getLoadBalance } from '@/services/training'
+import { getPerformanceProfile } from '@/services/performance'
 import { deriveStatusBadge } from '@/utils/productInsights'
 
+const router = useRouter()
 const health = ref({})
 const loadRows = ref([])
 const personalBests = ref({})
 const calendar = ref({ days: [] })
+const performanceProfile = ref(null)
 const errors = ref([])
 const loading = ref(false)
 
@@ -196,6 +186,23 @@ const loadReading = computed(() => {
   if (value <= 10) return '体能和疲劳比较平衡，可以按计划继续训练。'
   return '身体比较轻松，适合安排一次高质量训练或比赛。'
 })
+const loadBalanceLabel = computed(() => {
+  const tsb = currentLoad.value.tsb
+  if (tsb === null || tsb === undefined || tsb === '') return '待同步'
+  const value = Number(tsb)
+  if (value <= -20) return '恢复优先'
+  if (value < -8) return '负荷累积'
+  if (value <= 10) return '平衡'
+  return '状态轻松'
+})
+const loadBalanceTone = computed(() => {
+  const tsb = currentLoad.value.tsb
+  if (tsb === null || tsb === undefined || tsb === '') return 'neutral'
+  const value = Number(tsb)
+  if (value <= -20) return 'danger'
+  if (value < -8) return 'warning'
+  return 'good'
+})
 const pbHighlights = computed(() => {
   const groups = [
     ['跑步', personalBests.value.running],
@@ -205,66 +212,26 @@ const pbHighlights = computed(() => {
   ]
   return groups.flatMap(([group, items]) => (items || []).slice(0, 2).map((item) => ({ ...item, group }))).slice(0, 6)
 })
-const runningRecord = computed(() => pbHighlights.value.find((item) => item.group === '跑步') || null)
+const runningPower = computed(() => performanceProfile.value?.runningPower || null)
 const runningPowerScore = computed(() => {
-  const ctl = Number(currentLoad.value.ctl)
-  const tsb = Number(currentLoad.value.tsb)
-  const dailyLoad = Number(currentLoad.value.dailyTrainingLoad)
-  if (![ctl, tsb, dailyLoad].some(Number.isFinite)) return null
-
-  const base = Number.isFinite(ctl) ? ctl : 45
-  const freshness = Number.isFinite(tsb) ? Math.max(-12, Math.min(12, tsb)) * 0.35 : 0
-  const stimulus = Number.isFinite(dailyLoad) ? Math.min(dailyLoad, 120) * 0.05 : 0
-  return Math.round(Math.max(0, Math.min(100, base + freshness + stimulus)))
+  const value = Number(runningPower.value?.score)
+  return Number.isFinite(value) ? Math.max(0, Math.min(100, Math.round(value))) : null
 })
 const runningPowerDisplay = computed(() => runningPowerScore.value ?? '--')
-const runningPowerLevel = computed(() => {
-  const score = runningPowerScore.value
-  if (score === null) return '数据不足'
-  if (score < 45) return '基础'
-  if (score < 65) return '稳定'
-  if (score < 82) return '强劲'
-  return '巅峰'
-})
+const runningPowerLevel = computed(() => runningPower.value?.label || '数据不足')
 const scoreMarkerStyle = computed(() => ({
   '--score-position': `${runningPowerScore.value ?? 0}%`,
 }))
 const rqPowerAxes = computed(() => {
-  const ctl = toFiniteNumber(currentLoad.value.ctl)
-  const tsb = toFiniteNumber(currentLoad.value.tsb)
-  const dailyLoad = toFiniteNumber(currentLoad.value.dailyTrainingLoad)
-  const sleep = toFiniteNumber(health.value.sleepScore)
-  const stress = toFiniteNumber(health.value.avgStressLevel)
-  const hrv = toFiniteNumber(health.value.avgHrv)
-  const basePower = runningPowerScore.value ?? 48
-
-  return [
-    {
-      label: '耐力',
-      value: clampScore(Number.isFinite(ctl) ? ctl : basePower, 44),
-      detail: '体能储备与长期负荷',
-    },
-    {
-      label: '速度',
-      value: clampScore(basePower * 0.72 + (Number.isFinite(dailyLoad) ? dailyLoad * 0.18 : 8), 42),
-      detail: '跑力表现与训练刺激',
-    },
-    {
-      label: '技术',
-      value: clampScore((Number.isFinite(stress) ? 100 - stress : 58) * 0.48 + basePower * 0.38, 46),
-      detail: '压力控制与动作稳定性',
-    },
-    {
-      label: '肌力',
-      value: clampScore((Number.isFinite(dailyLoad) ? dailyLoad : basePower) * 0.46 + (Number.isFinite(ctl) ? ctl * 0.34 : 18), 43),
-      detail: '负荷承受与力量基础',
-    },
-    {
-      label: '稳定',
-      value: clampScore((Number.isFinite(sleep) ? sleep : 58) * 0.38 + (Number.isFinite(hrv) ? Math.min(hrv, 100) * 0.22 : 12) + (Number.isFinite(tsb) ? 50 + tsb : 46) * 0.28, 45),
-      detail: '睡眠、心率变异与状态平衡',
-    },
-  ]
+  const axes = performanceProfile.value?.fivePower
+  if (Array.isArray(axes) && axes.length) {
+    return axes.map((axis) => ({
+      label: axis.label,
+      value: Math.max(0, Math.min(100, Math.round(Number(axis.score) || 0))),
+      detail: axis.detail || '模型综合评估',
+    }))
+  }
+  return ['耐力', '速度', '技术', '肌力', '稳定'].map((label) => ({ label, value: 0, detail: '等待模型数据' }))
 })
 const rqRadarAxes = computed(() => rqPowerAxes.value.map((axis, index) => {
   const angle = -Math.PI / 2 + index * ((Math.PI * 2) / rqPowerAxes.value.length)
@@ -308,49 +275,24 @@ const recentLoadBars = computed(() => {
     }
   })
 })
-const analysisCategories = computed(() => [
-  {
-    title: '体能',
-    value: metricValue(currentLoad.value.ctl),
-    caption: '长期体能储备',
-    tone: 'fitness',
-  },
-  {
-    title: '跑力',
-    value: runningRecord.value?.value ? `${runningRecord.value.value}${runningRecord.value.unit ? ` ${runningRecord.value.unit}` : ''}` : '--',
-    caption: runningRecord.value?.label || '等待跑步纪录',
-    tone: 'power',
-  },
-  {
-    title: '技术',
-    value: metricValue(currentLoad.value.dailyTrainingLoad),
-    caption: '今日负荷与动作质量线索',
-    tone: 'technique',
-  },
-])
 const hasData = computed(() => (
   Object.keys(health.value || {}).length > 0
   || loadRows.value.length > 0
   || pbHighlights.value.length > 0
   || activeDays.value.length > 0
+  || performanceProfile.value
 ))
 
 function metricValue(value, unit = '') {
   return value === null || value === undefined || value === '' ? '--' : `${value}${unit}`
 }
 
-function toFiniteNumber(value) {
-  const number = Number(value)
-  return Number.isFinite(number) ? number : Number.NaN
-}
-
-function clampScore(value, fallback) {
-  const number = Number.isFinite(value) ? value : fallback
-  return Math.round(Math.max(0, Math.min(100, number)))
-}
-
 function coordinate(value) {
   return Number(value.toFixed(1))
+}
+
+function goPerformanceDetail() {
+  router.push('/status/performance')
 }
 
 async function load() {
@@ -363,10 +305,11 @@ async function load() {
     getLoadBalance({ range: '42d' }),
     getPersonalBests(),
     getCalendarStats({ month }),
+    getPerformanceProfile(),
   ])
-  const targets = [health, loadRows, personalBests, calendar]
-  const fallbacks = [{}, [], {}, { days: [] }]
-  const labels = ['健康数据', '训练负荷', '个人纪录', '运动日历']
+  const targets = [health, loadRows, personalBests, calendar, performanceProfile]
+  const fallbacks = [{}, [], {}, { days: [] }, null]
+  const labels = ['健康数据', '训练负荷', '个人纪录', '运动日历', '跑力模型']
 
   results.forEach((result, index) => {
     if (result.status === 'fulfilled') {
@@ -417,7 +360,20 @@ onMounted(load)
   background: var(--panel-soft);
   border-radius: var(--radius-lg);
 }
-.load-reading { margin: 0 0 14px; color: var(--muted); line-height: 1.55; }
+
+.status-chip.neutral {
+  color: var(--muted);
+}
+
+.status-chip.warning {
+  color: var(--app-amber);
+  border-color: color-mix(in srgb, var(--app-amber) 40%, var(--border));
+  background: color-mix(in srgb, var(--app-amber) 10%, var(--panel));
+}
+
+.status-chip.good {
+  background: color-mix(in srgb, var(--app-green) 10%, var(--panel));
+}
 
 .status-empty-rq-panel {
   display: grid;
@@ -500,38 +456,102 @@ onMounted(load)
   overflow-wrap: anywhere;
 }
 
-.analysis-category-grid {
+.rq-detail-link {
+  min-height: 34px;
+  padding: 0 14px;
+  border: 1px solid color-mix(in srgb, var(--app-green) 30%, var(--border));
+  border-radius: 999px;
+  color: var(--green-strong);
+  background: var(--panel);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.performance-gradient-track {
+  position: relative;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-items: center;
+  min-height: 34px;
+  overflow: visible;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #38bdf8 0%, #10b981 50%, #f59e0b 74%, #ef4444 100%);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.18);
+}
+
+.performance-gradient-track span {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 900;
+  text-align: center;
+  text-shadow: 0 1px 2px rgb(0 0 0 / 0.18);
+}
+
+.performance-gradient-track .score-band__marker {
+  top: 50%;
+  left: var(--score-position);
+  transform: translate(-50%, -50%);
+}
+
+.status-health-grid {
+  order: 0;
+}
+
+.training-load-panel {
+  position: relative;
+  overflow: hidden;
+  border-left: 4px solid var(--app-green);
+}
+
+.training-load-panel::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 74px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--app-green) 8%, transparent), transparent);
+  pointer-events: none;
+}
+
+.training-load-panel > * {
+  position: relative;
+}
+
+.training-load-panel .section-heading {
+  align-items: center;
+}
+
+.load-reading {
+  margin: -4px 0 16px;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.training-load-targets {
   gap: 10px;
 }
-.analysis-category-card {
+
+.training-load-targets span {
   display: grid;
-  gap: 6px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 6px 10px;
   min-width: 0;
-  padding: 14px 10px;
-  border: 1px solid color-mix(in srgb, var(--green) 16%, var(--border));
-  border-radius: 12px;
-  background: var(--panel);
-  box-shadow: var(--shadow-sm);
+  padding: 12px;
+  border-color: color-mix(in srgb, var(--app-green) 18%, var(--border));
+  background: color-mix(in srgb, var(--app-green) 5%, var(--panel-soft));
 }
-.analysis-category-card span {
-  font-size: 13px;
-  font-weight: 800;
-  color: var(--green-strong);
+
+.training-load-targets small {
+  grid-column: 1 / -1;
 }
-.analysis-category-card strong {
+
+.training-load-targets b {
   min-width: 0;
-  font-size: clamp(18px, 7cqi, 24px);
-  line-height: 1;
-  color: var(--text);
-  overflow-wrap: anywhere;
+  font-size: 20px;
 }
-.analysis-category-card small {
-  color: var(--muted);
-  font-size: 11px;
-  line-height: 1.3;
-}
-.analysis-category-card--power span { color: var(--app-blue); }
-.analysis-category-card--technique span { color: var(--app-amber); }
 </style>

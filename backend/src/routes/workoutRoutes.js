@@ -46,6 +46,22 @@ function parseNumber(value, name, limits) {
   }
 }
 
+function parseOptionalBoolean(value, name) {
+  if (value === undefined || value === null || value === '') {
+    return null;
+  }
+  if (typeof value === 'boolean') {
+    return value;
+  }
+  if (value === 1 || value === '1' || value === 'true') {
+    return true;
+  }
+  if (value === 0 || value === '0' || value === 'false') {
+    return false;
+  }
+  throw new ApiError(400, `${name} must be a boolean`, 'VALIDATION_ERROR');
+}
+
 function parseTrackPoint(point, index) {
   const sampleTimeUtc = parseDateTime(point.sampleTimeUtc || point.sample_time_utc, `trackPoints[${index}].sampleTimeUtc`, true);
   const latitude = parseNumber(point.latitude, 'latitude', { min: -90, max: 90 });
@@ -69,7 +85,12 @@ function parseTrackPoint(point, index) {
     speedMps: parseNumber(point.speedMps ?? point.speed_mps, 'speedMps', { min: 0, max: 30 }),
     heartRateBpm: parseNumber(point.heartRateBpm ?? point.heart_rate_bpm, 'heartRateBpm', { min: 30, max: 260 }),
     cadence: parseNumber(point.cadence, 'cadence', { min: 0, max: 300 }),
-    powerW: parseNumber(point.powerW ?? point.power_w, 'powerW', { min: 0, max: 2500 })
+    powerW: parseNumber(point.powerW ?? point.power_w, 'powerW', { min: 0, max: 2500 }),
+    accuracyM: parseNumber(point.accuracyM ?? point.accuracy_m, 'accuracyM', { min: 0, max: 10000 }),
+    bearingDeg: parseNumber(point.bearingDeg ?? point.bearing_deg, 'bearingDeg', { min: 0, max: 360 }),
+    provider: optionalText(point.provider, 40),
+    isAccepted: parseOptionalBoolean(point.isAccepted ?? point.is_accepted, 'isAccepted'),
+    rejectReason: optionalText(point.rejectReason ?? point.reject_reason, 80)
   };
 }
 

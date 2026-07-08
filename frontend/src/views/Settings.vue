@@ -1,48 +1,5 @@
 <template>
   <div class="page-stack">
-    <section class="settings-rq-panel">
-      <div class="section-heading">
-        <div>
-          <p class="overline">设置偏好</p>
-          <h2>跑者偏好</h2>
-        </div>
-        <span class="status-chip good">隐私优先</span>
-      </div>
-      <p class="muted-copy">MotionCare 只展示必要的账号和运动信息，不会在页面中显示密码、密钥或完整轨迹文件。</p>
-      <div class="settings-preference-grid">
-        <span>
-          <small>资料完整度</small>
-          <b>{{ profileCompletion }}%</b>
-        </span>
-        <span>
-          <small>训练单位</small>
-          <b>{{ unitSummary }}</b>
-        </span>
-        <span>
-          <small>隐私策略</small>
-          <b>{{ privacySummary }}</b>
-        </span>
-      </div>
-    </section>
-
-    <section class="dark-panel">
-      <div class="section-heading">
-        <div>
-          <h2>账号信息</h2>
-        </div>
-        <span class="status-chip good">{{ roleLabel }}</span>
-      </div>
-      <div class="account-summary">
-        <div class="account-avatar">{{ initials }}</div>
-        <div class="account-summary__body">
-          <strong>{{ authSession.user?.username || '已登录用户' }}</strong>
-          <span>{{ authSession.user?.email || '未提供邮箱' }}</span>
-          <small>{{ accountStatusLabel }}</small>
-        </div>
-        <button class="secondary-link" type="button" @click="handleLogout">退出登录</button>
-      </div>
-    </section>
-
     <StateBlock
       v-if="loading"
       title="正在加载设置"
@@ -57,151 +14,303 @@
       @action="load"
     />
 
-    <form v-else class="settings-grid" @submit.prevent="save">
-      <label class="settings-wide profile-bio-field">
-        <span>个人介绍</span>
-        <textarea v-model.trim="profile.bio" maxlength="50" placeholder="用一句话介绍你的运动偏好，最多 50 字" />
-        <small>{{ profile.bio.length }}/50</small>
-      </label>
-      <label>
-        <span>距离单位</span>
-        <select v-model="settings.distanceUnit">
-          <option value="km">公里</option>
-          <option value="mi">英里</option>
-        </select>
-      </label>
-      <label>
-        <span>体重单位</span>
-        <select v-model="settings.weightUnit">
-          <option value="kg">kg</option>
-          <option value="lb">lb</option>
-        </select>
-      </label>
-      <label>
-        <span>温度单位</span>
-        <select v-model="settings.temperatureUnit">
-          <option value="c">℃</option>
-          <option value="f">℉</option>
-        </select>
-      </label>
-      <label>
-        <span>配速显示</span>
-        <select v-model="settings.paceUnit">
-          <option value="min_per_km">分/公里</option>
-          <option value="min_per_mile">分/英里</option>
-        </select>
-      </label>
-      <label>
-        <span>默认隐私</span>
-        <select v-model="settings.defaultPrivacy">
-          <option value="private">私密</option>
-          <option value="followers">关注者</option>
-          <option value="public">公开</option>
-        </select>
-      </label>
-      <label class="toggle-row">
-        <span>隐藏地图起终点</span>
-        <input v-model="settings.hideMapEndpoints" type="checkbox" />
-      </label>
-      <label class="toggle-row">
-        <span>同步健康数据</span>
-        <input v-model="settings.healthSync" type="checkbox" />
-      </label>
+    <form
+      v-else
+      class="settings-profile-form"
+      :class="{ 'settings-profile-form--body-entry': isBodyEntry }"
+      @submit.prevent="save"
+    >
+      <section class="profile-setting-section">
+        <h2>个人信息</h2>
+        <div class="profile-setting-card">
+          <label>
+            <span>性别</span>
+            <button class="profile-select-button" type="button" @click="openSelect('gender')">
+              <span>{{ selectedOptionLabel('gender') }}</span>
+              <ChevronDown :size="18" aria-hidden="true" />
+            </button>
+          </label>
+          <label>
+            <span>出生日期</span>
+            <div class="profile-date-control">
+              <span :class="{ muted: !athleteProfile.birthDate }">{{ birthDateText }}</span>
+              <CalendarDays :size="18" aria-hidden="true" />
+              <input v-model="athleteProfile.birthDate" type="date" aria-label="出生日期" />
+            </div>
+          </label>
+          <label>
+            <span>年龄</span>
+            <input :value="ageText" type="text" readonly />
+          </label>
+        </div>
+      </section>
+
+      <section ref="bodyProfileRef" class="profile-setting-section">
+        <h2>身体数据</h2>
+        <div class="profile-setting-card">
+          <label>
+            <span>身高</span>
+            <input v-model.number="athleteProfile.heightCm" type="number" min="80" max="240" inputmode="decimal" placeholder="-" />
+            <b>cm</b>
+          </label>
+          <label>
+            <span>体重</span>
+            <input v-model.number="athleteProfile.weightKg" type="number" min="20" max="250" inputmode="decimal" placeholder="-" />
+            <b>kg</b>
+          </label>
+        </div>
+      </section>
+
+      <section class="profile-setting-section">
+        <h2>偏好设置</h2>
+        <div class="profile-setting-card">
+          <label>
+            <span>每周起始日</span>
+            <button class="profile-select-button" type="button" @click="openSelect('weekStartsOn')">
+              <span>{{ selectedOptionLabel('weekStartsOn') }}</span>
+              <ChevronDown :size="18" aria-hidden="true" />
+            </button>
+          </label>
+          <label>
+            <span>运动水平</span>
+            <button class="profile-select-button" type="button" @click="openSelect('activityLevel')">
+              <span>{{ selectedOptionLabel('activityLevel') }}</span>
+              <ChevronDown :size="18" aria-hidden="true" />
+            </button>
+          </label>
+        </div>
+      </section>
+
+      <section class="profile-setting-section">
+        <h2>生理指标</h2>
+        <div class="profile-setting-card">
+          <label>
+            <span>静息心率</span>
+            <input v-model.number="athleteProfile.restingHeartRate" type="number" min="30" max="120" inputmode="numeric" placeholder="-" />
+            <b>bpm</b>
+          </label>
+          <label>
+            <span>最大心率</span>
+            <input v-model.number="athleteProfile.maxHeartRate" type="number" min="80" max="230" inputmode="numeric" placeholder="-" />
+            <b>bpm</b>
+          </label>
+        </div>
+      </section>
+
+      <section class="profile-setting-section">
+        <h2>性能阈值</h2>
+        <div class="profile-setting-card">
+          <label>
+            <span>阈值配速 (LTP)</span>
+            <input v-model.trim="athleteProfile.thresholdPace" type="text" placeholder="-" />
+            <b>/km</b>
+          </label>
+          <label>
+            <span>阈值功率 (FTP)</span>
+            <input v-model.number="athleteProfile.thresholdPower" type="number" min="0" inputmode="numeric" placeholder="-" />
+            <b>W</b>
+          </label>
+        </div>
+      </section>
+
+      <section class="profile-setting-section">
+        <h2>体能水平</h2>
+        <div class="profile-setting-card">
+          <label>
+            <span>最大摄氧量 (跑步)</span>
+            <input v-model.number="athleteProfile.vo2maxRun" type="number" min="10" max="90" inputmode="decimal" placeholder="-" />
+            <b>ml/kg/min</b>
+          </label>
+          <label>
+            <span>最大摄氧量 (骑行)</span>
+            <input v-model.number="athleteProfile.vo2maxRide" type="number" min="10" max="90" inputmode="decimal" placeholder="-" />
+            <b>ml/kg/min</b>
+          </label>
+        </div>
+      </section>
+
       <div class="settings-actions settings-save-card">
         <div>
           <strong>保存偏好</strong>
-          <small>同步资料、单位和隐私设置</small>
         </div>
         <button class="primary-link" type="submit" :disabled="saving">{{ saving ? '保存中' : '保存设置' }}</button>
         <span v-if="saved" class="success-copy">设置已保存。</span>
       </div>
     </form>
+
+    <Teleport to=".phone-frame">
+      <div
+        v-if="activeSelectKey"
+        class="settings-select-backdrop"
+        role="presentation"
+        @click.self="closeSelect"
+      >
+        <section class="settings-select-sheet" role="dialog" aria-modal="true" :aria-label="activeSelectTitle">
+          <header>
+            <strong>{{ activeSelectTitle }}</strong>
+            <button type="button" aria-label="关闭" @click="closeSelect">
+              <X :size="20" aria-hidden="true" />
+            </button>
+          </header>
+          <div class="settings-select-options">
+            <button
+              v-for="option in activeSelectOptions"
+              :key="option.value"
+              type="button"
+              :class="{ active: option.value === athleteProfile[activeSelectKey] }"
+              @click="chooseOption(option.value)"
+            >
+              <span>{{ option.label }}</span>
+              <Check v-if="option.value === athleteProfile[activeSelectKey]" :size="20" aria-hidden="true" />
+            </button>
+          </div>
+        </section>
+      </div>
+    </Teleport>
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
+import { CalendarDays, Check, ChevronDown, X } from '@lucide/vue'
 
 import StateBlock from '@/components/StateBlock.vue'
-import { updateCurrentUserProfile } from '@/services/auth'
-import { getSettings, updateSettings } from '@/services/settings'
-import { authSession, signOut } from '@/stores/authStore'
 
-const router = useRouter()
-const settings = reactive({
-  distanceUnit: 'km',
-  weightUnit: 'kg',
-  temperatureUnit: 'c',
-  paceUnit: 'min_per_km',
-  defaultPrivacy: 'private',
-  hideMapEndpoints: true,
-  healthSync: false,
+const route = useRoute()
+const ATHLETE_PROFILE_STORAGE_KEY = 'motioncare-athlete-profile'
+const athleteProfile = reactive({
+  gender: '',
+  birthDate: '',
+  heightCm: '',
+  weightKg: '',
+  weekStartsOn: '',
+  activityLevel: '',
+  restingHeartRate: '',
+  maxHeartRate: '',
+  thresholdPace: '',
+  thresholdPower: '',
+  vo2maxRun: '',
+  vo2maxRide: '',
 })
-const profile = reactive({
-  bio: '',
-})
+const bodyProfileRef = ref(null)
 const error = ref('')
 const loading = ref(false)
 const saving = ref(false)
 const saved = ref(false)
-const roleLabel = computed(() => authSession.user?.role === 'admin' ? '管理员' : '普通用户')
-const accountStatusLabel = computed(() => (
-  authSession.user?.status === 'disabled' ? '账号状态：已停用' : '账号状态：正常'
-))
-const initials = computed(() => String(authSession.user?.username || 'GS').slice(0, 2).toUpperCase())
-const profileCompletion = computed(() => {
-  const fields = [
-    Boolean(authSession.user?.username),
-    Boolean(authSession.user?.email),
-    Boolean(profile.bio),
-    Boolean(settings.distanceUnit),
-    Boolean(settings.paceUnit),
-  ]
-  return Math.round((fields.filter(Boolean).length / fields.length) * 100)
+const activeSelectKey = ref('')
+const selectGroups = {
+  gender: {
+    title: '选择性别',
+    options: [
+      { value: '', label: '保密' },
+      { value: 'male', label: '男' },
+      { value: 'female', label: '女' },
+      { value: 'other', label: '其他' },
+    ],
+  },
+  weekStartsOn: {
+    title: '每周起始日',
+    options: [
+      { value: '', label: '-' },
+      { value: 'monday', label: '周一' },
+      { value: 'sunday', label: '周日' },
+    ],
+  },
+  activityLevel: {
+    title: '运动水平',
+    options: [
+      { value: '', label: '-' },
+      { value: 'beginner', label: '入门' },
+      { value: 'regular', label: '规律训练' },
+      { value: 'advanced', label: '进阶' },
+      { value: 'competitive', label: '竞赛' },
+    ],
+  },
+}
+const isBodyEntry = computed(() => route.query.section === 'body')
+const activeSelectTitle = computed(() => selectGroups[activeSelectKey.value]?.title || '')
+const activeSelectOptions = computed(() => selectGroups[activeSelectKey.value]?.options || [])
+const ageText = computed(() => {
+  if (!athleteProfile.birthDate) return '-'
+  const birth = new Date(athleteProfile.birthDate)
+  if (Number.isNaN(birth.getTime())) return '-'
+  const today = new Date()
+  let age = today.getFullYear() - birth.getFullYear()
+  const beforeBirthday = today.getMonth() < birth.getMonth()
+    || (today.getMonth() === birth.getMonth() && today.getDate() < birth.getDate())
+  if (beforeBirthday) age -= 1
+  return age > 0 ? `${age}` : '-'
 })
-const unitSummary = computed(() => {
-  const distance = settings.distanceUnit === 'mi' ? '英里' : '公里'
-  const pace = settings.paceUnit === 'min_per_mile' ? '英里配速' : '公里配速'
-  return `${distance} / ${pace}`
-})
-const privacySummary = computed(() => {
-  if (settings.defaultPrivacy === 'public') return '公开可见'
-  if (settings.defaultPrivacy === 'followers') return '关注者可见'
-  return '仅自己可见'
-})
+const birthDateText = computed(() => athleteProfile.birthDate || '选择日期')
 
-function syncProfile() {
-  profile.bio = authSession.user?.bio || ''
+function selectedOptionLabel(key) {
+  const group = selectGroups[key]
+  return group?.options.find((option) => option.value === athleteProfile[key])?.label || '-'
 }
 
-async function load() {
+function openSelect(key) {
+  activeSelectKey.value = key
+}
+
+function closeSelect() {
+  activeSelectKey.value = ''
+}
+
+function chooseOption(value) {
+  if (!activeSelectKey.value) return
+  athleteProfile[activeSelectKey.value] = value
+  closeSelect()
+}
+
+function syncNavTitle() {
+  const title = isBodyEntry.value ? '身体数据' : ''
+  window.dispatchEvent(new CustomEvent('motioncare:nav-title', { detail: { title } }))
+}
+
+function loadAthleteProfile() {
+  try {
+    const raw = window.localStorage.getItem(ATHLETE_PROFILE_STORAGE_KEY)
+    if (!raw) return
+    const data = JSON.parse(raw)
+    Object.keys(athleteProfile).forEach((key) => {
+      if (Object.prototype.hasOwnProperty.call(data, key)) athleteProfile[key] = data[key] ?? ''
+    })
+  } catch {
+    window.localStorage.removeItem(ATHLETE_PROFILE_STORAGE_KEY)
+  }
+}
+
+function saveAthleteProfile() {
+  window.localStorage.setItem(ATHLETE_PROFILE_STORAGE_KEY, JSON.stringify({ ...athleteProfile }))
+}
+
+function scrollToRouteSection() {
+  if (route.query.section === 'body') {
+    nextTick(() => bodyProfileRef.value?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
+  }
+}
+
+function load() {
   loading.value = true
   error.value = ''
   saved.value = false
   try {
-    Object.assign(settings, await getSettings())
+    loadAthleteProfile()
   } catch (err) {
     error.value = err instanceof Error ? err.message : '设置加载失败'
   } finally {
     loading.value = false
+    scrollToRouteSection()
   }
 }
 
-async function save() {
+function save() {
   saving.value = true
   error.value = ''
   saved.value = false
   try {
-    const [nextSettings, nextUser] = await Promise.all([
-      updateSettings(settings),
-      updateCurrentUserProfile({ bio: profile.bio }),
-    ])
-    Object.assign(settings, nextSettings)
-    if (nextUser) {
-      authSession.user = nextUser
-      syncProfile()
-    }
+    saveAthleteProfile()
     saved.value = true
   } catch (err) {
     error.value = err instanceof Error ? err.message : '设置保存失败'
@@ -210,13 +319,235 @@ async function save() {
   }
 }
 
-function handleLogout() {
-  signOut()
-  router.push({ name: 'login' })
-}
-
 onMounted(() => {
-  syncProfile()
+  syncNavTitle()
   load()
 })
+
+watch(() => route.query.section, () => {
+  syncNavTitle()
+})
+
+watch(activeSelectKey, (key) => {
+  document.body.style.overflow = key ? 'hidden' : ''
+})
+
+onBeforeUnmount(() => {
+  window.dispatchEvent(new CustomEvent('motioncare:nav-title', { detail: { title: '' } }))
+  document.body.style.overflow = ''
+})
 </script>
+
+<style scoped>
+.settings-profile-form {
+  display: grid;
+  gap: 18px;
+}
+
+.settings-profile-form--body-entry {
+  padding-top: 18px;
+}
+
+.profile-setting-section {
+  display: grid;
+  gap: 10px;
+  scroll-margin-top: 112px;
+}
+
+.profile-setting-section h2 {
+  margin: 0;
+  padding: 0 2px;
+  color: var(--muted);
+  font-size: 15px;
+  font-weight: 900;
+  line-height: 1.2;
+}
+
+.profile-setting-card {
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--app-green) 12%, var(--border));
+  border-radius: var(--radius-lg);
+  background: var(--panel);
+  box-shadow: var(--shadow-sm);
+}
+
+.profile-setting-card label {
+  min-height: 64px;
+  display: grid;
+  grid-template-columns: minmax(110px, 1fr) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 0 16px;
+  color: var(--text);
+}
+
+.profile-setting-card label + label {
+  border-top: 1px solid color-mix(in srgb, var(--text) 12%, transparent);
+}
+
+.profile-setting-card span {
+  font-size: 16px;
+  font-weight: 850;
+}
+
+.profile-setting-card :is(input, select) {
+  min-width: 0;
+  width: 100%;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-weight: 800;
+  text-align: right;
+}
+
+.profile-select-button,
+.profile-date-control {
+  position: relative;
+  min-width: 0;
+  width: 100%;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-weight: 850;
+  text-align: right;
+}
+
+.profile-select-button {
+  padding: 0;
+  cursor: pointer;
+}
+
+.profile-select-button:focus-visible,
+.profile-date-control:focus-within {
+  border-color: color-mix(in srgb, var(--app-green) 60%, transparent);
+  background: color-mix(in srgb, var(--app-green) 8%, transparent);
+  outline: none;
+}
+
+.profile-date-control {
+  overflow: hidden;
+  padding: 0;
+}
+
+.profile-date-control > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-date-control .muted {
+  color: var(--muted);
+}
+
+.profile-date-control input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.profile-setting-card input[readonly] {
+  color: var(--muted);
+}
+
+.profile-setting-card b {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.settings-select-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: flex-end;
+  padding: 14px;
+  padding-bottom: calc(14px + var(--safe-bottom));
+  background: rgb(6 20 14 / 0.34);
+}
+
+.settings-select-sheet {
+  width: 100%;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--app-green) 18%, var(--border));
+  border-radius: 18px;
+  background: var(--panel);
+  box-shadow: 0 24px 70px rgb(15 23 42 / 0.24);
+}
+
+.settings-select-sheet header {
+  min-height: 58px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 16px;
+  border-bottom: 1px solid color-mix(in srgb, var(--text) 10%, transparent);
+}
+
+.settings-select-sheet header strong {
+  color: var(--text);
+  font-size: 17px;
+  font-weight: 900;
+}
+
+.settings-select-sheet header button {
+  width: 38px;
+  height: 38px;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--text) 10%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--app-green) 6%, transparent);
+  color: var(--text);
+}
+
+.settings-select-options {
+  display: grid;
+  padding: 8px;
+}
+
+.settings-select-options button {
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 800;
+  text-align: left;
+}
+
+.settings-select-options button.active {
+  background: color-mix(in srgb, var(--app-green) 13%, transparent);
+  color: var(--app-green-dark);
+}
+
+@container phone-frame (max-width: 390px) {
+  .profile-setting-card label {
+    grid-template-columns: minmax(96px, 1fr) minmax(0, 1fr) auto;
+    min-height: 60px;
+    padding-inline: 14px;
+  }
+
+  .profile-setting-card span {
+    font-size: 15px;
+  }
+}
+</style>

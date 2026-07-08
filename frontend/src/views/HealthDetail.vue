@@ -1,507 +1,447 @@
 <template>
-  <div class="page-stack">
-    <section class="dark-panel">
-      <div class="section-heading">
-        <div>
-          <p class="overline">健康详情</p>
-          <h2>身体数据</h2>
-        </div>
-        <div class="health-date-selector" aria-label="选择健康日期">
-          <button class="health-date-step" type="button" aria-label="前一天" @click="prevDay">
-            <ChevronLeft :size="18" aria-hidden="true" />
-          </button>
-          <label class="health-date-chip">
-            <CalendarDays :size="17" aria-hidden="true" />
-            <span>{{ formattedSelectedDate }}</span>
-            <input v-model="selectedDate" type="date" aria-label="选择日期" class="health-date-native" />
-          </label>
-          <button class="health-date-step" type="button" aria-label="后一天" @click="nextDay">
-            <ChevronRight :size="18" aria-hidden="true" />
-          </button>
-        </div>
+  <div class="page-stack training-health-page">
+    <section class="training-health-hero">
+      <div class="range-stepper">
+        <button type="button" aria-label="上一周期">
+          <ChevronLeft :size="22" aria-hidden="true" />
+        </button>
+        <strong>{{ rangeLabel }}</strong>
+        <button type="button" aria-label="下一周期">
+          <ChevronRight :size="22" aria-hidden="true" />
+        </button>
+      </div>
+      <div class="range-pills" aria-label="时间范围">
+        <button
+          v-for="item in ranges"
+          :key="item.value"
+          type="button"
+          :class="{ active: range === item.value }"
+          @click="range = item.value"
+        >
+          {{ item.label }}
+        </button>
       </div>
     </section>
 
-    <StateBlock v-if="loading" title="加载中..." message="正在获取健康数据" />
-    <StateBlock v-else-if="error" title="加载失败" :message="error" tone="danger" action-label="重试" @action="loadAll" />
-    <section v-else-if="!hasHealthData" class="health-empty-rq-panel">
-      <div class="section-heading">
-        <div>
-          <p class="overline">恢复看板</p>
-          <h2>等待身体数据</h2>
-        </div>
-        <span class="status-chip neutral">待同步</span>
-      </div>
-      <div class="health-empty-gauge" aria-label="空健康恢复仪表">
-        <strong>--</strong>
-        <span aria-hidden="true"></span>
-      </div>
-      <div class="health-empty-grid">
-        <span>
-          <small>恢复概览</small>
-          <b>待同步</b>
-        </span>
-        <span>
-          <small>睡眠质量</small>
-          <b>--</b>
-        </span>
-        <span>
-          <small>压力水平</small>
-          <b>--</b>
-        </span>
-        <span>
-          <small>心率变异</small>
-          <b>--</b>
-        </span>
-      </div>
-      <p class="health-empty-note">设备同步后自动呈现睡眠、压力和心率变异趋势。</p>
-    </section>
+    <StateBlock v-if="loading" title="正在加载健康度" message="正在读取训练负荷数据。" />
+    <StateBlock v-else-if="error" title="健康度加载失败" :message="error" tone="danger" action-label="重试" @action="load" />
+    <StateBlock v-else-if="!chartRows.length" title="暂无训练负荷数据" message="同步运动数据后，这里会展示 CTL、ATL 和 TSB 状态。" />
 
     <template v-else>
-      <section class="health-rq-panel">
+      <ChartPanel class="training-health-chart" title="训练负荷状态" eyebrow="" :option="loadChartOption" />
+
+      <section class="training-health-status">
         <div class="section-heading">
           <div>
-            <p class="overline">恢复看板</p>
-            <h2>身体电量</h2>
+            <h2>今日状态</h2>
           </div>
-          <span class="status-chip">{{ recoveryScoreDisplay }}</span>
+          <span class="status-chip" :class="statusTone">{{ statusLabel }}</span>
         </div>
-        <div class="recovery-gauge" :style="recoveryGaugeStyle">
-          <strong>{{ recoveryScoreDisplay }}</strong>
-          <span aria-hidden="true"></span>
+        <div class="training-health-metrics">
+          <span>
+            <small>体能（CTL）</small>
+            <b class="ctl">{{ metricValue(latestLoad.ctl) }}</b>
+          </span>
+          <span>
+            <small>疲劳（ATL）</small>
+            <b class="atl">{{ metricValue(latestLoad.atl) }}</b>
+          </span>
+          <span>
+            <small>状态（TSB）</small>
+            <b class="tsb">{{ metricValue(latestLoad.tsb) }}</b>
+          </span>
         </div>
-        <div class="health-rq-grid">
-          <span>
-            <small>睡眠质量</small>
-            <b>{{ sleepQualityText }}</b>
-          </span>
-          <span>
-            <small>压力水平</small>
-            <b>{{ stressText }}</b>
-          </span>
-          <span>
-            <small>静息心率</small>
-            <b>{{ summary.restingHeartRateBpm != null ? `${summary.restingHeartRateBpm} 次/分` : '--' }}</b>
-          </span>
-          <span>
-            <small>心率变异</small>
-            <b>{{ summary.avgHrv != null ? `${summary.avgHrv}` : '--' }}</b>
-          </span>
+        <div class="training-health-advice">
+          <h3>行动建议</h3>
+          <p>{{ adviceText }}</p>
         </div>
       </section>
-
-      <div class="metric-grid">
-        <MetricCard label="步数" :value="summary.steps != null ? `${summary.steps}` : '--'" />
-        <MetricCard label="距离" :value="summary.distanceM != null ? `${(summary.distanceM / 1000).toFixed(2)} km` : '--'" />
-        <MetricCard label="活跃卡路里" :value="summary.activeCalories != null ? `${summary.activeCalories}` : '--'" />
-        <MetricCard label="强度分钟" :value="intensitySummary" />
-        <MetricCard label="静息心率" :value="summary.restingHeartRateBpm != null ? `${summary.restingHeartRateBpm} 次/分` : '--'" />
-        <MetricCard label="平均压力" :value="summary.avgStressLevel != null ? `${summary.avgStressLevel}` : '--'" />
-        <MetricCard label="睡眠评分" :value="summary.sleepScore != null ? `${summary.sleepScore}/100` : '--'" />
-        <MetricCard label="心率变异" :value="summary.avgHrv != null ? `${summary.avgHrv}` : '--'" />
-        <MetricCard label="心率变异状态" :value="summary.hrvStatus || '--'" />
-        <MetricCard label="睡眠心率" :value="summary.avgHeartRateDuringSleep != null ? `${summary.avgHeartRateDuringSleep} 次/分` : '--'" />
-        <MetricCard label="训练状态" :value="summary.trainingStatus || trainingStatus?.trainingStatus || '--'" />
-        <MetricCard label="骑行阈值功率" :value="summary.cyclingFtp != null ? `${summary.cyclingFtp} 瓦` : ftpText" />
-      </div>
-
-      <div class="detail-grid">
-        <ChartPanel v-if="heartRateMonitorData.length" title="全天心率" eyebrow="监测心率" :option="lineOption(heartRateMonitorData, '次/分', '#33b5ff')" />
-        <ChartPanel v-if="heartRateSleepData.length" title="睡眠心率" eyebrow="夜间心率" :option="lineOption(heartRateSleepData, '次/分', '#21d47b')" />
-        <ChartPanel v-if="stressMonitorData.length" title="全天压力" eyebrow="监测压力" :option="lineOption(stressMonitorData, '压力', '#ff9d19', 0, 100)" />
-        <ChartPanel v-if="stressSleepData.length" title="睡眠压力" eyebrow="夜间压力" :option="lineOption(stressSleepData, '压力', '#f97316', 0, 100)" />
-        <ChartPanel v-if="stepData.length" title="步数分布" eyebrow="全天步数" :option="barOption(stepData, '步数', '#33b5ff')" />
-        <ChartPanel v-if="intensityData.length" title="强度分钟" eyebrow="日内分布" :option="barOption(intensityData, '分钟', '#8b5cf6')" />
-        <ChartPanel v-if="sleepStages.length" title="睡眠阶段" eyebrow="夜间睡眠" :option="sleepStageOption" />
-        <ChartPanel v-if="hrvSampleData.length" title="心率变异采样" eyebrow="夜间心率变异" :option="lineOption(hrvSampleData, '毫秒', '#8b5cf6')" />
-        <ChartPanel v-if="sleepMovementData.length" title="睡眠体动" eyebrow="夜间体动" :option="barOption(sleepMovementData, '体动', '#21d47b')" />
-      </div>
     </template>
   </div>
 </template>
 
 <script setup>
 import { computed, ref, watch } from 'vue'
-import { CalendarDays, ChevronLeft, ChevronRight } from '@lucide/vue'
+import { ChevronLeft, ChevronRight } from '@lucide/vue'
 
 import ChartPanel from '@/components/ChartPanel.vue'
-import MetricCard from '@/components/MetricCard.vue'
 import StateBlock from '@/components/StateBlock.vue'
-import { getTodayHealth } from '@/services/dashboard'
-import {
-  getHealthSamples,
-  getLatestCyclingFtp,
-  getLatestRacePredictions,
-  getLatestLactateThreshold,
-  getLatestTrainingStatus,
-} from '@/services/health'
+import { getDashboardOverview } from '@/services/dashboard'
 
+const ranges = [
+  { label: '42天', value: '42d', days: 42 },
+  { label: '3个月', value: '3m', days: 90 },
+  { label: '6个月', value: '6m', days: 183 },
+  { label: '1年', value: '1y', days: 365 },
+  { label: '2年', value: '2y', days: 730 },
+]
+
+const range = ref('3m')
 const loading = ref(false)
 const error = ref('')
-const selectedDate = ref(new Date().toISOString().slice(0, 10))
+const trainingLoad = ref([])
+const tsbZones = [
+  { label: '过渡期', min: 25, max: 90, color: '#d97706', fill: '#fdecc8' },
+  { label: '精力充沛', min: 10, max: 25, color: '#0284c7', fill: '#dff4ff' },
+  { label: '灰色地带', min: -10, max: 10, color: '#475569', fill: '#edf2f7' },
+  { label: '最优', min: -30, max: -10, color: '#15803d', fill: '#dcfce7' },
+  { label: '高风险', min: -120, max: -30, color: '#dc2626', fill: '#fee2e2' },
+]
 
-const summary = ref({})
-const heartRateMonitorData = ref([])
-const heartRateSleepData = ref([])
-const stressMonitorData = ref([])
-const stressSleepData = ref([])
-const stepData = ref([])
-const intensityData = ref([])
-const sleepStages = ref([])
-const hrvSampleData = ref([])
-const sleepMovementData = ref([])
-const trainingStatus = ref(null)
-const racePredictions = ref(null)
-const lactateThreshold = ref(null)
-const cyclingFtp = ref(null)
-
-const intensitySummary = computed(() => {
-  const moderate = summary.value.moderateIntensityMinutes
-  const vigorous = summary.value.vigorousIntensityMinutes
-  if (moderate == null && vigorous == null) return '--'
-  return `${moderate || 0}/${vigorous || 0} 分`
+const activeRange = computed(() => ranges.find((item) => item.value === range.value) || ranges[1])
+const chartRows = computed(() => {
+  const rows = (trainingLoad.value || []).filter((row) => normalizeDateKey(row.date))
+  return rows.slice(-activeRange.value.days)
 })
-
-const ftpText = computed(() => (cyclingFtp.value?.ftpW != null ? `${cyclingFtp.value.ftpW} 瓦` : '--'))
-const formattedSelectedDate = computed(() => {
-  const [year, month, day] = String(selectedDate.value || '').split('-')
-  if (!year || !month || !day) return selectedDate.value || '--'
-  return `${year}/${month}/${day}`
+const latestLoad = computed(() => chartRows.value.at(-1) || {})
+const rangeLabel = computed(() => {
+  const first = chartRows.value[0]
+  const last = chartRows.value.at(-1)
+  if (!first || !last) return activeRange.value.label
+  return `${formatSlashDate(first.date)} - ${formatSlashDate(last.date)}`
 })
-const recoveryScore = computed(() => {
-  const parts = []
-  const sleepScore = Number(summary.value.sleepScore)
-  if (Number.isFinite(sleepScore)) parts.push(Math.max(0, Math.min(100, sleepScore)))
-
-  const stress = Number(summary.value.avgStressLevel)
-  if (Number.isFinite(stress)) parts.push(Math.max(0, Math.min(100, 100 - stress)))
-
-  const hrv = Number(summary.value.avgHrv)
-  if (Number.isFinite(hrv)) parts.push(Math.max(0, Math.min(100, hrv * 1.25)))
-
-  const restingHeartRate = Number(summary.value.restingHeartRateBpm)
-  if (Number.isFinite(restingHeartRate)) parts.push(Math.max(0, Math.min(100, 115 - restingHeartRate)))
-
-  if (!parts.length) return null
-  return Math.round(parts.reduce((sum, value) => sum + value, 0) / parts.length)
+const statusLabel = computed(() => {
+  const tsb = Number(latestLoad.value.tsb)
+  if (!Number.isFinite(tsb)) return '待评估'
+  if (tsb < -30) return '高风险'
+  if (tsb < -10) return '最优'
+  if (tsb <= 10) return '灰色地带'
+  if (tsb <= 25) return '精力充沛'
+  return '过渡期'
 })
-const recoveryScoreDisplay = computed(() => (recoveryScore.value == null ? '--' : `${recoveryScore.value}`))
-const recoveryGaugeStyle = computed(() => ({
-  '--recovery-position': `${recoveryScore.value ?? 0}%`,
-}))
-const sleepQualityText = computed(() => {
-  const score = Number(summary.value.sleepScore)
-  if (!Number.isFinite(score)) return '--'
-  if (score >= 85) return `${score}/100 优秀`
-  if (score >= 70) return `${score}/100 稳定`
-  if (score >= 55) return `${score}/100 关注`
-  return `${score}/100 偏低`
+const statusTone = computed(() => {
+  const tsb = Number(latestLoad.value.tsb)
+  if (!Number.isFinite(tsb)) return 'neutral'
+  if (tsb < -30) return 'danger'
+  if (tsb < -10) return 'good'
+  if (tsb <= 10) return 'steady'
+  return 'warning'
 })
-const stressText = computed(() => {
-  const stress = Number(summary.value.avgStressLevel)
-  if (!Number.isFinite(stress)) return '--'
-  if (stress < 30) return `${Math.round(stress)} 低`
-  if (stress < 60) return `${Math.round(stress)} 中`
-  return `${Math.round(stress)} 高`
+const adviceText = computed(() => {
+  const tsb = Number(latestLoad.value.tsb)
+  if (!Number.isFinite(tsb)) return '当前训练负荷数据不足，建议先同步运动记录。'
+  if (tsb < -30) return '疲劳明显偏高，今天优先恢复、拉伸或非常轻松的有氧。'
+  if (tsb < -10) return '你正处于较好的体能提升窗口，保持当前训练节奏，避免连续高强度。'
+  if (tsb <= 10) return '状态较平衡，适合稳定训练，也可以根据体感安排轻中强度内容。'
+  if (tsb <= 25) return '精力较充沛，可以安排质量课，但注意不要突然增加总量。'
+  return '近期负荷偏低，适合循序渐进恢复训练节奏。'
 })
-const hasHealthData = computed(() => (
-  Object.values(summary.value || {}).some((value) => value !== null && value !== undefined && value !== '')
-  || [heartRateMonitorData, heartRateSleepData, stressMonitorData, stressSleepData, stepData, intensityData, sleepStages, hrvSampleData, sleepMovementData]
-    .some((rows) => rows.value.length > 0)
-  || Boolean(trainingStatus.value || racePredictions.value || lactateThreshold.value || cyclingFtp.value)
-))
-
-function toTimestamp(ts) {
-  return ts ? new Date(ts).getTime() : 0
-}
-
-function lineOption(rows, unit, color, min, max) {
+const loadChartOption = computed(() => {
+  const dates = chartRows.value.map((row) => formatShortDate(row.date))
+  const ctl = chartRows.value.map((row) => roundNumber(row.ctl))
+  const atl = chartRows.value.map((row) => roundNumber(row.atl))
+  const tsb = chartRows.value.map((row) => roundNumber(row.tsb))
   return {
-    color: [color],
-    tooltip: {
-      trigger: 'axis',
-      formatter: (params = []) => {
-        const point = params[0]
-        if (!point) return ''
-        return `${point.axisValue}<br/>${point.value[1]} ${unit}`
-      },
-    },
-    grid: { left: 50, right: 16, top: 8, bottom: 24 },
-    xAxis: { type: 'time', axisLabel: { fontSize: 10 } },
-    yAxis: { type: 'value', name: unit, min, max },
-    series: [{
-      type: 'line',
-      data: rows.map((d) => [toTimestamp(d.time), d.value]),
-      symbol: 'none',
-      lineStyle: { width: 1.5 },
-      areaStyle: { opacity: 0.1 },
-    }],
-  }
-}
-
-function barOption(rows, unit, color) {
-  return {
-    color: [color],
+    color: ['#2f9de0', '#a855b1', '#22a85a'],
     tooltip: { trigger: 'axis' },
-    grid: { left: 50, right: 16, top: 8, bottom: 24 },
-    xAxis: { type: 'time', axisLabel: { fontSize: 10 } },
-    yAxis: { type: 'value', name: unit },
-    series: [{
-      type: 'bar',
-      data: rows.map((d) => [toTimestamp(d.time), d.value]),
-      barMaxWidth: 10,
-    }],
+    visualMap: {
+      show: false,
+      seriesIndex: 2,
+      dimension: 1,
+      pieces: tsbZones.map((zone) => ({
+        gt: zone.min,
+        lte: zone.max,
+        color: zone.color,
+      })),
+      outOfRange: { color: '#15803d' },
+    },
+    graphic: createTsbZoneLegendGraphic(),
+    legend: {
+      top: 2,
+      right: 4,
+      textStyle: { color: '#64748b' },
+      data: ['体能（CTL）', '疲劳（ATL）', '状态（TSB）'],
+    },
+    grid: [
+      { left: 58, right: 18, top: 40, height: '36%' },
+      { left: 58, right: 18, top: '64%', height: '25%' },
+    ],
+    xAxis: [
+      {
+        type: 'category',
+        data: dates,
+        boundaryGap: false,
+        axisLabel: { show: false },
+        axisLine: { lineStyle: { color: '#94a3b8' } },
+        axisTick: { show: false },
+      },
+      {
+        type: 'category',
+        gridIndex: 1,
+        data: dates,
+        boundaryGap: false,
+        axisLabel: { color: '#64748b', hideOverlap: true },
+        axisLine: { lineStyle: { color: '#94a3b8' } },
+        axisTick: { show: false },
+      },
+    ],
+    yAxis: [
+      {
+        type: 'value',
+        name: '训练负荷',
+        nameLocation: 'middle',
+        nameGap: 42,
+        nameRotate: 90,
+        axisLabel: { color: '#64748b', interval: 1 },
+        splitNumber: 4,
+        splitLine: { show: false },
+      },
+      {
+        type: 'value',
+        gridIndex: 1,
+        name: '状态（TSB）',
+        nameLocation: 'middle',
+        nameGap: 42,
+        nameRotate: 90,
+        min: -120,
+        max: 90,
+        interval: 60,
+        axisLabel: { color: '#64748b', interval: 1 },
+        splitNumber: 3,
+        splitLine: { show: false },
+      },
+    ],
+    series: [
+      { name: '体能（CTL）', type: 'line', data: ctl, smooth: true, symbol: 'none', areaStyle: { opacity: 0.08 }, lineStyle: { width: 3 } },
+      { name: '疲劳（ATL）', type: 'line', data: atl, smooth: true, symbol: 'none', lineStyle: { width: 2 } },
+      {
+        name: '状态（TSB）',
+        type: 'line',
+        xAxisIndex: 1,
+        yAxisIndex: 1,
+        data: tsb.map((value, index) => [dates[index], value]),
+        smooth: true,
+        symbol: 'none',
+        lineStyle: { width: 3.5 },
+        markArea: {
+          silent: true,
+          itemStyle: { opacity: 0.16 },
+          label: { show: false },
+          data: [
+            ...tsbZones.map((zone) => ([
+              { yAxis: zone.min, itemStyle: { color: zone.fill } },
+              { yAxis: zone.max },
+            ])),
+          ],
+        },
+      },
+    ],
   }
-}
+})
 
-const stageColors = { deep: '#21d47b', light: '#33b5ff', rem: '#8b5cf6', awake: '#ef4444', unknown: '#94a3b8' }
-const stageLabels = { deep: '深睡', light: '浅睡', rem: 'REM', awake: '清醒', unknown: '未知' }
+function createTsbZoneLegendGraphic() {
+  const itemWidth = 52
+  const itemGap = 6
+  const labelOffset = itemWidth / 2
 
-const sleepStageOption = computed(() => ({
-  color: Object.values(stageColors),
-  tooltip: {
-    trigger: 'item',
-    formatter: (params) => `${stageLabels[params.value[1]] || params.value[1]}<br/>${params.value[2] || 0} 分钟`,
-  },
-  grid: { left: 50, right: 16, top: 8, bottom: 24 },
-  xAxis: { type: 'time', axisLabel: { fontSize: 10 } },
-  yAxis: { type: 'category', data: Object.values(stageLabels), axisLabel: { fontSize: 11 } },
-  series: [{
-    type: 'scatter',
-    symbolSize: 9,
-    data: sleepStages.value.map((s) => ({
-      value: [toTimestamp(s.stageStartUtc), stageLabels[s.stageType] || s.stageType, Math.round((s.durationS || 0) / 60)],
-      itemStyle: { color: stageColors[s.stageType] || stageColors.unknown },
+  return [{
+    type: 'group',
+    left: 56,
+    top: '55%',
+    bounding: 'raw',
+    children: tsbZones.map((zone, index) => ({
+      type: 'group',
+      x: index * (itemWidth + itemGap),
+      y: 0,
+      children: [
+        {
+          type: 'rect',
+          shape: { x: 0, y: 0, width: itemWidth, height: 22, r: 11 },
+          style: { fill: zone.fill, stroke: 'transparent' },
+        },
+        {
+          type: 'text',
+          style: {
+            x: labelOffset,
+            y: 12,
+            text: zone.label,
+            fill: zone.color,
+            fontSize: 10,
+            fontWeight: 800,
+            align: 'center',
+            verticalAlign: 'middle',
+          },
+        },
+      ],
     })),
-  }],
-}))
-
-function prevDay() {
-  const d = new Date(`${selectedDate.value}T00:00:00`)
-  d.setDate(d.getDate() - 1)
-  selectedDate.value = d.toISOString().slice(0, 10)
+  }]
 }
 
-function nextDay() {
-  const d = new Date(`${selectedDate.value}T00:00:00`)
-  d.setDate(d.getDate() + 1)
-  selectedDate.value = d.toISOString().slice(0, 10)
+function metricValue(value) {
+  const number = Number(value)
+  return Number.isFinite(number) ? Math.round(number) : '--'
 }
 
-async function loadAll() {
+function roundNumber(value) {
+  const number = Number(value)
+  return Number.isFinite(number) ? Math.round(number * 10) / 10 : null
+}
+
+function normalizeDateKey(value) {
+  if (!value) return ''
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}/.test(value)) return value.slice(0, 10)
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
+
+function formatSlashDate(value) {
+  return normalizeDateKey(value).replaceAll('-', '/')
+}
+
+function formatShortDate(value) {
+  const key = normalizeDateKey(value)
+  return key ? key.slice(5).replace('-', '/') : ''
+}
+
+async function load() {
   loading.value = true
   error.value = ''
-  const date = selectedDate.value
   try {
-    const [
-      healthRes,
-      hrMonitorRes,
-      hrSleepRes,
-      stressMonitorRes,
-      stressSleepRes,
-      stepsRes,
-      intensityRes,
-      stagesRes,
-      hrvRes,
-      movementRes,
-      trainingRes,
-      raceRes,
-      thresholdRes,
-      ftpRes,
-    ] = await Promise.all([
-      getTodayHealth({ date }),
-      getHealthSamples('heart-rate', { date, source: 'monitoring' }),
-      getHealthSamples('heart-rate', { date, source: 'sleep' }),
-      getHealthSamples('stress', { date, source: 'monitoring' }),
-      getHealthSamples('stress', { date, source: 'sleep' }),
-      getHealthSamples('steps', { date }),
-      getHealthSamples('intensity-minutes', { date }),
-      getHealthSamples('sleep-stages', { date }),
-      getHealthSamples('hrv', { date }),
-      getHealthSamples('sleep-movement', { date }),
-      getLatestTrainingStatus(),
-      getLatestRacePredictions(),
-      getLatestLactateThreshold(),
-      getLatestCyclingFtp(),
-    ])
-
-    summary.value = healthRes || {}
-    heartRateMonitorData.value = hrMonitorRes
-    heartRateSleepData.value = hrSleepRes
-    stressMonitorData.value = stressMonitorRes
-    stressSleepData.value = stressSleepRes
-    stepData.value = stepsRes
-    intensityData.value = intensityRes
-    sleepStages.value = stagesRes
-    hrvSampleData.value = hrvRes
-    sleepMovementData.value = movementRes
-    trainingStatus.value = trainingRes
-    racePredictions.value = raceRes
-    lactateThreshold.value = thresholdRes
-    cyclingFtp.value = ftpRes
+    const overview = await getDashboardOverview({ training_load_range: activeRange.value.value })
+    trainingLoad.value = overview.trainingLoad || []
   } catch (err) {
-    error.value = err instanceof Error ? err.message : '加载健康数据失败'
+    error.value = err instanceof Error ? err.message : '健康度加载失败'
   } finally {
     loading.value = false
   }
 }
 
-watch(selectedDate, loadAll, { immediate: true })
+watch(range, load, { immediate: true })
 </script>
 
 <style scoped>
-.health-date-selector {
-  display: flex;
-  flex: 1 1 190px;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
-  min-width: 0;
-  max-width: 100%;
-}
-
-.health-date-step {
-  background: var(--panel-strong);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  color: var(--text);
-  width: 42px;
-  height: 42px;
-  flex: 0 0 42px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.health-date-chip {
-  position: relative;
-  display: flex;
-  flex: 1 1 auto;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  min-width: 0;
-  min-height: 42px;
-  padding: 0 14px;
-  overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--app-green) 20%, var(--border));
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--app-green) 8%, var(--panel-soft));
-  color: var(--text);
-  font-weight: 800;
-}
-
-.health-date-chip span {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.health-date-native {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  cursor: pointer;
-  opacity: 0;
-}
-
-@container phone-frame (max-width: 374px) {
-  .health-date-selector {
-    flex-basis: 100%;
-    justify-content: stretch;
-  }
-}
-
-.health-date-step:hover,
-.health-date-chip:hover {
-  background: var(--panel);
-}
-
-.health-empty-rq-panel {
+.training-health-hero,
+.training-health-status {
   display: grid;
   gap: 14px;
   padding: var(--space-5);
-  border: 1px solid color-mix(in srgb, var(--app-green) 20%, var(--border));
-  border-top: 4px solid var(--app-green);
-  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--app-green) 16%, var(--border));
+  border-radius: 18px;
   background: var(--panel);
   box-shadow: var(--shadow-sm);
 }
 
-.health-empty-gauge {
-  position: relative;
+.training-health-chart :deep(.panel-heading .overline:empty) {
+  display: none;
+}
+
+.training-health-chart :deep(.panel-heading) {
+  margin-bottom: 4px;
+}
+
+.training-health-chart :deep(.chart-canvas) {
+  min-height: 400px;
+}
+
+.training-health-status {
+  padding-top: 18px;
+}
+
+.training-health-status .section-heading {
+  align-items: center;
+  margin: 0;
+}
+
+.training-health-status .section-heading h2 {
+  margin: 0;
+  font-size: 26px;
+  line-height: 1.15;
+}
+
+.range-stepper {
   display: grid;
-  min-height: 84px;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
+  align-items: center;
+}
+
+.range-stepper button {
+  width: 44px;
+  height: 44px;
+  display: grid;
   place-items: center;
-  overflow: hidden;
-  border-radius: 10px;
-  background: linear-gradient(90deg, #d8f5e4 0%, #f1f8f4 48%, #e5f8ee 100%);
+  border: 0;
+  background: transparent;
   color: var(--text);
 }
 
-.health-empty-gauge strong {
-  position: relative;
-  z-index: 1;
+.range-stepper strong {
+  min-width: 0;
+  color: var(--text);
+  font-size: 22px;
+  line-height: 1.2;
+  text-align: center;
+}
+
+.range-pills {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.range-pills button {
+  min-height: 38px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--panel-soft);
+  color: var(--text);
+  font-weight: 900;
+}
+
+.range-pills button.active {
+  background: var(--app-green);
+  color: #fff;
+}
+
+.training-health-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.training-health-metrics span {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 14px 8px;
+  border-radius: 14px;
+  background: var(--panel-soft);
+}
+
+.training-health-metrics small {
+  color: var(--text);
+  font-weight: 800;
+  text-align: center;
+}
+
+.training-health-metrics b {
   font-size: 34px;
   line-height: 1;
 }
 
-.health-empty-gauge span {
-  position: absolute;
-  inset: auto 16px 18px;
-  height: 10px;
-  border-radius: 999px;
-  background: linear-gradient(90deg, #9be7b8, var(--app-green));
-  opacity: 0.55;
+.training-health-metrics .ctl { color: #2f9de0; }
+.training-health-metrics .atl { color: #a855b1; }
+.training-health-metrics .tsb { color: #22a85a; }
+
+.training-health-advice {
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
 }
 
-.health-empty-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.health-empty-grid span {
-  min-width: 0;
-  padding: 10px 12px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--panel-soft);
-}
-
-.health-empty-grid small,
-.health-empty-grid b {
-  display: block;
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-
-.health-empty-grid small {
-  color: var(--muted);
-  font-size: 12px;
-}
-
-.health-empty-grid b {
-  margin-top: 4px;
-  color: var(--text);
-  font-size: 15px;
-}
-
-.detail-grid {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 16px;
-  margin-top: 16px;
-}
-
-.health-empty-note {
+.training-health-advice h3,
+.training-health-advice p {
   margin: 0;
-  color: var(--muted);
-  font-size: 13px;
-  font-weight: 700;
-  line-height: 1.6;
+}
+
+.training-health-advice h3 {
+  font-size: 20px;
+}
+
+.training-health-advice p {
+  margin-top: 10px;
+  color: var(--text);
+  font-size: 16px;
+  line-height: 1.65;
 }
 </style>

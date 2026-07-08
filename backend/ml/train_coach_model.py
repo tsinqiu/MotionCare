@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 from collections import Counter, defaultdict
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 import joblib
@@ -12,7 +12,13 @@ import numpy as np
 from sklearn.ensemble import HistGradientBoostingClassifier
 from sklearn.impute import SimpleImputer
 from sklearn.inspection import permutation_importance
-from sklearn.metrics import accuracy_score, confusion_matrix
+from sklearn.metrics import (
+    accuracy_score,
+    balanced_accuracy_score,
+    classification_report,
+    confusion_matrix,
+    f1_score,
+)
 from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 
@@ -26,6 +32,13 @@ SOURCE_WEIGHTS = {
     "user_feedback": 5.0,
     "delayed_objective": 3.0,
     "rule_pseudo": 1.0,
+}
+DEFAULT_ATHLETE_PROFILE = {
+    "age": 21,
+    "halfMarathonPbMinutes": 79,
+    "marathonPbMinutes": 176,
+    "athleteTier": "competitive_amateur",
+    "trainingTolerance": "high",
 }
 
 
@@ -102,6 +115,66 @@ def weather_risk(feels_like: float, humidity: float, condition_risk: int) -> int
 def coverage(days: list[date], latest_day: date, window: int) -> float:
     start = latest_day - timedelta(days=window - 1)
     return len({day for day in days if start <= day <= latest_day}) / window
+
+
+def percentile_rank(value: float, values: list[float]) -> float:
+    numeric_values = [float(item) for item in values if item is not None and np.isfinite(float(item))]
+    if not numeric_values:
+        return 50 if value > 0 else 0
+    return len([item for item in numeric_values if item <= value]) / len(numeric_values) * 100
+
+
+def safe_ratio(value: float, baseline: float, fallback: float = 0) -> float:
+    if baseline <= 0:
+        return fallback if value > 0 else 0
+    return value / baseline
+
+
+def daily_totals(by_day: dict[date, list[dict[str, object]]], day: date) -> dict[str, float | date]:
+    rows = by_day.get(day, [])
+    return {
+        "date": day,
+        "load": sum(float(row.get("activity_training_load") or 0) for row in rows),
+        "distance": sum(float(row.get("distance_m") or 0) for row in rows) / 1000,
+        "duration": sum(float(row.get("duration_s") or 0) for row in rows) / 3600,
+    }
+
+
+def history_totals(by_day: dict[date, list[dict[str, object]]], latest_day: date, window: int) -> list[dict[str, float | date]]:
+    start = latest_day - timedelta(days=window)
+    return [
+        daily_totals(by_day, current_day)
+        for current_day in sorted(by_day)
+        if start <= current_day < latest_day
+    ]
+
+
+def load_fitrec_reference(path: Path) -> dict[str, object]:
+    if not path.exists():
+        return {
+            "available": False,
+            "path": str(path),
+            "usage": "neutral_defaults",
+            "reason": "reference report not found",
+        }
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        return {
+            "available": False,
+            "path": str(path),
+            "usage": "neutral_defaults",
+            "reason": str(error),
+        }
+    return {
+        "available": True,
+        "path": str(path),
+        "usage": "offline_reference_only",
+        "source": payload.get("source"),
+        "counts": payload.get("counts", {}),
+        "similarActivityDistribution": payload.get("similarActivityDistribution", {}),
+        "quality": payload.get("quality", {}),
+    }
 
 
 def build_daily_features(connection) -> list[dict[str, object]]:
@@ -204,6 +277,33 @@ def build_daily_features(connection) -> list[dict[str, object]]:
             if float(row.get("activity_training_load") or 0) >= 120 or float(row.get("avg_heart_rate_bpm") or 0) >= 155
         )
         features["rest_days_7d"] = max(0, 7 - active_days_7d)
+        history90 = history_totals(by_day, day, 90)
+        history28 = history_totals(by_day, day, 28)
+        history_for_percentiles = history90 or history_totals(by_day, day, 365)
+        features["session_load_percentile_90d"] = percentile_rank(
+            features["load_1d"],
+            [float(item["load"]) for item in history_for_percentiles],
+        )
+        features["distance_percentile_90d"] = percentile_rank(
+            features["distance_1d"],
+            [float(item["distance"]) for item in history_for_percentiles],
+        )
+        features["duration_percentile_90d"] = percentile_rank(
+            features["duration_1d"],
+            [float(item["duration"]) for item in history_for_percentiles],
+        )
+        long_run_baseline = max([float(item["distance"]) for item in history28], default=0)
+        features["long_run_ratio_28d"] = safe_ratio(features["distance_1d"], long_run_baseline, 1)
+        load_values = [float(item["load"]) for item in history_for_percentiles if float(item["load"]) > 0]
+        load_p80 = float(np.quantile(load_values, 0.8)) if load_values else None
+        previous_hard_days = [
+            item["date"]
+            for item in history_for_percentiles
+            if load_p80 is not None and float(item["load"]) >= load_p80
+        ]
+        features["hard_session_gap_days"] = (day - max(previous_hard_days)).days if previous_hard_days else 90
+        avg_load_28d = sum(float(item["load"]) for item in history28) / len(history28) if history28 else 0
+        features["load_spike_ratio_28d"] = safe_ratio(features["load_1d"], avg_load_28d, 1)
 
         train_row = training.get(day, {})
         features["atl"] = float(train_row.get("acute_training_load") or 0)
@@ -357,6 +457,25 @@ def delayed_recovery_label(row: dict[str, object]) -> str | None:
     return None
 
 
+def legacy_perceived_effort_label(row: dict[str, object]) -> str:
+    if float(row.get("load_1d") or 0) >= 150 or float(row.get("hard_minutes_7d") or 0) >= 45:
+        return "hard"
+    if float(row.get("load_1d") or 0) >= 50:
+        return "moderate"
+    return "easy"
+
+
+def relative_perceived_effort_label(row: dict[str, object]) -> str:
+    if float(row.get("load_1d") or 0) <= 0 and float(row.get("hard_minutes_7d") or 0) <= 0:
+        return "easy"
+    percentile = float(row.get("session_load_percentile_90d") or 50)
+    if percentile < 40:
+        return "easy"
+    if percentile <= 80:
+        return "moderate"
+    return "hard"
+
+
 def perceived_effort_label(row: dict[str, object]) -> tuple[str, str]:
     effort = row.get("_perceived_effort_avg")
     if effort is not None:
@@ -366,11 +485,7 @@ def perceived_effort_label(row: dict[str, object]) -> tuple[str, str]:
         if effort <= 6:
             return "moderate", "user_feedback"
         return "hard", "user_feedback"
-    if float(row.get("load_1d") or 0) >= 150 or float(row.get("hard_minutes_7d") or 0) >= 45:
-        return "hard", "rule_pseudo"
-    if float(row.get("load_1d") or 0) >= 50:
-        return "moderate", "rule_pseudo"
-    return "easy", "rule_pseudo"
+    return relative_perceived_effort_label(row), "rule_pseudo"
 
 
 def advice_feedback_label(row: dict[str, object]) -> tuple[str, str]:
@@ -480,11 +595,18 @@ def train_classifier(features: np.ndarray, labels: np.ndarray, sample_weights: n
     )
     report = {
         "testAccuracy": None,
+        "trainAccuracy": None,
+        "macroF1": None,
+        "weightedF1": None,
+        "balancedAccuracy": None,
+        "classificationReport": None,
         "baselineAccuracy": None,
         "confusionMatrix": None,
         "featureImportance": [],
         "classDistribution": {label: int(count) for label, count in zip(*np.unique(labels, return_counts=True))},
         "warnings": [],
+        "trainable": True,
+        "evaluated": False,
         "sampleWeight": {
             "min": float(np.min(sample_weights)) if len(sample_weights) else None,
             "max": float(np.max(sample_weights)) if len(sample_weights) else None,
@@ -495,8 +617,13 @@ def train_classifier(features: np.ndarray, labels: np.ndarray, sample_weights: n
     report["baselineAccuracy"] = float(majority_count / len(labels)) if len(labels) else None
     if len(report["classDistribution"]) < 2:
         report["warnings"].append("only one class present; model cannot learn class boundaries")
+        report["trainable"] = False
+        report["notTrainableReason"] = "only one class present"
+        return None, report
     if report["classDistribution"] and min(report["classDistribution"].values()) < 5:
         report["warnings"].append("minority class has fewer than 5 samples")
+    if report["classDistribution"] and min(report["classDistribution"].values()) < 20:
+        report["warnings"].append("minority class has fewer than 20 samples; do not treat metrics as product-grade")
 
     if len(set(labels)) > 1 and min(np.bincount(np.unique(labels, return_inverse=True)[1])) >= 2 and len(labels) >= 20:
         x_train, x_test, y_train, y_test, weights_train, weights_test = train_test_split(
@@ -509,7 +636,14 @@ def train_classifier(features: np.ndarray, labels: np.ndarray, sample_weights: n
         )
         pipeline.fit(x_train, y_train, classifier__sample_weight=weights_train)
         y_pred = pipeline.predict(x_test)
+        train_pred = pipeline.predict(x_train)
+        report["trainAccuracy"] = float(accuracy_score(y_train, train_pred))
         report["testAccuracy"] = float(accuracy_score(y_test, y_pred))
+        report["macroF1"] = float(f1_score(y_test, y_pred, average="macro", zero_division=0))
+        report["weightedF1"] = float(f1_score(y_test, y_pred, average="weighted", zero_division=0))
+        report["balancedAccuracy"] = float(balanced_accuracy_score(y_test, y_pred))
+        report["classificationReport"] = classification_report(y_test, y_pred, output_dict=True, zero_division=0)
+        report["evaluated"] = True
         classes = list(pipeline.named_steps["classifier"].classes_)
         report["confusionMatrix"] = {
             "labels": classes,
@@ -537,6 +671,8 @@ def train_classifier(features: np.ndarray, labels: np.ndarray, sample_weights: n
             report["warnings"].append(f"feature importance unavailable: {error}")
     else:
         pipeline.fit(features, labels, classifier__sample_weight=sample_weights)
+        report["trainAccuracy"] = float(accuracy_score(labels, pipeline.predict(features)))
+        report["warnings"].append("not enough stratified samples for a held-out classification report")
     return pipeline, report
 
 
@@ -544,6 +680,10 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--env", default=str(Path(__file__).resolve().parents[1] / ".env"))
     parser.add_argument("--out", default=str(Path(__file__).resolve().parent / "models" / "coach_model.joblib"))
+    parser.add_argument(
+        "--fitrec-reference",
+        default=str(Path(__file__).resolve().parent / "reference" / "fitrec_reference_report.json"),
+    )
     args = parser.parse_args()
 
     connection = connect(Path(args.env))
@@ -560,21 +700,34 @@ def main() -> None:
     labels_by_name: dict[str, list[str]] = defaultdict(list)
     weights_by_name: dict[str, list[float]] = defaultdict(list)
     sources_by_name: dict[str, list[str]] = defaultdict(list)
+    perceived_effort_pseudo_comparison = {
+        "legacyDistribution": Counter(),
+        "relativeDistribution": Counter(),
+        "changedCount": 0,
+    }
     for row in rows:
         label_bundle = build_label_bundle(row)
         for name, value in label_bundle.items():
             labels_by_name[name].append(str(value["label"]))
             weights_by_name[name].append(float(value["weight"]))
             sources_by_name[name].append(str(value["source"]))
+        if label_bundle["perceivedEffortLevel"]["source"] == "rule_pseudo":
+            legacy_label = legacy_perceived_effort_label(row)
+            relative_label = str(label_bundle["perceivedEffortLevel"]["label"])
+            perceived_effort_pseudo_comparison["legacyDistribution"][legacy_label] += 1
+            perceived_effort_pseudo_comparison["relativeDistribution"][relative_label] += 1
+            if legacy_label != relative_label:
+                perceived_effort_pseudo_comparison["changedCount"] += 1
 
     models = {}
     reports = {}
     classes = {}
     for name, labels in labels_by_name.items():
         model, report = train_classifier(features, np.array(labels), np.array(weights_by_name[name], dtype=float))
-        models[name] = model
+        if model is not None:
+            models[name] = model
         reports[name] = report
-        classes[name] = list(model.named_steps["classifier"].classes_)
+        classes[name] = list(model.named_steps["classifier"].classes_) if model is not None else list(report["classDistribution"].keys())
 
     source_summary = label_source_summary(sources_by_name)
     aggregate_sources = Counter(source for sources in sources_by_name.values() for source in sources)
@@ -590,6 +743,21 @@ def main() -> None:
         "perceivedEffortCoverage": perceived_effort_real / len(rows) if rows else 0,
         "sampleWeights": SOURCE_WEIGHTS,
     }
+    fitrec_reference = load_fitrec_reference(Path(args.fitrec_reference))
+    model_card = {
+            "generatedAt": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
+        "modelVersion": MODEL_VERSION,
+        "dataSources": {
+            "primary": "local MotionAnalysis MySQL Garmin-derived activities, health, sleep, training status, and feedback",
+            "externalReference": fitrec_reference,
+        },
+        "labelGovernance": {
+            "realLabelRatio": label_source_summary_payload["realLabelRatio"],
+            "pseudoLabelRatio": label_source_summary_payload["pseudoLabelRatio"],
+            "perceivedEffortCoverage": label_source_summary_payload["perceivedEffortCoverage"],
+        },
+        "sampleCount": len(rows),
+    }
 
     output_path = Path(args.out)
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -601,6 +769,8 @@ def main() -> None:
         "classes": classes,
         "testAccuracy": {name: report["testAccuracy"] for name, report in reports.items()},
         "labelSourceSummary": label_source_summary_payload,
+        "athleteProfile": DEFAULT_ATHLETE_PROFILE,
+        "modelCard": model_card,
     }
     joblib.dump(bundle, output_path)
 
@@ -617,6 +787,13 @@ def main() -> None:
         "realLabelRatio": label_source_summary_payload["realLabelRatio"],
         "pseudoLabelRatio": label_source_summary_payload["pseudoLabelRatio"],
         "perceivedEffortCoverage": label_source_summary_payload["perceivedEffortCoverage"],
+        "perceivedEffortPseudoComparison": {
+            "legacyDistribution": dict(perceived_effort_pseudo_comparison["legacyDistribution"]),
+            "relativeDistribution": dict(perceived_effort_pseudo_comparison["relativeDistribution"]),
+            "changedCount": perceived_effort_pseudo_comparison["changedCount"],
+        },
+        "athleteProfile": DEFAULT_ATHLETE_PROFILE,
+        "modelCard": model_card,
         "reports": reports,
     }, ensure_ascii=False, indent=2), encoding="utf-8")
     print(json.dumps(metadata, ensure_ascii=False, indent=2))

@@ -1,5 +1,5 @@
 <template>
-  <div class="page-stack">
+  <div class="page-stack today-home">
     <StateBlock v-if="loading" title="正在准备今日建议" message="正在读取身体状态、训练负荷和最近运动。" />
     <StateBlock
       v-else-if="!hasData && errors.length"
@@ -9,86 +9,93 @@
       tone="danger"
       @action="loadToday"
     />
-    <template v-else-if="!hasData">
-      <section class="today-empty-rq-panel">
-        <div class="today-empty-rq-panel__top">
-          <div>
-            <p class="overline">今日跑力</p>
-            <h2>新手跑力</h2>
-          </div>
-          <strong>--</strong>
-        </div>
-        <div class="score-band" aria-label="空数据跑力区间">
-          <span class="score-band__segment score-band__segment--base">基础</span>
-          <span class="score-band__segment score-band__segment--steady">稳定</span>
-          <span class="score-band__segment score-band__segment--strong">强化</span>
-          <span class="score-band__segment score-band__segment--peak">冲刺</span>
-          <i class="score-band__marker" aria-hidden="true"></i>
-        </div>
-        <div class="today-empty-rq-panel__stats">
-          <span><small>数据同步</small><b>待同步</b></span>
-          <span><small>训练负荷</small><b>待记录</b></span>
-          <span><small>今日建议</small><b>轻松跑</b></span>
-        </div>
-      </section>
-
-      <section class="today-empty-plan">
-        <div class="section-heading">
-          <div>
-            <p class="overline">训练节奏</p>
-            <h2>训练节奏</h2>
-          </div>
-          <span class="status-chip neutral">等待数据</span>
-        </div>
-        <div class="today-empty-bars" aria-label="空数据训练节奏">
-          <i v-for="bar in emptyLoadBars" :key="bar.key" :style="{ '--bar-height': bar.height }">
-            <span>{{ bar.label }}</span>
-          </i>
-        </div>
-      </section>
-    </template>
 
     <template v-else>
       <p v-if="errors.length" class="soft-note">部分内容暂时不可用，已用现有数据为你生成建议。</p>
 
-      <section class="rq-overview-panel">
-        <div class="rq-overview-panel__top">
-          <p class="overline">训练总览</p>
-          <span class="status-chip" :class="statusBadge.tone">{{ statusBadge.label }}</span>
+      <header class="today-date-nav" aria-label="日期切换">
+        <button type="button" aria-label="前一天" @click="shiftSelectedDate(-1)">
+          <ChevronLeft :size="24" />
+        </button>
+        <strong>{{ selectedDateLabel }}</strong>
+        <button type="button" aria-label="后一天" :disabled="!canShiftNextDate" @click="shiftSelectedDate(1)">
+          <ChevronRight :size="24" />
+        </button>
+      </header>
+
+      <section class="today-weather-card">
+        <div class="today-weather-card__top">
+          <span class="weather-pin" aria-hidden="true">
+            <MapPin :size="24" />
+          </span>
+          <div class="weather-copy">
+            <h2>{{ weatherCard.location }}</h2>
+            <p>{{ weatherCard.message }}</p>
+          </div>
+          <div class="weather-temp" aria-label="当前温度">
+            <Sun :size="34" />
+            <strong>{{ weatherCard.temperature }}</strong>
+          </div>
         </div>
-        <div class="rq-overview-panel__score">
-          <span>当前训练指数</span>
-          <strong>{{ currentTrainingIndexDisplay }}</strong>
-        </div>
-        <div class="score-band" :style="trainingIndexStyle" aria-label="当前训练指数">
-          <span class="score-band__segment score-band__segment--base">恢复</span>
-          <span class="score-band__segment score-band__segment--steady">建设</span>
-          <span class="score-band__segment score-band__segment--strong">推进</span>
-          <span class="score-band__segment score-band__segment--peak">风险</span>
-          <i class="score-band__marker" aria-hidden="true"></i>
-        </div>
-        <div class="rq-overview-panel__stats">
-          <span><small>体能储备</small><b>{{ metricValue(currentLoad.ctl) }}</b></span>
-          <span><small>疲劳负荷</small><b>{{ metricValue(currentLoad.atl) }}</b></span>
-          <span><small>状态余量</small><b>{{ metricValue(currentLoad.tsb) }}</b></span>
-          <span><small>最近训练</small><b>{{ recentActivities.length }}</b></span>
+        <div class="today-weather-card__bottom">
+          <div>
+            <span>体感 {{ weatherCard.feelsLike }}</span>
+            <span>风力 {{ weatherCard.wind }}</span>
+          </div>
+          <button type="button" class="location-pill">
+            <Crosshair :size="18" />
+            开启定位
+          </button>
         </div>
       </section>
 
-      <section class="rq-daily-advice">
-        <p class="overline">每日建议 · {{ greeting }}</p>
-        <h2>{{ recommendationHeadline }}</h2>
-        <p>{{ recommendationText }}</p>
-        <small>
-          {{ briefAvailable ? '建议已结合你的近期运动生成' : '基于身体状态与训练负荷生成' }}
-        </small>
+      <nav class="today-action-grid" aria-label="今日快捷入口">
+        <RouterLink v-for="item in todayActions" :key="item.label" :to="item.to">
+          <component :is="item.icon" :size="32" :style="{ color: item.color }" aria-hidden="true" />
+          <span>{{ item.label }}</span>
+        </RouterLink>
+      </nav>
+
+      <section class="today-activity-section">
+        <ActivityCard
+          v-for="activity in selectedDateActivities"
+          :key="activity.id || activity.activity_key"
+          :activity="activity"
+          @select="openActivity"
+        />
+        <article v-if="!selectedDateActivities.length" class="today-no-activity-card">
+          <span aria-hidden="true">
+            <CalendarDays :size="34" />
+          </span>
+          <strong>今日无训练安排</strong>
+        </article>
+      </section>
+
+      <section class="rq-overview-panel training-index-panel">
+        <div class="rq-overview-panel__top">
+          <h2 class="training-index-title">训练指数</h2>
+        </div>
+        <div class="rq-overview-panel__score training-index-score">
+          <span class="training-index-advice">{{ compactTrainingAdvice }}</span>
+          <strong>{{ trainingIndexDisplay }}</strong>
+        </div>
+        <div class="performance-gradient-track" :style="trainingIndexStyle" aria-label="训练指数">
+          <span>恢复</span>
+          <span>稳态</span>
+          <span>训练</span>
+          <i class="score-band__marker" aria-hidden="true"></i>
+        </div>
+        <div class="rq-overview-panel__stats">
+          <span><small>体能（CTL）</small><b>{{ metricValue(currentLoad.ctl) }}</b></span>
+          <span><small>疲劳（ATL）</small><b>{{ metricValue(currentLoad.atl) }}</b></span>
+          <span><small>状态（TSB）</small><b>{{ metricValue(currentLoad.tsb) }}</b></span>
+        </div>
       </section>
 
       <section class="microcycle-panel">
         <div class="section-heading">
           <div>
-            <p class="overline">训练节奏</p>
-            <h2>本周训练节奏</h2>
+            <h2>本周负荷</h2>
           </div>
           <span class="status-chip" :class="weekSummary.tone">{{ weekSummary.label }}</span>
         </div>
@@ -98,41 +105,58 @@
           <span><small>完成度</small><b>{{ weekSummary.completion }}</b></span>
         </div>
         <div class="microcycle-bars" aria-label="本周训练负荷">
-          <span v-for="bar in weeklyLoadBars" :key="bar.key" :class="{ today: bar.isToday, active: bar.hasLoad }">
+          <span
+            v-for="bar in weeklyLoadBars"
+            :key="bar.key"
+            :class="{ today: bar.isToday, active: bar.hasLoad }"
+            :title="bar.tooltip"
+            :aria-label="bar.tooltip"
+          >
             <i :style="{ '--bar-height': bar.height }" aria-hidden="true"></i>
             <small>{{ bar.label }}</small>
           </span>
         </div>
-        <p>{{ weekSummary.message }}</p>
       </section>
-
-      <div class="metric-grid">
-        <MetricCard label="睡眠分数" :value="metricValue(health.sleepScore)" />
-        <MetricCard label="静息心率" :value="metricValue(health.restingHeartRateBpm, ' 次/分')" />
-        <MetricCard label="平均压力" :value="metricValue(health.avgStressLevel)" />
-        <MetricCard label="心率变异" :value="metricValue(health.avgHrv)" />
-      </div>
     </template>
   </div>
 </template>
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
+import {
+  CalendarDays,
+  ChevronLeft,
+  ChevronRight,
+  ClipboardList,
+  Crosshair,
+  HeartPulse,
+  MapPin,
+  Sun,
+  TrendingUp,
+} from '@lucide/vue'
+import { useRouter } from 'vue-router'
 
-import MetricCard from '@/components/MetricCard.vue'
+import ActivityCard from '@/components/ActivityCard.vue'
 import StateBlock from '@/components/StateBlock.vue'
 import { getDailyBrief } from '@/services/ai'
 import { getDashboardOverview, getTodayHealth } from '@/services/dashboard'
+import { getPerformanceProfile } from '@/services/performance'
 import { deriveStatusBadge } from '@/utils/productInsights'
 
+const router = useRouter()
 const overview = ref({ recentActivities: [], monthlySummary: {}, yearlySummary: {}, trainingLoad: [] })
 const health = ref({})
 const brief = ref(null)
+const performanceProfile = ref(null)
 const loading = ref(false)
 const errors = ref([])
 const briefAvailable = ref(false)
+const selectedDate = ref(startOfDay(new Date()))
 
 const recentActivities = computed(() => (overview.value.recentActivities || []).slice(0, 6))
+const selectedDateActivities = computed(() => recentActivities.value.filter((activity) => (
+  normalizeDateKey(activity.local_start_time || activity.start_time_utc) === formatDateKey(selectedDate.value)
+)))
 const currentLoad = computed(() => (overview.value.trainingLoad || []).at(-1) || {})
 const statusBadge = computed(() => deriveStatusBadge({
   sleepScore: health.value.sleepScore,
@@ -144,36 +168,64 @@ const hasData = computed(() => (
   || recentActivities.value.length > 0
   || (overview.value.trainingLoad || []).length > 0
 ))
-const recommendationHeadline = computed(() => brief.value?.headline || statusBadge.value.label)
-const recommendationText = computed(() => brief.value?.recommendation || statusBadge.value.message)
-const greeting = computed(() => {
-  const hour = new Date().getHours()
-  if (hour < 6) return '凌晨好，注意休息'
-  if (hour < 11) return '早上好，今天适合怎么运动'
-  if (hour < 14) return '中午好，今天适合怎么运动'
-  if (hour < 18) return '下午好，今天适合怎么运动'
-  return '晚上好，回顾今天的状态'
+const trainingIndex = computed(() => performanceProfile.value?.trainingIndex || null)
+const trainingIndexScore = computed(() => {
+  const fromProfile = Number(trainingIndex.value?.score)
+  if (Number.isFinite(fromProfile)) return Math.max(0, Math.min(100, Math.round(fromProfile)))
+  const fromBrief = Number(brief.value?.ml?.trainingIndexScore ?? brief.value?.ml?.readinessScore)
+  return Number.isFinite(fromBrief) ? Math.max(0, Math.min(100, Math.round(fromBrief))) : null
 })
-const currentTrainingIndex = computed(() => {
-  const ctl = Number(currentLoad.value.ctl)
-  const atl = Number(currentLoad.value.atl)
-  const tsb = Number(currentLoad.value.tsb)
-  if (![ctl, atl, tsb].some(Number.isFinite)) return null
-
-  const fitness = Number.isFinite(ctl) ? ctl : 45
-  const fatigueControl = Number.isFinite(atl) ? Math.max(0, 100 - Math.min(atl, 100)) * 0.18 : 6
-  const freshness = Number.isFinite(tsb) ? Math.max(-12, Math.min(12, tsb)) * 0.45 : 0
-  return Math.round(Math.max(0, Math.min(100, fitness + fatigueControl + freshness)))
+const trainingIndexDisplay = computed(() => trainingIndexScore.value ?? '--')
+const trainingIndexLabel = computed(() => trainingIndex.value?.label || brief.value?.ml?.trainingIndexLabel || statusBadge.value.label)
+const trainingIndexTone = computed(() => {
+  const score = trainingIndexScore.value
+  if (score === null) return statusBadge.value.tone
+  if (score < 45) return 'danger'
+  if (score < 65) return 'warning'
+  if (score < 80) return 'steady'
+  return 'good'
 })
-const currentTrainingIndexDisplay = computed(() => currentTrainingIndex.value ?? '--')
+const compactTrainingAdvice = computed(() => {
+  const text = trainingIndex.value?.recommendation || brief.value?.recommendation || statusBadge.value.message || ''
+  const advice = text.replace(/[。.!！]$/, '')
+  const label = trainingIndexLabel.value || ''
+  if (!label) return advice
+  if (!advice) return label
+  return advice.startsWith(label) ? advice : `${label}，${advice}`
+})
 const trainingIndexStyle = computed(() => ({
-  '--score-position': `${currentTrainingIndex.value ?? 0}%`,
+  '--score-position': `${trainingIndexScore.value ?? 0}%`,
 }))
-const emptyLoadBars = computed(() => ['一', '二', '三', '四', '五', '六', '日'].map((label, index) => ({
-  key: `empty-${index}`,
-  label,
-  height: `${18 + (index % 4) * 10}%`,
-})))
+const selectedDateLabel = computed(() => {
+  const date = selectedDate.value
+  const week = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][date.getDay()]
+  return `${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')}，${week}`
+})
+const canShiftNextDate = computed(() => formatDateKey(selectedDate.value) < formatDateKey(startOfDay(new Date())))
+const todayActions = [
+  { label: '运动日历', to: { path: '/status/calendar', query: { from: 'today' } }, icon: CalendarDays, color: '#2563eb' },
+  { label: '健康度', to: { path: '/status/health', query: { from: 'today' } }, icon: HeartPulse, color: '#f59e0b' },
+  { label: '趋势', to: { path: '/status/trends', query: { from: 'today' } }, icon: TrendingUp, color: '#0ea5e9' },
+  { label: '训练计划', to: { path: '/training-plans', query: { from: 'today' } }, icon: ClipboardList, color: '#16a34a' },
+]
+const latestWeatherActivity = computed(() => recentActivities.value.find((activity) => (
+  activity.weather_condition || activity.temperature_c != null || activity.feels_like_c != null || activity.humidity_percent != null
+)) || recentActivities.value[0] || null)
+const weatherCard = computed(() => {
+  const activity = latestWeatherActivity.value
+  const temperature = activity?.temperature_c
+  const feelsLike = activity?.feels_like_c ?? temperature
+  const humidity = activity?.humidity_percent
+  const location = activity?.location_name || '最近运动地点'
+  const hasWeather = activity && (activity.weather_condition || temperature != null || feelsLike != null || humidity != null)
+  return {
+    location,
+    message: hasWeather ? weatherMessage(temperature, humidity, activity.weather_condition) : '天气数据待同步，建议运动前确认天气。',
+    temperature: temperature == null ? '--°' : `${Math.round(temperature)}°`,
+    feelsLike: feelsLike == null ? '--°C' : `${Math.round(feelsLike)}°C`,
+    wind: '--级',
+  }
+})
 const weeklyLoadBars = computed(() => {
   const rows = buildWeekRows()
   const maxLoad = Math.max(...rows.map((row) => row.load), 1)
@@ -181,6 +233,7 @@ const weeklyLoadBars = computed(() => {
     ...row,
     hasLoad: row.load > 0,
     height: `${Math.max(10, Math.min(100, Math.round((row.load / maxLoad) * 100)))}%`,
+    tooltip: `${row.label}：训练负荷 ${Math.round(row.load)}`,
   }))
 })
 const weekSummary = computed(() => {
@@ -218,6 +271,28 @@ const weekSummary = computed(() => {
 
 function metricValue(value, unit = '') {
   return value === null || value === undefined || value === '' ? '--' : `${value}${unit}`
+}
+
+function shiftSelectedDate(offset) {
+  const next = new Date(selectedDate.value)
+  next.setDate(next.getDate() + offset)
+  const normalized = startOfDay(next)
+  const today = startOfDay(new Date())
+  selectedDate.value = normalized > today ? today : normalized
+}
+
+function openActivity(activity) {
+  if (activity?.id) router.push(`/activities/${activity.id}`)
+}
+
+function weatherMessage(temperature, humidity, condition) {
+  const temp = Number(temperature)
+  const humid = Number(humidity)
+  const riskyCondition = /雨|雪|雷|storm|rain|snow/i.test(condition || '')
+  if (riskyCondition) return '天气不稳，户外运动注意安全。'
+  if (Number.isFinite(temp) && (temp < 3 || temp > 32)) return '气温不太理想，建议降低训练强度。'
+  if (Number.isFinite(humid) && humid >= 85) return '湿度偏高，运动时注意补水和降强度。'
+  return '天气适宜，适合户外运动。'
 }
 
 function buildWeekRows() {
@@ -269,6 +344,7 @@ async function loadToday() {
     getDashboardOverview(),
     getTodayHealth(),
     getDailyBrief(),
+    getPerformanceProfile(),
   ])
 
   if (results[0].status === 'fulfilled') overview.value = results[0].value
@@ -288,6 +364,12 @@ async function loadToday() {
     brief.value = null
     errors.value.push('个性化建议暂时不可用')
   }
+  if (results[3].status === 'fulfilled') {
+    performanceProfile.value = results[3].value
+  } else {
+    performanceProfile.value = null
+    errors.value.push('训练指数模型暂时不可用')
+  }
   loading.value = false
 }
 
@@ -295,6 +377,195 @@ onMounted(loadToday)
 </script>
 
 <style scoped>
+.today-home {
+  gap: 16px;
+}
+
+.today-date-nav {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
+  align-items: center;
+  min-height: 56px;
+  border: 1px solid color-mix(in srgb, var(--app-green) 12%, var(--border));
+  border-radius: 14px;
+  background: var(--panel);
+  box-shadow: var(--shadow-sm);
+}
+
+.today-date-nav button {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.today-date-nav button:disabled {
+  color: color-mix(in srgb, var(--muted) 48%, transparent);
+  cursor: not-allowed;
+  opacity: 0.42;
+}
+
+.today-date-nav strong {
+  min-width: 0;
+  color: var(--text);
+  font-size: 20px;
+  line-height: 1.2;
+  text-align: center;
+}
+
+.today-weather-card {
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+  border: 1px solid color-mix(in srgb, var(--app-green) 18%, var(--border));
+  border-radius: 18px;
+  background: var(--panel);
+  box-shadow: 0 14px 34px rgb(15 23 42 / 0.08);
+}
+
+.today-weather-card__top {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+}
+
+.weather-pin {
+  width: 54px;
+  height: 54px;
+  display: grid;
+  place-items: center;
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--app-green) 12%, var(--panel-soft));
+  color: var(--app-green);
+}
+
+.weather-copy {
+  min-width: 0;
+}
+
+.weather-copy h2 {
+  margin: 0;
+  color: var(--text);
+  font-size: 22px;
+  line-height: 1.2;
+}
+
+.weather-copy p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.weather-temp {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: #f59e0b;
+}
+
+.weather-temp strong {
+  color: var(--text);
+  font-size: 42px;
+  line-height: 1;
+}
+
+.today-weather-card__bottom {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  padding-top: 14px;
+  border-top: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+}
+
+.today-weather-card__bottom div {
+  display: grid;
+  gap: 4px;
+  color: var(--text);
+  line-height: 1.35;
+}
+
+.location-pill {
+  min-height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--app-green);
+  color: #fff;
+  font-weight: 900;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.today-action-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  padding: 2px 0;
+}
+
+.today-action-grid a {
+  display: grid;
+  justify-items: center;
+  gap: 9px;
+  min-width: 0;
+  padding: 10px 4px;
+  color: var(--text);
+  font-weight: 900;
+  line-height: 1.2;
+  text-align: center;
+  text-decoration: none;
+}
+
+.today-action-grid span {
+  min-width: 0;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+.today-activity-section {
+  display: grid;
+  gap: 12px;
+}
+
+.today-no-activity-card {
+  min-height: 92px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 16px;
+  padding: 18px;
+  border: 1px solid color-mix(in srgb, var(--border) 80%, var(--app-green));
+  border-radius: 18px;
+  background: var(--panel);
+  box-shadow: var(--shadow-sm);
+}
+
+.today-no-activity-card span {
+  width: 58px;
+  height: 58px;
+  display: grid;
+  place-items: center;
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--muted) 10%, var(--panel-soft));
+  color: var(--muted);
+}
+
+.today-no-activity-card strong {
+  color: var(--text);
+  font-size: 20px;
+  line-height: 1.25;
+}
+
 .soft-note {
   margin: 0;
   padding: 10px 14px;
@@ -328,6 +599,133 @@ onMounted(loadToday)
 .rq-daily-advice small {
   color: var(--faint);
   font-size: 12px;
+}
+
+.training-index-panel {
+  gap: 12px;
+  padding: 18px;
+}
+
+.training-index-panel .rq-overview-panel__top {
+  display: block;
+  margin-bottom: -2px;
+}
+
+.training-index-title {
+  margin: 0;
+  color: var(--text);
+  font-size: 24px;
+  line-height: 1.12;
+  font-weight: 900;
+  letter-spacing: 0;
+}
+
+.training-index-panel .rq-overview-panel__score {
+  align-items: start;
+  margin-top: -12px;
+}
+
+.training-index-panel .rq-overview-panel__score span {
+  color: var(--muted);
+  font-size: 16px;
+  font-weight: 400;
+}
+
+.training-index-panel .rq-overview-panel__score strong {
+  letter-spacing: 0;
+  line-height: 0.82;
+  transform: translateY(-18px);
+}
+
+.training-index-score {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 16px;
+  min-height: 62px;
+}
+
+.training-index-advice {
+  max-width: 250px;
+  padding-top: 20px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.performance-gradient-track {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: center;
+  min-height: 40px;
+  overflow: visible;
+  border-radius: 999px;
+  background:
+    linear-gradient(90deg, rgb(255 255 255 / 0.2), rgb(255 255 255 / 0)),
+    linear-gradient(90deg, #38bdf8 0%, #16c784 47%, #f59e0b 76%, #ef4444 100%);
+  box-shadow:
+    inset 0 0 0 1px rgb(255 255 255 / 0.2),
+    0 8px 18px rgb(16 185 129 / 0.14);
+}
+
+.performance-gradient-track span {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 900;
+  text-align: center;
+  text-shadow: 0 1px 2px rgb(0 0 0 / 0.18);
+}
+
+.performance-gradient-track .score-band__marker {
+  top: 50%;
+  left: var(--score-position);
+  width: 18px;
+  height: 18px;
+  border: 3px solid #fff;
+  border-radius: 999px;
+  background: var(--app-green-dark);
+  box-shadow:
+    0 0 0 3px rgb(16 185 129 / 0.16),
+    0 6px 14px rgb(15 23 42 / 0.24);
+  transform: translate(-50%, -50%);
+}
+
+.performance-gradient-track .score-band__marker::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -8px;
+  width: 3px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--app-green-dark);
+  transform: translateX(-50%);
+}
+
+.training-index-panel .rq-overview-panel__stats {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 0;
+}
+
+.training-index-panel .rq-overview-panel__stats span {
+  padding: 13px 12px;
+  border: 1px solid color-mix(in srgb, var(--app-green) 10%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--app-green) 7%, var(--panel-soft));
+}
+
+.training-index-panel .rq-overview-panel__stats small {
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.training-index-panel .rq-overview-panel__stats b {
+  color: var(--text);
+  font-size: 17px;
+  line-height: 1.15;
 }
 
 .today-empty-rq-panel,
@@ -423,7 +821,7 @@ onMounted(loadToday)
 }
 .microcycle-panel {
   display: grid;
-  gap: 14px;
+  gap: 16px;
   padding: var(--space-5);
   border: 1px solid color-mix(in srgb, var(--app-green) 14%, var(--border));
   border-top: 4px solid var(--app-green);
@@ -437,25 +835,25 @@ onMounted(loadToday)
   margin: 0;
 }
 .microcycle-panel h2 {
-  margin-top: 3px;
-  font-size: var(--fs-h2);
-  line-height: 1.18;
+  font-size: 25px;
+  line-height: 1.14;
 }
-.microcycle-panel > p {
-  color: var(--muted);
-  line-height: 1.5;
+
+.microcycle-panel .status-chip {
+  font-size: 15px;
+  font-weight: 500;
 }
 .microcycle-summary {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
+  gap: 10px;
 }
 .microcycle-summary span {
   display: grid;
   gap: 4px;
   min-width: 0;
-  padding: 10px;
-  border-radius: 10px;
+  padding: 12px 11px;
+  border-radius: 12px;
   background: color-mix(in srgb, var(--app-green) 8%, var(--panel-soft));
 }
 .microcycle-summary small {
@@ -474,9 +872,9 @@ onMounted(loadToday)
   grid-template-columns: repeat(7, minmax(0, 1fr));
   align-items: end;
   gap: 6px;
-  height: 86px;
-  padding: 10px 6px 0;
-  border-radius: 12px;
+  height: 108px;
+  padding: 12px 10px 0;
+  border-radius: 14px;
   background: color-mix(in srgb, var(--app-green) 7%, var(--panel-soft));
 }
 .microcycle-bars span {
@@ -486,6 +884,7 @@ onMounted(loadToday)
   gap: 6px;
   min-width: 0;
   height: 100%;
+  cursor: default;
 }
 .microcycle-bars i {
   justify-self: center;

@@ -6,10 +6,16 @@ import Activities from '@/views/Activities.vue'
 import ActivityDetail from '@/views/ActivityDetail.vue'
 import Calendar from '@/views/Calendar.vue'
 import Coach from '@/views/Coach.vue'
+import Community from '@/views/Community.vue'
 import Download from '@/views/Download.vue'
+import Explore from '@/views/Explore.vue'
+import ExploreCourses from '@/views/ExploreCourses.vue'
+import ExploreEvents from '@/views/ExploreEvents.vue'
+import ExploreRoutes from '@/views/ExploreRoutes.vue'
 import HealthDetail from '@/views/HealthDetail.vue'
 import Login from '@/views/Login.vue'
 import Me from '@/views/Me.vue'
+import PerformanceDetail from '@/views/PerformanceDetail.vue'
 import RecordActivity from '@/views/RecordActivity.vue'
 import Records from '@/views/Records.vue'
 import Register from '@/views/Register.vue'
@@ -21,6 +27,7 @@ import Status from '@/views/Status.vue'
 import Sync from '@/views/Sync.vue'
 import Today from '@/views/Today.vue'
 import TrainingLoad from '@/views/TrainingLoad.vue'
+import TrainingPlans from '@/views/TrainingPlans.vue'
 import {
   authSession,
   hasAuthToken,
@@ -73,7 +80,7 @@ const routes = [
     path: '/activities/:id',
     name: 'activity-detail',
     component: ActivityDetail,
-    meta: { title: '运动详情', requiresAuth: true },
+    meta: { title: '运动详情', requiresAuth: true, backTo: '/activities' },
   },
   {
     path: '/record',
@@ -91,37 +98,73 @@ const routes = [
     path: '/status/health',
     name: 'status-health',
     component: HealthDetail,
-    meta: { title: '健康详情', requiresAuth: true },
+    meta: { title: '健康度', requiresAuth: true, backTo: '/status' },
+  },
+  {
+    path: '/status/performance',
+    name: 'status-performance',
+    component: PerformanceDetail,
+    meta: { title: '跑力详情', requiresAuth: true, backTo: '/status' },
   },
   {
     path: '/status/training-load',
     name: 'status-training-load',
     component: TrainingLoad,
-    meta: { title: '训练负荷', requiresAuth: true },
+    meta: { title: '训练负荷', requiresAuth: true, backTo: '/status' },
   },
   {
     path: '/status/trends',
     name: 'status-trends',
     component: Statistics,
-    meta: { title: '运动趋势', requiresAuth: true },
+    meta: { title: '趋势', requiresAuth: true, backTo: '/status' },
   },
   {
     path: '/status/calendar',
     name: 'status-calendar',
     component: Calendar,
-    meta: { title: '训练日历', requiresAuth: true },
+    meta: { title: '运动日历', requiresAuth: true, backTo: '/status' },
   },
   {
     path: '/status/records',
     name: 'status-records',
     component: Records,
-    meta: { title: '最佳记录', requiresAuth: true },
+    meta: { title: '最佳记录', requiresAuth: true, backTo: '/status' },
   },
   {
     path: '/coach',
     name: 'coach',
     component: Coach,
     meta: { title: '教练', requiresAuth: true },
+  },
+  {
+    path: '/training-plans',
+    name: 'training-plans',
+    component: TrainingPlans,
+    meta: { title: '训练计划', requiresAuth: true, backTo: '/explore' },
+  },
+  {
+    path: '/explore',
+    name: 'explore',
+    component: Explore,
+    meta: { title: '探索', requiresAuth: true },
+  },
+  {
+    path: '/explore/events',
+    name: 'explore-events',
+    component: ExploreEvents,
+    meta: { title: '热门赛事', requiresAuth: true, backTo: '/explore' },
+  },
+  {
+    path: '/explore/courses',
+    name: 'explore-courses',
+    component: ExploreCourses,
+    meta: { title: '常用课程', requiresAuth: true, backTo: '/explore' },
+  },
+  {
+    path: '/explore/routes',
+    name: 'explore-routes',
+    component: ExploreRoutes,
+    meta: { title: '运动路线', requiresAuth: true, backTo: '/explore' },
   },
   {
     path: '/me',
@@ -133,31 +176,31 @@ const routes = [
     path: '/me/sync',
     name: 'me-sync',
     component: Sync,
-    meta: { title: '数据同步', requiresAuth: true },
+    meta: { title: '数据同步', requiresAuth: true, backTo: '/me' },
   },
   {
     path: '/me/shoes',
     name: 'me-shoes',
     component: Shoes,
-    meta: { title: '跑鞋', requiresAuth: true },
+    meta: { title: '跑鞋', requiresAuth: true, backTo: '/me' },
   },
   {
     path: '/me/security',
     name: 'me-security',
     component: Security,
-    meta: { title: '账号安全', requiresAuth: true },
+    meta: { title: '账号安全', requiresAuth: true, backTo: '/me' },
   },
   {
     path: '/me/settings',
     name: 'me-settings',
     component: Settings,
-    meta: { title: '个人设置', requiresAuth: true },
+    meta: { title: '个人设置', requiresAuth: true, backTo: '/me' },
   },
   {
     path: '/me/admin',
     name: 'me-admin',
     component: Admin,
-    meta: { title: '用户管理', requiresAuth: true, requiresAdmin: true },
+    meta: { title: '用户管理', requiresAuth: true, requiresAdmin: true, backTo: '/me' },
   },
   { path: '/start', redirect: '/record' },
   { path: '/health', redirect: '/status/health' },
@@ -168,12 +211,16 @@ const routes = [
   { path: '/trends', redirect: '/status/trends' },
   { path: '/analytics', redirect: '/status/trends' },
   { path: '/assistant', redirect: '/coach' },
-  { path: '/explore', redirect: '/coach' },
   { path: '/sync', redirect: '/me/sync' },
   { path: '/shoes', redirect: '/me/shoes' },
   { path: '/settings', redirect: '/me/settings' },
   { path: '/admin', redirect: '/me/admin' },
-  { path: '/community', redirect: '/today' },
+  {
+    path: '/community',
+    name: 'community',
+    component: Community,
+    meta: { title: '运动圈', navTitle: '运动圈', requiresAuth: true },
+  },
   {
     path: '/schema',
     redirect: '/today',

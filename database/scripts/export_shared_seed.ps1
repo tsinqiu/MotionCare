@@ -107,7 +107,7 @@ USE MotionAnalysis;
 SET FOREIGN_KEY_CHECKS=0;
 DELETE FROM Users;
 INSERT INTO Users (id, username, email, password_hash, role, status)
-VALUES (1, 'demo', 'demo@example.com', '$demoPasswordHash', 'admin', 'active');
+VALUES (1, 'demo', 'name@motioncare.com', '$demoPasswordHash', 'admin', 'active');
 
 "@
     [System.IO.File]::WriteAllText($seedSql, $header, $utf8NoBom)
@@ -136,7 +136,7 @@ VALUES (1, 'demo', 'demo@example.com', '$demoPasswordHash', 'admin', 'active');
         Write-Host "Wrote $uploadsOutPath ($uploadsSizeMb MB)"
     }
 
-    Write-Host "Demo login after import: demo@example.com / 123456"
+    Write-Host "Demo login after import: name@motioncare.com / 123456"
 }
 finally {
     foreach ($path in @($defaultsFile, $dumpFile, $seedSql)) {

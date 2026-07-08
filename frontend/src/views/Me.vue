@@ -59,6 +59,17 @@
       </div>
 
       <div class="cell-section">
+        <p class="cell-section__title">应用</p>
+        <van-cell-group inset>
+          <van-cell title="下载APK" label="获取安卓安装包" is-link to="/download">
+            <template #icon>
+              <DownloadIcon :size="20" class="cell-icon" aria-hidden="true" />
+            </template>
+          </van-cell>
+        </van-cell-group>
+      </div>
+
+      <div class="cell-section">
         <p class="cell-section__title">偏好</p>
         <van-cell-group inset>
           <van-cell
@@ -84,7 +95,7 @@
 
 <script setup>
 import { computed } from 'vue'
-import { Footprints, LogOut, Moon, RefreshCw, Settings, ShieldCheck, Sun } from '@lucide/vue'
+import { Download as DownloadIcon, Footprints, LogOut, Moon, RefreshCw, Settings, ShieldCheck, Sun } from '@lucide/vue'
 import { useRouter } from 'vue-router'
 
 import StateBlock from '@/components/StateBlock.vue'

@@ -76,7 +76,7 @@ function resolveProjectPath(value, fallback) {
   return path.resolve(PROJECT_ROOT, target);
 }
 
-const serverPort = parseInteger(process.env.PORT, 8089);
+const serverPort = parseInteger(process.env.PORT, 8080);
 const rateLimitDefaults = getRateLimitDefaults(process.env.NODE_ENV);
 
 const config = {
@@ -121,6 +121,12 @@ const config = {
   },
   cache: {
     statsTtlSeconds: parseInteger(process.env.STATS_CACHE_TTL_SECONDS, 60)
+  },
+  maps: {
+    amap: {
+      key: process.env.AMAP_JS_API_KEY || process.env.AMAP_KEY || '',
+      securityCode: process.env.AMAP_SECURITY_CODE || ''
+    }
   },
   uploads: {
     root: resolveBackendPath(process.env.UPLOAD_ROOT, 'uploads'),

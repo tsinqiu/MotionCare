@@ -12,6 +12,11 @@ const SUGGESTION_TYPES = new Set(['daily_brief', 'chat', 'training_load', 'sleep
 const MUSCLE_SORENESS_VALUES = new Set(['none', 'mild', 'obvious']);
 const MENTAL_STATE_VALUES = new Set(['poor', 'normal', 'good']);
 const TRAINING_WILLINGNESS_VALUES = new Set(['rest', 'easy', 'normal']);
+const TRAINING_INDEX_LABELS = {
+  low: '恢复优先',
+  medium: '稳态训练',
+  high: '适合训练'
+};
 
 const EMPTY_OVERVIEW = {
   recentActivities: [],
@@ -66,6 +71,13 @@ function round(value, digits = 1) {
   if (numberValue === null) return null;
   const factor = 10 ** digits;
   return Math.round(numberValue * factor) / factor;
+}
+
+function trainingIndexScoreFromPrediction(prediction) {
+  let value = Math.max(0, Math.min(100, Math.round(toNumber(prediction?.readinessScore) ?? 50)));
+  if (prediction?.riskLevel === 'red') value = Math.min(value, 44);
+  else if (prediction?.riskLevel === 'orange') value = Math.min(value, 54);
+  return value;
 }
 
 function formatKm(valueM) {
@@ -293,11 +305,12 @@ function buildAdviceSet(overview = EMPTY_OVERVIEW, context = EMPTY_RAG_CONTEXT) 
     ? `${weather}。${mlPrediction?.weatherRisk === 'high' || (profile.metrics.feelsLikeC !== null && profile.metrics.feelsLikeC >= 30) ? '户外训练建议避开高温时段，降低目标配速并注意补水。' : '天气信号可作为训练强度和装备选择的辅助参考。'}`
     : '近期活动缺少天气数据，建议训练前补充查看实时天气、温度和湿度。';
 
+  const trainingIndexScore = trainingIndexScoreFromPrediction(mlPrediction);
   const recoveryAdvice = profile.riskLevel === 'green'
     ? '恢复信号整体稳定，可以按计划训练，并保留热身、放松和补给。'
     : profile.riskLevel === 'yellow'
       ? '存在轻度风险信号，建议把训练目标从冲强度调整为完成质量。'
-      : `恢复优先级较高，模型恢复评分 ${mlPrediction?.readinessScore ?? '--'}，恢复状态${mlReadinessLabels[mlPrediction?.readinessLevel] || '需保守判断'}，建议今天以恢复、拉伸或轻松有氧为主。`;
+      : `训练指数 ${trainingIndexScore ?? '--'}，状态${TRAINING_INDEX_LABELS[mlPrediction?.readinessLevel] || mlReadinessLabels[mlPrediction?.readinessLevel] || '需保守判断'}，建议今天以恢复、拉伸或轻松有氧为主。`;
 
   return {
     ...profile,
@@ -387,6 +400,8 @@ function buildDailyBrief(overview = EMPTY_OVERVIEW, context = EMPTY_RAG_CONTEXT)
     placements: advice.placements,
     ml: advice.mlPrediction ? {
       readinessScore: advice.mlPrediction.readinessScore,
+      trainingIndexScore: trainingIndexScoreFromPrediction(advice.mlPrediction),
+      trainingIndexLabel: TRAINING_INDEX_LABELS[advice.mlPrediction.readinessLevel] || null,
       readinessLevel: advice.mlPrediction.readinessLevel,
       recoveryRisk: advice.mlPrediction.recoveryRisk,
       riskLevel: advice.mlPrediction.riskLevel,
