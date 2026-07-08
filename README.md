@@ -136,6 +136,13 @@ Linux 服务器上可使用：
 python3 -m pip install -r /var/www/motion-analysis/database/requirements.txt
 ```
 
+服务器部署时还要确认 `backend/.env` 里的 `GARMIN_PYTHON_PATH` 指向同一个
+Python 解释器，例如：
+
+```text
+GARMIN_PYTHON_PATH=/usr/local/bin/python3
+```
+
 如果同步页出现 `No module named 'garminconnect'`，说明当前运行脚本的 Python
 环境没有安装 `database/requirements.txt` 中的依赖。安装完成后重新点击“重试”
 或重新绑定 Garmin 账号即可触发新的登录流程。
