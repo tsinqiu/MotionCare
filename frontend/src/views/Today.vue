@@ -23,6 +23,16 @@
         </button>
       </header>
 
+      <RouterLink v-if="showApkDownloadEntry" class="today-apk-entry" :to="{ name: 'download' }">
+        <span class="today-apk-entry__icon" aria-hidden="true">
+          <DownloadIcon :size="22" />
+        </span>
+        <span class="today-apk-entry__copy">
+          <strong>下载安卓版 APK</strong>
+          <small>手机安装包</small>
+        </span>
+      </RouterLink>
+
       <section class="today-weather-card">
         <div class="today-weather-card__top">
           <span class="weather-pin" aria-hidden="true">
@@ -122,6 +132,7 @@
 </template>
 
 <script setup>
+import { Capacitor } from '@capacitor/core'
 import { computed, onMounted, ref } from 'vue'
 import {
   CalendarDays,
@@ -129,6 +140,7 @@ import {
   ChevronRight,
   ClipboardList,
   Crosshair,
+  Download as DownloadIcon,
   HeartPulse,
   MapPin,
   Sun,
@@ -152,6 +164,7 @@ const loading = ref(false)
 const errors = ref([])
 const briefAvailable = ref(false)
 const selectedDate = ref(startOfDay(new Date()))
+const showApkDownloadEntry = !Capacitor.isNativePlatform()
 
 const recentActivities = computed(() => (overview.value.recentActivities || []).slice(0, 6))
 const selectedDateActivities = computed(() => recentActivities.value.filter((activity) => (
@@ -415,6 +428,50 @@ onMounted(loadToday)
   font-size: 20px;
   line-height: 1.2;
   text-align: center;
+}
+
+.today-apk-entry {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  min-height: 62px;
+  padding: 12px 16px;
+  border: 1px solid color-mix(in srgb, var(--app-green) 20%, var(--border));
+  border-radius: 16px;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--app-green) 13%, var(--panel)), var(--panel));
+  color: var(--text);
+  text-decoration: none;
+  box-shadow: var(--shadow-sm);
+}
+
+.today-apk-entry__icon {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  background: var(--app-green);
+  color: #fff;
+}
+
+.today-apk-entry__copy {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.today-apk-entry__copy strong {
+  color: var(--text);
+  font-size: 17px;
+  line-height: 1.2;
+}
+
+.today-apk-entry__copy small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
 }
 
 .today-weather-card {
