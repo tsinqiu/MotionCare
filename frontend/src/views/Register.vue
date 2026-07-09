@@ -1,23 +1,17 @@
 <template>
   <main class="auth-page">
     <section class="auth-card">
-      <div class="auth-topline">
-        <RouterLink class="auth-brand" to="/login">
-          <span class="brand-mark">GS</span>
+      <div class="auth-topline auth-topline--center">
+        <div class="auth-brand auth-brand--plain">
+          <img class="auth-brand__icon" src="/icons/motioncare-icon.svg" alt="" />
           <span>
-            <strong>GarSync Motion</strong>
+            <strong>MotionCare</strong>
           </span>
-        </RouterLink>
-        <button class="theme-toggle auth-theme-toggle" type="button" @click="toggleTheme">
-          <component :is="isNightTheme ? Sun : Moon" :size="16" />
-          {{ isNightTheme ? '日间' : '夜晚' }}
-        </button>
+        </div>
       </div>
 
       <div class="auth-heading">
-        <p class="overline">创建账号</p>
-        <h1>注册访问账号</h1>
-        <p>新账号注册后会自动登录，可立即进入 Garmin 运动数据分析数据库系统。</p>
+        <h1>注册 MotionCare</h1>
       </div>
 
       <form class="auth-form" @submit.prevent="submit">
@@ -33,7 +27,7 @@
           <span>邮箱</span>
           <div class="input-with-icon">
             <Mail :size="18" />
-            <input v-model.trim="form.email" type="email" autocomplete="email" placeholder="name@example.com" required />
+            <input v-model.trim="form.email" type="email" autocomplete="email" placeholder="name@motioncare.com" required />
           </div>
         </label>
 
@@ -82,14 +76,12 @@
 <script setup>
 import { reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Eye, EyeOff, LockKeyhole, Mail, Moon, Sun, UserRound } from '@lucide/vue'
+import { Eye, EyeOff, LockKeyhole, Mail, UserRound } from '@lucide/vue'
 
-import { useThemeMode } from '@/composables/useThemeMode'
 import { authSession, normalizeRedirect, signUp } from '@/stores/authStore'
 
 const route = useRoute()
 const router = useRouter()
-const { isNightTheme, toggleTheme } = useThemeMode()
 const showPassword = ref(false)
 const localError = ref('')
 const form = reactive({
@@ -131,3 +123,16 @@ async function submit() {
   }
 }
 </script>
+
+<style scoped>
+.auth-heading {
+  justify-items: center;
+  padding-block: 6px 4px;
+  text-align: center;
+}
+
+.auth-heading h1 {
+  padding-block: 3px;
+  line-height: 1.18;
+}
+</style>

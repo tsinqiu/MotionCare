@@ -1,23 +1,21 @@
 <template>
-  <main class="auth-page">
-    <section class="auth-card">
-      <div class="auth-topline">
-        <RouterLink class="auth-brand" to="/login">
-          <span class="brand-mark">GS</span>
+  <main class="auth-page auth-page--login">
+    <section class="auth-card auth-card--quiet">
+      <div class="auth-topline auth-topline--center">
+        <div class="auth-brand auth-brand--plain">
+          <img class="auth-brand__icon" src="/icons/motioncare-icon.svg" alt="" />
           <span>
-            <strong>GarSync Motion</strong>
+            <strong>MotionCare</strong>
           </span>
-        </RouterLink>
-        <button class="theme-toggle auth-theme-toggle" type="button" @click="toggleTheme">
-          <component :is="isNightTheme ? Sun : Moon" :size="16" />
-          {{ isNightTheme ? '日间' : '夜晚' }}
-        </button>
+        </div>
       </div>
 
-      <div class="auth-heading">
-        <p class="overline">安全访问</p>
-        <h1>登录数据库管理系统</h1>
-        <p>登录后可查看 Garmin 运动数据、管理手动活动并访问统计分析。</p>
+      <div class="auth-login-mark">
+        <img src="/icons/motioncare-icon.svg" alt="" />
+      </div>
+
+      <div class="auth-heading auth-heading--center">
+        <h1>欢迎回来</h1>
       </div>
 
       <form class="auth-form" @submit.prevent="submit">
@@ -25,7 +23,7 @@
           <span>邮箱</span>
           <div class="input-with-icon">
             <Mail :size="18" />
-            <input v-model.trim="form.email" type="email" autocomplete="email" placeholder="name@example.com" required />
+            <input v-model.trim="form.email" type="email" autocomplete="email" placeholder="name@motioncare.com" required />
           </div>
         </label>
 
@@ -58,6 +56,7 @@
       <p class="auth-switch">
         还没有账号？
         <RouterLink :to="{ name: 'register', query: route.query }">立即注册</RouterLink>
+        <RouterLink :to="{ name: 'download' }">下载APK</RouterLink>
       </p>
     </section>
   </main>
@@ -66,14 +65,12 @@
 <script setup>
 import { reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Eye, EyeOff, LockKeyhole, LogIn, Mail, Moon, Sun } from '@lucide/vue'
+import { Eye, EyeOff, LockKeyhole, LogIn, Mail } from '@lucide/vue'
 
-import { useThemeMode } from '@/composables/useThemeMode'
 import { authSession, normalizeRedirect, signIn } from '@/stores/authStore'
 
 const route = useRoute()
 const router = useRouter()
-const { isNightTheme, toggleTheme } = useThemeMode()
 const showPassword = ref(false)
 const localError = ref('')
 const form = reactive({
@@ -106,3 +103,20 @@ async function submit() {
   }
 }
 </script>
+
+<style scoped>
+.auth-switch {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.auth-switch a + a::before {
+  content: "·";
+  margin-right: 8px;
+  color: var(--muted);
+  font-weight: 700;
+}
+</style>

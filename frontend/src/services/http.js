@@ -1,11 +1,45 @@
 import axios from 'axios'
+import { Capacitor } from '@capacitor/core'
 
 const TOKEN_STORAGE_KEY = 'motion-analysis-token'
+const LOCAL_API_BASE_URL = import.meta.env.DEV ? 'http://localhost:8089/api' : '/api'
+const DEFAULT_NATIVE_API_BASE_URL = 'http://47.112.190.14/api'
+const API_TIMEOUT_MS = Number(import.meta.env.VITE_API_TIMEOUT_MS || 20000)
 let authFailureHandler = null
 
+function absoluteApiBaseUrl(value) {
+  return typeof value === 'string' && /^https?:\/\//i.test(value) ? value : ''
+}
+
+export function resolveApiBaseUrl() {
+  if (Capacitor.isNativePlatform()) {
+    const configuredNativeUrl = absoluteApiBaseUrl(import.meta.env.VITE_NATIVE_API_BASE_URL)
+    return configuredNativeUrl
+      || absoluteApiBaseUrl(import.meta.env.VITE_API_BASE_URL)
+      || DEFAULT_NATIVE_API_BASE_URL
+  }
+
+  return import.meta.env.VITE_API_BASE_URL || LOCAL_API_BASE_URL
+}
+
+export function resolveMediaUrl(value) {
+  if (!value || typeof value !== 'string') return ''
+  if (/^https?:\/\//i.test(value) || value.startsWith('blob:') || value.startsWith('data:')) return value
+  if (!value.startsWith('/')) return value
+
+  const baseUrl = resolveApiBaseUrl()
+  if (!baseUrl || baseUrl.startsWith('/')) return value
+
+  try {
+    return `${new URL(baseUrl).origin}${value}`
+  } catch {
+    return value
+  }
+}
+
 export const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api',
-  timeout: 8000,
+  baseURL: resolveApiBaseUrl(),
+  timeout: Number.isFinite(API_TIMEOUT_MS) && API_TIMEOUT_MS > 0 ? API_TIMEOUT_MS : 20000,
 })
 
 apiClient.interceptors.request.use((config) => {
@@ -44,10 +78,6 @@ export function setAuthFailureHandler(handler) {
   authFailureHandler = handler
 }
 
-export function useMockData() {
-  return import.meta.env.VITE_USE_MOCK === 'true'
-}
-
 export function unwrapApiResponse(payload) {
   if (payload && typeof payload === 'object' && Object.prototype.hasOwnProperty.call(payload, 'data')) {
     return {
@@ -80,3 +110,4 @@ export function clearAuthToken() {
   if (typeof localStorage === 'undefined') return
   localStorage.removeItem(TOKEN_STORAGE_KEY)
 }
+

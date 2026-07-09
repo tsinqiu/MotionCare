@@ -1,5 +1,5 @@
-import { getLoadBalance as getMockLoadBalance, normalizeActivity } from '@/services/activities'
-import { getEnvelope, useMockData } from '@/services/api'
+import { normalizeActivity } from '@/services/activities'
+import { getEnvelope } from '@/services/api'
 
 function normalizeLoadRow(row = {}) {
   return {
@@ -9,8 +9,6 @@ function normalizeLoadRow(row = {}) {
 }
 
 export async function getLoadBalance(params = {}) {
-  if (useMockData()) return getMockLoadBalance(params)
-
   const envelope = await getEnvelope('/training/load-balance', {
     params,
     normalizer: normalizeLoadRow,

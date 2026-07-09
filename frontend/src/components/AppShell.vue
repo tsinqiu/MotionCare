@@ -1,104 +1,146 @@
 <template>
-  <div class="app-shell">
-    <aside class="sidebar">
-      <RouterLink class="brand" to="/today">
-        <span class="brand-mark">GS</span>
-        <span>
-          <strong>GarSync Motion</strong>
-        </span>
-      </RouterLink>
-
-      <nav class="nav-list" aria-label="主导航">
-        <RouterLink v-for="item in navItems" :key="item.to" :to="item.to">
-          <component :is="item.icon" :size="18" aria-hidden="true" />
-          {{ item.label }}
-        </RouterLink>
-      </nav>
-    </aside>
-
-    <div class="content-shell">
-      <header class="topbar">
-        <h1>Garmin 运动数据分析数据库系统</h1>
-        <div class="topbar-actions">
-          <button class="theme-toggle" type="button" @click="toggleTheme">
-            <component :is="isNightTheme ? Sun : Moon" :size="16" />
-            {{ isNightTheme ? '日间' : '夜晚' }}
+  <div class="app-viewport">
+    <div class="phone-frame">
+      <van-nav-bar
+        class="app-navbar"
+        :title="navTitle"
+        :left-arrow="showBack"
+        :left-text="showBack ? '返回' : ''"
+        @click-left="goBack"
+      >
+        <template v-if="pageAction || showProfileShortcut" #right>
+          <button v-if="pageAction" class="app-navbar-action" type="button" :aria-label="pageAction.label" @click="handlePageAction">
+            <component v-if="pageAction.icon" :is="pageAction.icon" :size="21" aria-hidden="true" />
+            <span v-else>{{ pageAction.label }}</span>
           </button>
-          <div class="user-chip" :title="authSession.user?.email">
-            <UserRound :size="16" />
-            <span>{{ userLabel }}</span>
-            <small>{{ roleLabel }}</small>
-          </div>
-          <RouterLink class="topbar-start" to="/start">
-            <Play :size="16" />
-            开始
-          </RouterLink>
-          <button class="topbar-logout" type="button" @click="handleLogout">
-            <LogOut :size="16" />
-            退出
+          <button v-else class="app-navbar-action" type="button" aria-label="进入我的" @click="goProfile">
+            <UserRound :size="21" aria-hidden="true" />
           </button>
-        </div>
-      </header>
+        </template>
+      </van-nav-bar>
 
-      <main class="page-frame">
-        <RouterView />
-        <footer class="app-footer">
-          <span>Garmin 运动数据分析数据库系统</span>
-        </footer>
+      <main ref="scrollEl" class="page-frame">
+        <RouterView v-slot="{ Component }">
+          <Transition name="page" mode="out-in">
+            <component :is="Component" />
+          </Transition>
+        </RouterView>
       </main>
+
+      <van-tabbar
+        v-if="!hideTabbar"
+        class="app-tabbar"
+        :model-value="activeTab"
+        :fixed="false"
+        @change="goTab"
+      >
+        <van-tabbar-item
+          v-for="item in navItems"
+          :key="item.to"
+          :class="{ 'app-tabbar-item--record': item.icon === 'record' }"
+          :name="item.icon"
+        >
+          <span>{{ item.label }}</span>
+          <template #icon>
+            <component :is="iconMap[item.icon]" :size="22" aria-hidden="true" />
+          </template>
+        </van-tabbar-item>
+      </van-tabbar>
     </div>
   </div>
 </template>
 
 <script setup>
-import { computed } from 'vue'
-import {
-  Activity,
-  BarChart3,
-  Bot,
-  Compass,
-  Database,
-  HeartPulse,
-  LogOut,
-  Moon,
-  Play,
-  RefreshCw,
-  Settings,
-  ShieldCheck,
-  Sun,
-  UserRound,
-  Users,
-} from '@lucide/vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
+import { Activity, Compass, HeartPulse, MapPin, UserRound, UsersRound } from '@lucide/vue'
+import { useRoute, useRouter } from 'vue-router'
 
-import { authSession, signOut } from '@/stores/authStore'
-import { useThemeMode } from '@/composables/useThemeMode'
+import { primaryNavigation } from '@/constants/product'
 
-const { isNightTheme, toggleTheme } = useThemeMode()
-const userLabel = computed(() => authSession.user?.username || '已登录用户')
-const roleLabel = computed(() => authSession.user?.role === 'admin' ? '管理员' : '用户')
+const route = useRoute()
+const router = useRouter()
+const scrollEl = ref(null)
+const pageTitleOverride = ref('')
+const pageAction = shallowRef(null)
 
-function handleLogout() {
-  signOut()
-  window.location.assign('/login')
+const iconMap = {
+  today: HeartPulse,
+  activities: Activity,
+  record: MapPin,
+  explore: Compass,
+  community: UsersRound,
+}
+const navItems = primaryNavigation
+const returnTargets = {
+  today: '/today',
+  explore: '/explore',
+}
+const returnTarget = computed(() => returnTargets[route.query.from] || '')
+const showBack = computed(() => Boolean(route.meta.backTo || returnTarget.value))
+const hideTabbar = computed(() => showBack.value)
+const navTitle = computed(() => (showBack.value ? pageTitleOverride.value || route.meta.title || '返回' : route.meta.navTitle || 'MotionCare'))
+const showProfileShortcut = computed(() => !pageAction.value && !route.meta.authLayout && route.path !== '/me')
+
+// Highlight the tab that owns the current route, including nested pages
+// (e.g. /status/health lights up 状态, /me/sync lights up 我的).
+const activeTab = computed(() => {
+  const segment = route.path.split('/')[1] || ''
+  return navItems.some((item) => item.icon === segment) ? segment : ''
+})
+
+function goTab(name) {
+  const target = navItems.find((item) => item.icon === name)
+  if (target && route.path !== target.to) router.push(target.to)
 }
 
-const baseNavItems = [
-  { to: '/today', label: '今日', icon: HeartPulse },
-  { to: '/activities', label: '运动记录', icon: Activity },
-  { to: '/statistics', label: '运动统计', icon: BarChart3 },
-  { to: '/sync', label: '同步', icon: RefreshCw },
-  { to: '/assistant', label: 'AI 助手', icon: Bot },
-  { to: '/explore', label: '探索', icon: Compass },
-  { to: '/community', label: '运动圈', icon: Users },
-  { to: '/schema', label: '数据库', icon: Database },
-  { to: '/settings', label: '设置', icon: Settings },
-]
+function goBack() {
+  const event = new CustomEvent('motioncare:nav-back', { cancelable: true })
+  window.dispatchEvent(event)
+  if (event.defaultPrevented) return
 
-const navItems = computed(() => {
-  if (authSession.user?.role !== 'admin') return baseNavItems
-  return [
-    ...baseNavItems,
-    { to: '/admin', label: '管理中心', icon: ShieldCheck },
-  ]
+  if (returnTarget.value) {
+    router.push(returnTarget.value)
+    return
+  }
+  router.push(route.meta.backTo || '/today')
+}
+
+function goProfile() {
+  if (route.path !== '/me') router.push('/me')
+}
+
+function handlePageTitle(event) {
+  pageTitleOverride.value = event.detail?.title || ''
+}
+
+function handlePageNavAction(event) {
+  pageAction.value = event.detail || null
+}
+
+function handlePageAction() {
+  window.dispatchEvent(new CustomEvent('motioncare:nav-action-click'))
+}
+
+// The scroll container is the phone frame's body, not the window, so reset it
+// ourselves whenever the route changes.
+watch(
+  () => route.path,
+  () => {
+    pageTitleOverride.value = ''
+    pageAction.value = null
+    nextTick(() => {
+      if (scrollEl.value) scrollEl.value.scrollTop = 0
+    })
+  },
+)
+
+onMounted(() => {
+  window.addEventListener('motioncare:nav-title', handlePageTitle)
+  window.addEventListener('motioncare:nav-action', handlePageNavAction)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('motioncare:nav-title', handlePageTitle)
+  window.removeEventListener('motioncare:nav-action', handlePageNavAction)
 })
 </script>

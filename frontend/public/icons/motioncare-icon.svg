@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="MotionCare route runner">
+  <title>MotionCare route runner</title>
+  <rect width="512" height="512" rx="112" fill="#2e681d"/>
+  <path fill="none" stroke="#15b66a" stroke-width="34" stroke-linecap="round" d="M90 360c64-92 142-139 234-139 47 0 87 13 121 38"/>
+  <path fill="none" stroke="#effaf2" stroke-width="32" stroke-linecap="round" stroke-linejoin="round" d="M104 356c62-72 129-103 199-91 48 8 86 33 114 72"/>
+  <circle cx="310" cy="170" r="31" fill="#effaf2"/>
+  <path fill="none" stroke="#effaf2" stroke-width="32" stroke-linecap="round" stroke-linejoin="round" d="M288 218l-42 58 58 34 44-65"/>
+  <path fill="none" stroke="#effaf2" stroke-width="28" stroke-linecap="round" stroke-linejoin="round" d="M246 276l-64 31m120 2l-52 74m55-73l78 56"/>
+  <path fill="none" stroke="#f6d34d" stroke-width="24" stroke-linecap="round" d="M160 408h164"/>
+</svg>

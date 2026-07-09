@@ -1,10 +1,9 @@
 <template>
   <div class="page-stack">
-    <section class="sync-hero">
+    <section class="sync-hero sync-rq-panel">
       <div class="sync-brand">
         <img class="garmin-mark" :src="garminIconUrl" alt="Garmin Connect" />
         <div>
-          <p class="overline">Garmin Connect</p>
           <h2>连接你的 Garmin 账号</h2>
           <p>同步后，新运动会自动归入当前账号；本地已有记录会自动跳过。</p>
         </div>
@@ -18,6 +17,20 @@
         </div>
         <span class="status-chip" :class="account.exists ? 'good' : ''">
           {{ accountStatusLabel(account.status) }}
+        </span>
+      </div>
+      <div class="sync-health-grid">
+        <span>
+          <small>连接健康</small>
+          <b>{{ account.exists ? '已连接' : '未连接' }}</b>
+        </span>
+        <span>
+          <small>最近同步</small>
+          <b>{{ formatDateTime(account.lastSyncAt) }}</b>
+        </span>
+        <span>
+          <small>导入记录</small>
+          <b>{{ latestJobCount }}</b>
         </span>
       </div>
     </section>
@@ -39,108 +52,110 @@
     />
 
     <template v-else>
-      <div class="sync-layout">
-        <section class="dark-panel provider-card sync-status-card">
+      <div class="sync-layout sync-account-stack" :class="{ 'sync-layout--connected': account.exists }">
+        <section v-if="account.exists" class="dark-panel provider-card sync-status-card sync-connection-panel sync-account-section">
           <div class="sync-card-title">
             <div>
-              <p class="overline">Account</p>
+              <p class="overline">账号状态</p>
               <h2>连接状态</h2>
             </div>
-            <Wifi :size="20" :class="account.exists ? 'good-text' : 'muted-text'" />
+            <span class="status-chip good">
+              <Wifi :size="15" />
+              {{ accountStatusLabel(account.status) }}
+            </span>
           </div>
 
-          <div class="sync-status-line">
-            <img class="garmin-mark small" :src="garminIconUrl" alt="" aria-hidden="true" />
+          <div class="sync-status-profile">
+            <div class="garmin-avatar">{{ accountInitial }}</div>
             <div>
-              <strong>{{ account.exists ? 'Garmin Connect 已绑定' : '还没有绑定 Garmin' }}</strong>
-              <span>{{ account.email || '绑定后即可从最近的本地记录继续同步。' }}</span>
+              <strong>{{ account.email || 'Garmin 账号' }}</strong>
+              <span>{{ account.isCn ? '中国区 Garmin' : '全球区 Garmin' }}</span>
             </div>
           </div>
 
-          <div class="provider-meta">
-            <span><small>账号区域</small><b>{{ account.isCn ? '中国区 Garmin' : '全球区 Garmin' }}</b></span>
+          <div class="sync-connection-summary">
             <span><small>绑定时间</small><b>{{ formatDateTime(account.connectedAt) }}</b></span>
             <span><small>最近同步</small><b>{{ formatDateTime(account.lastSyncAt) }}</b></span>
             <span><small>导入记录</small><b>{{ latestJobCount }}</b></span>
           </div>
 
-          <div class="sync-progress">
-            <span :style="{ width: account.exists ? '100%' : '18%' }"></span>
-          </div>
-
           <div class="sync-actions">
             <button
-              class="primary-link"
+              class="primary-link sync-action-primary"
               type="button"
-              :disabled="busy || !account.exists"
+              :disabled="busy"
               @click="runSync"
             >
               <RefreshCw :size="16" />
               {{ syncing ? '同步中' : '立即同步' }}
             </button>
             <button
-              class="danger-link"
+              class="danger-link sync-action-danger"
               type="button"
-              :disabled="busy || !account.exists"
+              :disabled="busy"
               @click="disconnect"
             >
               解除绑定
             </button>
           </div>
 
-          <p class="sync-note">
-            没有本地 Garmin 记录时会直接完成同步；有历史记录时，会从最近一次本地记录之后继续检查。
-          </p>
         </section>
 
-        <form class="dark-panel garmin-form" @submit.prevent="authorize">
+        <form class="dark-panel garmin-form sync-connect-form sync-account-section" @submit.prevent="authorize">
           <div class="sync-form-title">
             <div>
-              <p class="overline">Sign in</p>
+              <p class="overline">绑定账号</p>
               <h2>{{ account.exists ? '更新 Garmin 绑定' : '绑定 Garmin' }}</h2>
             </div>
-            <UserRound :size="20" class="good-text" />
+            <span class="status-chip">
+              <UserRound :size="15" />
+              Garmin
+            </span>
           </div>
 
-          <label>
-            <span>Garmin 邮箱</span>
-            <input
-              v-model.trim="form.email"
-              autocomplete="username"
-              placeholder="name@example.com"
-              required
-              type="email"
-            />
-          </label>
-          <label>
-            <span>Garmin 密码</span>
-            <input
-              v-model="form.password"
-              autocomplete="current-password"
-              placeholder="仅用于本次绑定"
-              required
-              type="password"
-            />
-          </label>
-          <label>
-            <span>验证码 / MFA（可选）</span>
-            <input
-              v-model.trim="form.mfaCode"
-              autocomplete="one-time-code"
-              placeholder="需要二次验证时填写"
-              type="text"
-            />
-          </label>
-          <label class="toggle-row sync-toggle">
-            <span>使用 Garmin 中国区</span>
-            <input v-model="form.isCn" type="checkbox" />
-          </label>
+          <div class="sync-bind-grid">
+            <label>
+              <span>Garmin 邮箱</span>
+              <input
+                v-model.trim="form.email"
+                autocomplete="username"
+                placeholder="name@example.com"
+                required
+                type="email"
+              />
+            </label>
+            <label>
+              <span>Garmin 密码</span>
+              <input
+                v-model="form.password"
+                autocomplete="current-password"
+                placeholder="仅用于本次绑定"
+                required
+                type="password"
+              />
+            </label>
+            <label>
+              <span>验证码 / MFA（可选）</span>
+              <input
+                v-model.trim="form.mfaCode"
+                autocomplete="one-time-code"
+                placeholder="需要二次验证时填写"
+                type="text"
+              />
+            </label>
+            <label class="toggle-row sync-toggle">
+              <span>使用 Garmin 中国区</span>
+              <input v-model="form.isCn" type="checkbox" />
+            </label>
+          </div>
 
-          <button class="primary-link sync-submit" type="submit" :disabled="busy || !canSubmit">
-            <LinkIcon :size="16" />
-            {{ authorizing ? '绑定中' : '保存绑定' }}
-          </button>
-          <p class="sync-note">密码不会保存在数据库中，只用于本次连接验证。</p>
+          <div class="sync-form-actions">
+            <p class="sync-note">凭据只用于完成连接验证，不会在页面中显示。</p>
+            <button class="primary-link sync-submit" type="submit" :disabled="busy || !canSubmit">
+              <LinkIcon :size="16" />
+              {{ authorizing ? '绑定中' : '保存绑定' }}
+            </button>
+          </div>
         </form>
       </div>
 
@@ -148,7 +163,6 @@
         <section class="dark-panel sync-list-card">
           <div class="section-heading">
             <div>
-              <p class="overline">History</p>
               <h2>最近同步</h2>
             </div>
             <button class="secondary-link" type="button" :disabled="busy" @click="load">
@@ -180,7 +194,6 @@
         <section class="dark-panel sync-list-card">
           <div class="section-heading">
             <div>
-              <p class="overline">Activity</p>
               <h2>同步动态</h2>
             </div>
           </div>

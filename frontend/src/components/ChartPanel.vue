@@ -12,13 +12,13 @@
 </template>
 
 <script setup>
-import { BarChart, LineChart, PieChart } from 'echarts/charts'
-import { GridComponent, LegendComponent, TooltipComponent } from 'echarts/components'
+import { BarChart, LineChart, PieChart, ScatterChart } from 'echarts/charts'
+import { GraphicComponent, GridComponent, LegendComponent, MarkAreaComponent, TooltipComponent, VisualMapComponent } from 'echarts/components'
 import { init, use } from 'echarts/core'
 import { CanvasRenderer } from 'echarts/renderers'
 import { onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 
-use([BarChart, CanvasRenderer, GridComponent, LegendComponent, LineChart, PieChart, TooltipComponent])
+use([BarChart, CanvasRenderer, GraphicComponent, GridComponent, LegendComponent, LineChart, MarkAreaComponent, PieChart, ScatterChart, TooltipComponent, VisualMapComponent])
 
 const props = defineProps({
   title: {

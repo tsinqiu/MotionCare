@@ -924,6 +924,17 @@ test('POST /api/ml/running-prediction allows local API origin', async () => {
   assert.equal(response.body.data.predictedTrainingLoadLevel, 'medium');
 });
 
+test('POST /api/auth/login allows native WebView loopback origin', async () => {
+  const response = await request(buildApp())
+    .post('/api/auth/login')
+    .set('Origin', 'http://127.0.0.1')
+    .send({ email: 'tester@example.com', password: 'password123' });
+
+  assert.equal(response.status, 200);
+  assert.equal(response.headers['access-control-allow-origin'], 'http://127.0.0.1');
+  assert.equal(response.body.data.token, 'login-token');
+});
+
 test('POST /api/auth/register returns user and token', async () => {
   const response = await request(buildApp())
     .post('/api/auth/register')

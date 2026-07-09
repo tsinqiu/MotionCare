@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportHeight="108"
+    android:viewportWidth="108">
+    <!-- MotionCare simple route launcher background -->
+    <path
+        android:fillColor="#2e681d"
+        android:pathData="M0,0h108v108h-108z" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M9,78C24,58 45,49 69,50C84,51 96,57 104,66"
+        android:strokeColor="#15b66a"
+        android:strokeLineCap="round"
+        android:strokeWidth="7" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M14,91C35,79 57,76 79,81C90,84 98,89 104,95"
+        android:strokeColor="#2BFFFFFF"
+        android:strokeLineCap="round"
+        android:strokeWidth="3" />
+</vector>
